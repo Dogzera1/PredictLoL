@@ -1,162 +1,115 @@
-# LoL-GPT Betting Assistant
+# 🤖 LoL-GPT Betting Assistant
 
-Bot do Telegram para acompanhamento de partidas de League of Legends e assistência para apostas.
+Bot do Telegram para análise e previsões de partidas de League of Legends usando modelos de machine learning.
 
-## 📋 Funcionalidades
+## 🚀 Funcionalidades
 
-- 🎮 **Partidas ao vivo**: Acompanhe partidas em andamento com estatísticas em tempo real
-- 📊 **Previsões**: Obtenha análises de probabilidade e odds justas para apostas
-- 🔍 **Análise detalhada**: Veja análises aprofundadas de composições e situação atual da partida
-- 📅 **Próximas partidas**: Veja a agenda de partidas futuras
-- 🤖 **IA avançada**: Modelo preditivo treinado com dados históricos de 2023-2025
+- ✅ **Comandos básicos**: `/start`, `/ajuda`, `/sobre`
+- 🔮 **Previsões LoL**: Análise de partidas usando ML
+- 📊 **Estatísticas**: Dados históricos e probabilidades
+- 🤖 **Telegram Bot**: Interface amigável
 
-## 🚀 Instalação
-
-### Pré-requisitos
-
-- Python 3.7+
-- pip (gerenciador de pacotes Python)
-- Token de bot do Telegram (obtenha com [@BotFather](https://t.me/BotFather))
-- Chave de API da Riot (opcional, para funcionalidades completas)
-
-### Passos para instalação
-
-1. Clone o repositório:
-   ```
-   git clone https://github.com/seu-usuario/lol-gpt-apostas.git
-   cd lol-gpt-apostas
-   ```
-
-2. Instale as dependências:
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. Configure as credenciais:
-   - Abra `config.py`
-   - Substitua `SEU_TOKEN_AQUI` pelo token do seu bot do Telegram
-   - Substitua `SUA_CHAVE_API_AQUI` pela sua chave de API da Riot (opcional)
-
-4. Testar o modelo localmente:
-   ```
-   python simple_test.py
-   ```
-
-5. Execute o bot localmente:
-   ```
-   python bot.py
-   ```
-
-### Implantação no Vercel
-
-1. Instale a CLI do Vercel:
-   ```
-   npm install -g vercel
-   ```
-
-2. Faça login e configure o projeto:
-   ```
-   vercel login
-   vercel link
-   ```
-
-3. Configure as variáveis de ambiente:
-   ```
-   vercel env add TELEGRAM_TOKEN
-   ```
-
-4. Implante o bot:
-   ```
-   vercel deploy
-   ```
-
-5. Configure o webhook do Telegram:
-   ```
-   curl -F "url=https://seu-novo-projeto.vercel.app/api/webhook" -F "secret_token=lol_gpt_secret_token" https://api.telegram.org/bot<SEU_TOKEN>/setWebhook
-   ```
-
-### Testar Localmente com o Webhook
-
-Para testar o webhook localmente, use:
+## 📋 Estrutura do Projeto
 
 ```
-python local_webhook.py
+├── main.py              # Aplicação principal Flask + Bot
+├── config.py            # Configurações do bot
+├── requirements.txt     # Dependências Python
+├── Dockerfile          # Container para deploy
+├── Procfile            # Comando Railway/Heroku
+├── handlers/           # Handlers do bot Telegram
+├── services/           # Serviços de ML e APIs
+├── utils/              # Utilitários
+└── data/               # Modelos e dados treinados
 ```
 
-Então use uma ferramenta como ngrok para expor seu servidor local:
+## 🛠️ Configuração Local
 
-```
-ngrok http 8000
-```
-
-Configure o webhook do Telegram com o URL fornecido pelo ngrok:
-
-```
-curl -F "url=https://seu-tunnel-ngrok.io/api/webhook" -F "secret_token=lol_gpt_secret_token" https://api.telegram.org/bot<SEU_TOKEN>/setWebhook
+### 1. Instalar Dependências
+```bash
+pip install -r requirements.txt
 ```
 
-## 📝 Comandos do Bot
+### 2. Configurar Token
+```bash
+# Editar config.py ou definir variável de ambiente
+export TELEGRAM_TOKEN="seu_token_aqui"
+```
 
-- `/start` - Inicia o bot e mostra o menu principal
-- `/ajuda` - Mostra lista de comandos disponíveis
-- `/ao_vivo` - Mostra partidas que estão acontecendo agora
-- `/proximas` - Mostra próximas partidas agendadas
-- `/partida [id]` - Mostra detalhes de uma partida específica
-- `/sobre` - Informações sobre o bot
+### 3. Executar Localmente
+```bash
+python main.py
+```
 
-## 💡 Uso da API
+## 🚂 Deploy no Railway
 
-O bot utiliza a API oficial da Riot Games para LoL Esports. Para funcionalidade completa, é recomendado obter uma chave de API no [Portal de Desenvolvedores da Riot](https://developer.riotgames.com/).
+### 1. Conectar Repositório
+1. Acesse [railway.app](https://railway.app)
+2. New Project → Deploy from GitHub repo
+3. Conecte este repositório
 
-## 📊 Modelo de Previsão
+### 2. Configurar Variáveis
+No painel Railway, adicione:
+```
+TELEGRAM_TOKEN = 7584060058:AAG-L6BJ5Y3Y74MadbGYhzSuiygJixrblNo
+PORT = 8080
+```
 
-O serviço de previsão utiliza um algoritmo avançado de machine learning treinado com dados históricos de 2023-2025. O modelo considera:
+### 3. Deploy Automático
+O Railway detectará automaticamente:
+- `Dockerfile` (método preferido)
+- `Procfile` (método alternativo)
+- `nixpacks.toml` (configuração explícita)
 
-- Histórico completo dos times em torneios recentes
-- Composição (champions selecionados)
-- Estatísticas em tempo real (ouro, kills, dragões, etc.)
-- Fase do jogo (early, mid, late game)
-- Tendências e padrões de comportamento dos times
+### 4. Configurar Webhook
+Após deploy bem-sucedido:
+```bash
+python setup_railway.py https://sua-url.up.railway.app
+```
 
-Os palpites são atualizados em tempo real conforme a partida progride, utilizando tanto dados históricos quanto a situação atual para oferecer previsões mais precisas.
+## 📖 Documentação
 
-### Treinamento do Modelo
+- **[GUIA_RAILWAY.md](GUIA_RAILWAY.md)** - Guia completo de deploy
+- **[PLANO_DE_ATAQUE_RAILWAY.md](PLANO_DE_ATAQUE_RAILWAY.md)** - Soluções para problemas
 
-O modelo é treinado utilizando:
+## 🔧 Comandos Úteis
 
-- Random Forest Classifier para previsão de resultados
-- Normalização de features com StandardScaler
-- Validação cruzada para garantir precisão
-- Features derivadas de mais de 1000 partidas profissionais
+### Testar Bot
+```bash
+python test_bot.py
+```
 
-## ⚠️ Solução de Problemas
+### Configurar Webhook
+```bash
+python set_webhook.py
+```
 
-### Problema de Features do Modelo
-Se você encontrar o erro "X has 18 features, but StandardScaler is expecting 13 features as input.", o problema foi corrigido no arquivo `services/model_trainer.py`. O código agora ajusta automaticamente o número de features para 13, garantindo compatibilidade com o modelo treinado.
+### Verificar Status
+```bash
+python -c "import requests; print(requests.get('https://api.telegram.org/bot{TOKEN}/getMe').json())"
+```
 
-### Problemas com o Webhook
-Se o bot não estiver respondendo no Telegram após a implantação no Vercel:
+## 🤖 Bot Telegram
 
-1. Verifique os logs do Vercel:
-   ```
-   vercel logs
-   ```
+**Nome**: @BETLOLGPT_bot  
+**Status**: Ativo  
+**Comandos**:
+- `/start` - Iniciar bot
+- `/ajuda` - Lista de comandos
+- `/sobre` - Informações do bot
 
-2. Confirme que o webhook está configurado corretamente:
-   ```
-   curl https://api.telegram.org/bot<SEU_TOKEN>/getWebhookInfo
-   ```
+## 🛟 Suporte
 
-3. Verifique se a variável de ambiente TELEGRAM_TOKEN está configurada no Vercel
+Se tiver problemas:
+1. Verifique logs no Railway
+2. Teste localmente primeiro
+3. Consulte os guias de documentação
+4. Verifique se o token está configurado
 
-## 🤝 Contribuição
+## 📄 Licença
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar pull requests.
+Este projeto é desenvolvido para fins educacionais e de demonstração.
 
-## 📜 Licença
+---
 
-Este projeto está licenciado sob a licença MIT - veja o arquivo LICENSE para detalhes.
-
-## ⚠️ Aviso Legal
-
-Este bot foi desenvolvido apenas para fins educacionais e de entretenimento. As previsões não devem ser consideradas conselhos financeiros ou garantia de resultados em apostas. Aposte com responsabilidade. 
+**Desenvolvido com ❤️ para a comunidade LoL** 🎮 
