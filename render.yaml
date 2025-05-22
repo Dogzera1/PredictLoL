@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: bot-lol-gpt
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    numInstances: 1
+    region: oregon
+    
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: TELEGRAM_TOKEN
+        value: 7584060058:AAG-L6BJ5Y3Y74MadbGYhzSuiygJixrblNo
+        
+    healthCheckPath: /health
+    
+    scaling:
+      minInstances: 1
+      maxInstances: 1 
