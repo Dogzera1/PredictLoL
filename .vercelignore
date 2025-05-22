@@ -1,0 +1,35 @@
+# Incluir apenas o essencial para o webhook
+*
+!api/webhook.py
+!requirements.txt
+!vercel.json
+!runtime.txt
+
+# Se precisar incluir o config.py para o token em ambiente de desenvolvimento
+!config.py
+
+# Ignorar diretórios de dados e cache
+data/
+__pycache__/
+*.pyc
+temp_vercel/
+lol-gpt-apostas/
+
+# Ignorar arquivos de teste
+*_test.py
+test_*.py
+simple_test.py
+debug_webhook.py
+resultado_teste.txt
+error_output*.txt
+
+# Arquivos grandes desnecessários para a função webhook
+*.csv
+*.pkl
+*.model
+*.json
+
+# Diretórios locais
+.git/
+.vercel/local
+venv/ 
