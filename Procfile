@@ -1,1 +1,1 @@
-web: python main.pyrelease: echo "Deploy do bot LoL concluído!" 
+web: python main.py 
