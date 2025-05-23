@@ -450,14 +450,8 @@ class ImprovedRiotAPI:
             # Tentar buscar da API oficial
             live_matches = await self._get_live_from_api()
 
-
-except Exception as e:
-    logger.error(f'Erro: {e}')
-
             if live_matches:
-                logger.info(
-    f"✅ {
-        len(live_matches)} partidas ao vivo da API oficial")
+                logger.info(f"✅ {len(live_matches)} partidas ao vivo da API oficial")
                 return live_matches
 
             # Se API falhar, usar dados de fallback
@@ -475,9 +469,6 @@ except Exception as e:
             async with aiohttp.ClientSession() as session:
                 url = f"{self.base_url}/getLive"
                 params = {'hl': 'en-US'}
-except Exception as e:
-    logger.error(f'Erro: {e}')
-
                 async with session.get(url, headers=self.headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
@@ -504,9 +495,6 @@ except Exception as e:
             # Tentar extrair composições dos games
             if 'match' in match_data and 'games' in match_data['match']:
                 games = match_data['match']['games']
-except Exception as e:
-    logger.error(f'Erro: {e}')
-
                 for game in games:
                     if game.get('state') == 'inProgress':
                         # Extrair composições do jogo ativo
@@ -538,9 +526,6 @@ except Exception as e:
                 for team in game_data['teams']:
                     side = team.get('side', '')
                     participants = team.get('participants', [])
-except Exception as e:
-    logger.error(f'Erro: {e}')
-
                     comp = [p.get('championId', 'Unknown') for p in participants]
 
                     if side == 'blue':
@@ -579,8 +564,6 @@ class DynamicPredictionSystem:
             teams = match_data.get('teams', [])
             if len(teams) < 2:
                 return self._get_fallback_prediction()
-except Exception as e:
-    logger.error(f'Erro: {e}')
 
             team1 = teams[0]
             team2 = teams[1]
@@ -709,8 +692,6 @@ except Exception as e:
             # Verificar se há dados de games em andamento
             if 'match' not in match_data or 'games' not in match_data['match']:
                 return 0
-except Exception as e:
-    logger.error(f'Erro: {e}')
 
             games = match_data['match']['games']
             teams = match_data.get('teams', [])
@@ -885,8 +866,6 @@ class TelegramBotV3Improved:
                 await update_or_query.edit_message_text("🔄 Buscando TODAS as partidas ao vivo...")
             else:
                 loading_msg = await update_or_query.message.reply_text("🔄 Buscando TODAS as partidas ao vivo...")
-except Exception as e:
-    logger.error(f'Erro: {e}')
 
             # Buscar partidas ao vivo
             live_matches = await self.riot_api.get_all_live_matches()
@@ -983,12 +962,10 @@ Não há partidas acontecendo neste momento.
             else:
                 await update_or_query.message.reply_text(error_text)
 
-        async def predict_match_callback(self, query, match_id: str):
+    async def predict_match_callback(self, query, match_id: str):
         """Callback para predição de partida específica"""
         try:
             await query.edit_message_text("🔄 Analisando partida e gerando predição...")
-except Exception as e:
-    logger.error(f'Erro: {e}')
 
             # Buscar dados da partida
             live_matches = await self.riot_api.get_all_live_matches()
@@ -1032,7 +1009,7 @@ except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             await query.edit_message_text(f"❌ Erro na predição: {str(e)}")
 
-        def _format_match_prediction(self, prediction: Dict, match_data: Dict) -> str:
+    def _format_match_prediction(self, prediction: Dict, match_data: Dict) -> str:
         """Formata predição da partida"""
         team1 = prediction['team1']
         team2 = prediction['team2']
@@ -1072,8 +1049,6 @@ except Exception as e:
         """Mostra análise detalhada do draft"""
         try:
             await query.edit_message_text("🔄 Analisando draft da partida...")
-except Exception as e:
-    logger.error(f'Erro: {e}')
 
             # Buscar dados da partida
             live_matches = await self.riot_api.get_all_live_matches()
@@ -1117,7 +1092,7 @@ except Exception as e:
             logger.error(f"❌ Erro na análise de draft: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
 
-        def _format_draft_analysis(self, draft_analysis: Dict, match_data: Dict) -> str:
+    def _format_draft_analysis(self, draft_analysis: Dict, match_data: Dict) -> str:
         """Formata análise de draft"""
         teams = match_data.get('teams', [])
         team1_name = teams[0].get('code', 'Team 1') if len(teams) > 0 else 'Team 1'
@@ -1188,8 +1163,6 @@ except Exception as e:
                 await self.current_rankings_callback(query)
             else:
                 await query.edit_message_text("⚠️ Funcionalidade em desenvolvimento")
-except Exception as e:
-    logger.error(f'Erro: {e}')
 
         except Exception as e:
             logger.error(f"❌ Erro no callback: {e}")
@@ -1369,12 +1342,12 @@ Use os botões ou comandos:
 
 💡 **Dica:** Use a interface com botões para melhor experiência!"""
 
-        keyboard = [
+            keyboard = [
                 [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
+            ]
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def run(self):
@@ -1387,8 +1360,6 @@ Use os botões ou comandos:
             # Criar aplicação
             application = Application.builder().token(TOKEN).build()
             self.app = application
-except Exception as e:
-    logger.error(f'Erro: {e}')
 
             # Configurar handlers
             self.setup_handlers()
