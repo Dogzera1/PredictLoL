@@ -89,7 +89,7 @@ except ImportError:
 class ChampionAnalyzer:
     """Analisador avançado de composições de campeões"""
 
-        def __init__(self):
+    def __init__(self):
         # Base de dados de campeões com ratings e synergias
         self.champion_stats = {
             # Top laners
@@ -138,10 +138,7 @@ class ChampionAnalyzer:
             ('fighter', 'engage'): 0.7
         }
 
-    def analyze_draft(
-    self,
-    team1_comp: List[str],
-     team2_comp: List[str]) -> Dict:
+    def analyze_draft(self, team1_comp: List[str], team2_comp: List[str]) -> Dict:
         """Analisa o draft completo entre dois times"""
         team1_analysis = self._analyze_team_composition(team1_comp)
         team2_analysis = self._analyze_team_composition(team2_comp)
@@ -470,10 +467,9 @@ class ImprovedRiotAPI:
 
             # Se API falhar, usar dados de fallback
             logger.warning("⚠️ API não disponível, usando dados simulados")
-            logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
                 
-            except Exception as e:
+        except Exception as e:
             logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
 
@@ -546,7 +542,7 @@ class ImprovedRiotAPI:
                         team1_comp = comp
                     elif side == 'red':
                         team2_comp = comp
-            except Exception as e:
+        except Exception as e:
             logger.error(f"❌ Erro ao extrair composições: {e}")
 
         return team1_comp, team2_comp
