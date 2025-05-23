@@ -21,5 +21,5 @@ COPY . .
 # Expor porta
 EXPOSE $PORT
 
-# Comando de inicialização SIMPLES
-CMD ["python", "-u", "main.py"] 
+# Comando de inicialização para Railway
+CMD ["python", "-u", "main_v3_riot_integrated.py"] 

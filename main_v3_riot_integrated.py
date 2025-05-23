@@ -1364,8 +1364,52 @@ async def main():
     await bot.run()
 
 
+# Flask App para Railway deployment
+if FLASK_AVAILABLE:
+    app = Flask(__name__)
+    
+    @app.route('/')
+    def home():
+        return jsonify({
+            "status": "online",
+            "version": "3.0-melhorado",
+            "features": {
+                "probabilidades_dinamicas": True,
+                "todas_partidas_ao_vivo": True,
+                "analise_draft_completa": True,
+                "interface_funcional": True,
+                "justificativa_apostas": True
+            },
+            "telegram_available": TELEGRAM_AVAILABLE
+        })
+    
+    @app.route('/health')
+    def health():
+        return jsonify({
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "bot_status": "running",
+            "version": "3.0-melhorado"
+        })
+
 if __name__ == "__main__":
-    if TELEGRAM_AVAILABLE:
-        asyncio.run(main())
+    import threading
+    
+    # Iniciar bot Telegram em thread separada
+    if TELEGRAM_AVAILABLE and TOKEN:
+        def run_telegram_bot():
+            asyncio.run(main())
+        
+        telegram_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+        telegram_thread.start()
+        print("🤖 Bot Telegram iniciado em background")
+    
+    # Iniciar Flask app para Railway
+    if FLASK_AVAILABLE:
+        port = int(os.environ.get("PORT", 8080))
+        print(f"🚀 Iniciando Flask server na porta {port}")
+        app.run(host="0.0.0.0", port=port, debug=False)
     else:
-        print("🔧 Modo teste - execute com TOKEN válido") 
+        print("❌ Flask não disponível - apenas modo Telegram")
+        if TELEGRAM_AVAILABLE:
+            asyncio.run(main()) 
