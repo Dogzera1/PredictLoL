@@ -165,26 +165,68 @@ class BackgroundLoopManager:
     
     def run_coroutine(self, coro):
         """Executa corrotina no loop persistente"""
-        if self._loop is None or self._loop.is_closed():
-            logger.warning("⚠️ Loop não disponível, reiniciando...")
-            self.start_background_loop()
-            import time
-            time.sleep(0.2)
+        max_retries = 3
+        retry_count = 0
         
+        while retry_count < max_retries:
+            try:
+                # Verificar se loop está saudável
+                if self._loop is None or self._loop.is_closed():
+                    logger.warning(f"⚠️ Loop não disponível (tentativa {retry_count + 1}), reiniciando...")
+                    self.start_background_loop()
+                    import time
+                    time.sleep(0.3)
+                
+                # Executar no loop singleton
+                future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+                result = future.result(timeout=30.0)
+                return result
+                
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"❌ Erro na execução assíncrona (tentativa {retry_count}): {e}")
+                
+                if retry_count < max_retries:
+                    logger.info("🔄 Tentando reiniciar loop singleton...")
+                    self._force_restart_loop()
+                    import time
+                    time.sleep(0.5)
+                else:
+                    logger.error("❌ Máximo de tentativas atingido")
+                    raise
+    
+    def _force_restart_loop(self):
+        """Força reinicialização completa do loop"""
         try:
-            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-            result = future.result(timeout=30.0)
-            return result
+            # Fechar loop atual se existir
+            if self._loop and not self._loop.is_closed():
+                self._loop.call_soon_threadsafe(self._loop.stop)
+                
+            # Aguardar thread anterior terminar
+            if self._thread and self._thread.is_alive():
+                self._thread.join(timeout=2.0)
+            
+            # Limpar referências
+            self._loop = None
+            self._thread = None
+            
+            # Reiniciar
+            self.start_background_loop()
+            logger.info("✅ Loop singleton reiniciado com sucesso")
+            
         except Exception as e:
-            logger.error(f"❌ Erro na execução assíncrona: {e}")
-            raise
+            logger.error(f"❌ Erro ao reiniciar loop: {e}")
     
     def is_healthy(self):
         """Verifica se o loop está saudável"""
-        return (self._loop is not None and 
-                not self._loop.is_closed() and 
-                self._thread is not None and 
-                self._thread.is_alive())
+        try:
+            return (self._loop is not None and 
+                    not self._loop.is_closed() and 
+                    self._thread is not None and 
+                    self._thread.is_alive() and
+                    self._loop.is_running())
+        except Exception:
+            return False
 
 
 # Instância global do gerenciador de loop
@@ -194,25 +236,42 @@ class TelegramBotV3:
     """Bot Telegram V3 com integração Riot API"""
     
     def __init__(self):
+        # Aguardar o loop singleton estar pronto
+        import time
+        time.sleep(0.3)
+        
+        # Verificar se o loop singleton está disponível
+        if not loop_manager.is_healthy():
+            logger.warning("⚠️ Loop singleton não saudável, reiniciando...")
+            loop_manager.start_background_loop()
+            time.sleep(0.3)
+        
+        # FORÇAR Application a usar o loop singleton
+        if loop_manager._loop and not loop_manager._loop.is_closed():
+            # Definir o loop singleton como loop padrão para esta thread
+            try:
+                asyncio.set_event_loop(loop_manager._loop)
+                logger.info("✅ Telegram Application forçada a usar loop singleton")
+            except Exception as e:
+                logger.warning(f"⚠️ Não foi possível definir loop: {e}")
+        
+        # Criar Application normalmente (agora usando o loop singleton)
         self.app = Application.builder().token(TOKEN).build()
         self.riot_system = riot_prediction_system
         self.initialization_status = "pending"
         self.setup_handlers()
         
-        # Inicializar Application de forma síncrona
+        # Inicializar Application usando o loop singleton
         if TELEGRAM_AVAILABLE and TOKEN:
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    loop.run_until_complete(self.app.initialize())
-                    logger.info("✅ Application Telegram inicializada")
-                except Exception as e:
-                    logger.error(f"❌ Erro ao inicializar Application: {e}")
-                finally:
-                    loop.close()
+                def init_app():
+                    """Inicializa app no loop singleton"""
+                    return loop_manager.run_coroutine(self.app.initialize())
+                
+                init_app()
+                logger.info("✅ Application Telegram inicializada no loop singleton")
             except Exception as e:
-                logger.error(f"❌ Erro na inicialização do loop: {e}")
+                logger.error(f"❌ Erro ao inicializar Application: {e}")
     
     async def initialize_riot_system(self):
         """Inicializa sistema Riot API em background"""
