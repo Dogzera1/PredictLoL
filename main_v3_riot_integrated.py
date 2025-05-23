@@ -1076,6 +1076,49 @@ def create_flask_app():
     
     app = Flask(__name__)
     
+    # Loop persistente para operações assíncronas
+    background_loop = None
+    background_thread = None
+    
+    def setup_background_loop():
+        """Cria loop persistente em thread separada"""
+        nonlocal background_loop
+        background_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(background_loop)
+        try:
+            background_loop.run_forever()
+        except Exception as e:
+            logger.error(f"Erro no background loop: {e}")
+        finally:
+            background_loop.close()
+    
+    def start_background_loop():
+        """Inicia thread com loop persistente"""
+        nonlocal background_thread
+        if background_thread is None or not background_thread.is_alive():
+            background_thread = threading.Thread(target=setup_background_loop, daemon=True)
+            background_thread.start()
+            # Aguardar loop estar pronto
+            import time
+            time.sleep(0.1)
+            logger.info("✅ Background loop iniciado")
+    
+    def run_in_background_loop(coro):
+        """Executa corrotina no loop persistente"""
+        if background_loop is None or background_loop.is_closed():
+            start_background_loop()
+        
+        future = asyncio.run_coroutine_threadsafe(coro, background_loop)
+        try:
+            result = future.result(timeout=30.0)  # Timeout de 30 segundos
+            return result
+        except Exception as e:
+            logger.error(f"Erro na execução assíncrona: {e}")
+            raise e
+    
+    # Iniciar loop ao criar app
+    start_background_loop()
+    
     @app.route('/')
     def home():
         return jsonify({
@@ -1100,7 +1143,8 @@ def create_flask_app():
             "components": {
                 "telegram": TELEGRAM_AVAILABLE,
                 "riot_api": riot_prediction_system is not None,
-                "flask": True
+                "flask": True,
+                "background_loop": background_loop is not None and not background_loop.is_closed()
             }
         }
         
@@ -1130,10 +1174,9 @@ def create_flask_app():
                 
                 update = Update.de_json(json_data, telegram_bot_v3.app.bot)
                 
-                # Processamento simplificado sem threading
+                # Usar loop persistente para processamento
                 try:
-                    # Usar asyncio.run que cria e gerencia o loop automaticamente
-                    asyncio.run(telegram_bot_v3.app.process_update(update))
+                    run_in_background_loop(telegram_bot_v3.app.process_update(update))
                     logger.info("✅ Webhook: Update processado com sucesso")
                     return "OK"
                 except Exception as e:
