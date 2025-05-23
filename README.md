@@ -112,4 +112,9 @@ Este projeto é desenvolvido para fins educacionais e de demonstração.
 
 ---
 
-**Desenvolvido com ❤️ para a comunidade LoL** 🎮 
+**Desenvolvido com ❤️ para a comunidade LoL** 🎮
+
+## Status
+- ✅ Funcionando no Railway
+- 🤖 @BETLOLGPT_bot
+- 🔧 Event loop corrigido - Build 2025.05.23 
