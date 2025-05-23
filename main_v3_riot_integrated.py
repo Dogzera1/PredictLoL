@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Bot LoL Predictor V3 MELHORADO
+Bot LoL Predictor V3 MELHORADO + VALUE BETTING AUTOMÁTICO
 Sistema completo integrado com API oficial da Riot Games
 MELHORIAS IMPLEMENTADAS:
 - Probabilidades dinâmicas baseadas em dados reais
@@ -11,6 +11,8 @@ MELHORIAS IMPLEMENTADAS:
 - Aba do draft da partida
 - Sem separação por liga
 - Botão direto para predição (sem comando predict)
+- 🔥 NOVO: Sistema automático de Value Betting
+- 🔥 NOVO: Notificações de apostas de valor em tempo real
 """
 
 import os
@@ -38,20 +40,20 @@ except ImportError:
     # Modo teste - usar classes mock do arquivo original
     logger.warning("⚠️ Telegram libraries não encontradas - modo teste ativo")
     TELEGRAM_AVAILABLE = False
-
+    
     # Classes mock (same as original)
     class Update:
         pass
-
+    
     class InlineKeyboardButton:
         def __init__(self, text, callback_data=None):
             self.text = text
             self.callback_data = callback_data
-
+    
     class InlineKeyboardMarkup:
         def __init__(self, keyboard):
             self.keyboard = keyboard
-
+    
     # [resto das classes mock...]
 
 try:
@@ -71,11 +73,23 @@ if not TOKEN:
     if os.environ.get("TELEGRAM_TOKEN") != "test-token-for-local-testing":
         print("⚠️ TELEGRAM_TOKEN não configurado - usando modo teste")
 
+# Importar sistema de Value Betting
+try:
+    from value_bet_system import (
+        initialize_value_bet_system,
+        ValueBetDetector,
+        LiveValueBetMonitor
+    )
+    VALUE_BETTING_AVAILABLE = True
+    logger.info("✅ Sistema de Value Betting carregado")
+except ImportError:
+    VALUE_BETTING_AVAILABLE = False
+    logger.warning("⚠️ Sistema de Value Betting não disponível")
 
 class ChampionAnalyzer:
     """Analisador avançado de composições de campeões"""
 
-    def __init__(self):
+        def __init__(self):
         # Base de dados de campeões com ratings e synergias
         self.champion_stats = {
             # Top laners
@@ -356,7 +370,7 @@ class ChampionAnalyzer:
 
 class ImprovedRiotAPI:
     """Cliente melhorado para API da Riot com análise de composições"""
-
+    
     def __init__(self):
         self.base_url = "https://esports-api.lolesports.com/persisted/gw"
         self.api_key = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
@@ -458,8 +472,8 @@ class ImprovedRiotAPI:
             logger.warning("⚠️ API não disponível, usando dados simulados")
             logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
-
-        except Exception as e:
+                
+            except Exception as e:
             logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
 
@@ -532,7 +546,7 @@ class ImprovedRiotAPI:
                         team1_comp = comp
                     elif side == 'red':
                         team2_comp = comp
-        except Exception as e:
+            except Exception as e:
             logger.error(f"❌ Erro ao extrair composições: {e}")
 
         return team1_comp, team2_comp
@@ -781,7 +795,7 @@ class DynamicPredictionSystem:
             analysis.append(f"💰 **APOSTA RECOMENDADA:** {favorite} (alta confiança)")
         elif favorite_prob > 60:
             analysis.append(f"💰 **APOSTA RECOMENDADA:** {favorite} (confiança moderada)")
-        else:
+            else:
             analysis.append(f"💰 **RECOMENDAÇÃO:** Partida equilibrada, aposte com cautela")
 
         return "\n".join(analysis)
@@ -815,6 +829,9 @@ class TelegramBotV3Improved:
         self.live_matches_cache = []
         self.cache_timestamp = None
 
+        # Sistema de Value Betting (será inicializado depois)
+        self.value_monitor = None
+
         logger.info("🤖 Bot V3 Melhorado inicializado")
 
     def setup_handlers(self):
@@ -843,17 +860,21 @@ class TelegramBotV3Improved:
             [
                 InlineKeyboardButton("📊 Análise de Draft", callback_data="draft_analysis"),
                 InlineKeyboardButton("🎯 Predições Rápidas", callback_data="quick_predictions")
-        ],
+            ],
             [
                 InlineKeyboardButton("💰 Dicas de Apostas", callback_data="betting_tips"),
                 InlineKeyboardButton("📈 Rankings Atuais", callback_data="current_rankings")
-        ],
+            ],
+            [
+                InlineKeyboardButton("🔥 VALUE BETS", callback_data="value_betting"),
+                InlineKeyboardButton("📊 Stats Value", callback_data="value_stats")
+            ],
             [InlineKeyboardButton("ℹ️ Ajuda", callback_data="help")]
         ]
-
+        
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
-
+    
     async def live_command(self, update: Update, context):
         """Comando /live melhorado - mostra TODAS as partidas"""
         await self.show_all_live_matches(update)
@@ -884,12 +905,12 @@ Não há partidas acontecendo neste momento.
 • 🏆 Ligas regionais menores
 
 🔄 Atualize em alguns minutos!"""
-
+                
                 keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all")],
                     [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
                 ]
-
+                
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
                 if is_callback:
@@ -897,7 +918,7 @@ Não há partidas acontecendo neste momento.
                 else:
                     await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
                 return
-
+            
             # Formatar lista de partidas
             text = f"🔴 **PARTIDAS AO VIVO ({len(live_matches)})**\n\n"
             text += "👆 **Clique em uma partida para ver:**\n"
@@ -926,7 +947,7 @@ Não há partidas acontecendo neste momento.
                     text += f"{state_emoji} **{league}**\n"
                     text += f"⚔️ {team1.get('code', team1.get('name', 'Team1'))} vs "
                     text += f"{team2.get('code', team2.get('name', 'Team2'))}{score_text}\n\n"
-
+            
             # Criar botões para cada partida
             keyboard = []
             for match in live_matches[:8]:  # Máximo 8 partidas
@@ -937,22 +958,22 @@ Não há partidas acontecendo neste momento.
 
                     button_text = f"🔮 {team1_name} vs {team2_name}"
                     callback_data = f"predict_match_{match['id']}"
-                    keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+            
             # Botões de ação
             keyboard.append([
                 InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all"),
                 InlineKeyboardButton("📊 Ver Rankings", callback_data="current_rankings")
             ])
             keyboard.append([InlineKeyboardButton("🏠 Menu Principal", callback_data="start")])
-
+            
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if is_callback:
                 await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
             else:
                 await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
+        
         except Exception as e:
             logger.error(f"❌ Erro ao mostrar partidas: {e}")
             error_text = f"❌ Erro ao buscar partidas: {str(e)}"
@@ -979,13 +1000,13 @@ Não há partidas acontecendo neste momento.
             if not match_data:
                 await query.edit_message_text("❌ Partida não encontrada")
                 return
-
+            
             # Gerar predição
             prediction = await self.prediction_system.predict_live_match(match_data)
 
             # Formatar resultado
             text = self._format_match_prediction(prediction, match_data)
-
+            
             # Botões de ação
             keyboard = [
                 [
@@ -1001,10 +1022,10 @@ Não há partidas acontecendo neste momento.
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
                 ]
             ]
-
+            
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
+            
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             await query.edit_message_text(f"❌ Erro na predição: {str(e)}")
@@ -1018,7 +1039,7 @@ Não há partidas acontecendo neste momento.
         odds1 = prediction['team1_odds']
         odds2 = prediction['team2_odds']
         confidence = prediction['confidence']
-
+        
         # Header
         text = f"🔮 **PREDIÇÃO EM TEMPO REAL**\n\n"
 
@@ -1042,9 +1063,9 @@ Não há partidas acontecendo neste momento.
         # Timing
         text += f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {datetime.now().strftime('%H:%M:%S')}\n"
         text += f"🔄 *Probabilidades atualizadas dinamicamente*"
-
+        
         return text
-
+    
     async def show_draft_analysis(self, query, match_id: str):
         """Mostra análise detalhada do draft"""
         try:
@@ -1062,7 +1083,7 @@ Não há partidas acontecendo neste momento.
             if not match_data:
                 await query.edit_message_text("❌ Partida não encontrada")
                 return
-
+            
             # Análise de draft
             team1_comp = match_data.get('team1_composition', [])
             team2_comp = match_data.get('team2_composition', [])
@@ -1084,14 +1105,14 @@ Não há partidas acontecendo neste momento.
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
                 ]
             ]
-
+            
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
+            
         except Exception as e:
             logger.error(f"❌ Erro na análise de draft: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
-
+    
     def _format_draft_analysis(self, draft_analysis: Dict, match_data: Dict) -> str:
         """Formata análise de draft"""
         teams = match_data.get('teams', [])
@@ -1161,13 +1182,21 @@ Não há partidas acontecendo neste momento.
                 await self.betting_tips_callback(query)
             elif data == "current_rankings":
                 await self.current_rankings_callback(query)
+            elif data == "value_betting":
+                await self.value_betting_callback(query)
+            elif data == "value_stats":
+                await self.value_stats_callback(query)
+            elif data == "subscribe_value":
+                await self.subscribe_value_callback(query)
+            elif data == "unsubscribe_value":
+                await self.unsubscribe_value_callback(query)
             else:
                 await query.edit_message_text("⚠️ Funcionalidade em desenvolvimento")
-
+            
         except Exception as e:
             logger.error(f"❌ Erro no callback: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
-
+    
     async def start_command_callback(self, query):
         """Callback para comando start"""
         await self.start_command_text(query)
@@ -1195,6 +1224,10 @@ Não há partidas acontecendo neste momento.
                 InlineKeyboardButton("💰 Dicas de Apostas", callback_data="betting_tips"),
                 InlineKeyboardButton("📈 Rankings Atuais", callback_data="current_rankings")
         ],
+            [
+                InlineKeyboardButton("🔥 VALUE BETS", callback_data="value_betting"),
+                InlineKeyboardButton("📊 Stats Value", callback_data="value_stats")
+            ],
             [InlineKeyboardButton("ℹ️ Ajuda", callback_data="help")]
         ]
 
@@ -1233,13 +1266,13 @@ Não há partidas acontecendo neste momento.
 • Comparação entre times
 • Histórico de performance
 • Análise de momentum"""
-
-        keyboard = [
+            
+            keyboard = [
             [InlineKeyboardButton("🔴 Testar Agora", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def betting_tips_callback(self, query):
@@ -1312,13 +1345,94 @@ Aposte com responsabilidade."""
 🔄 Rankings atualizados automaticamente
 baseado em performance recente"""
 
-        keyboard = [
+            keyboard = [
             [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(rankings_text, reply_markup=reply_markup, parse_mode='Markdown')
+
+    async def value_betting_callback(self, query):
+        """Callback para sistema de value betting"""
+        user_id = query.from_user.id
+        
+        # Verificar se sistema está disponível
+        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
+            await query.edit_message_text(
+                "❌ Sistema de Value Betting não disponível"
+            )
+            return
+        
+        # Verificar se usuário já está inscrito
+        is_subscribed = user_id in self.value_monitor.notification_system.subscribers
+        
+        text = """🔥 **SISTEMA VALUE BETTING AUTOMÁTICO**
+
+🎯 **O QUE É:**
+Sistema que monitora TODAS as partidas ao vivo em busca de apostas de valor - quando nossa IA detecta alta probabilidade de vitória mas as odds estão desreguladas (>1.5x).
+
+💰 **QUANDO ALERTA:**
+• Probabilidade real ≥ 55%
+• Odds atuais ≥ 1.5x  
+• Edge de +15% ou mais
+• Durante partidas em andamento
+
+🚨 **TIPOS DE URGÊNCIA:**
+🔥 Alta: +25% edge, 70%+ prob
+⚡ Média: +20% edge, 60%+ prob
+💡 Baixa: +15% edge, 55%+ prob
+
+⚠️ **AVISO:** Aposte com responsabilidade!"""
+
+        # Botões baseados no status de inscrição
+        if is_subscribed:
+            keyboard = [
+                [InlineKeyboardButton("❌ Cancelar Inscrição", callback_data="unsubscribe_value")],
+                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+            ]
+        else:
+            keyboard = [
+                [InlineKeyboardButton("✅ Ativar Notificações", callback_data="subscribe_value")],
+                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+            ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+
+    async def value_stats_callback(self, query):
+        """Callback para estatísticas de value betting"""
+        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
+            await query.edit_message_text(
+                "❌ Sistema de Value Betting não disponível"
+            )
+            return
+            
+        stats = self.value_monitor.get_stats()
+        
+        text = f"""📊 **ESTATÍSTICAS VALUE BETTING**
+
+🎯 **Value Bets Encontradas:** {stats['value_bets_found']}
+📱 **Notificações Enviadas:** {stats['notifications_sent']}
+🔍 **Partidas Analisadas:** {stats['matches_analyzed']}
+👥 **Usuários Inscritos:** {stats['subscribers']}
+
+⚙️ **Status:** {'🟢 Ativo' if stats['is_running'] else '🔴 Inativo'}
+⏱️ **Intervalo de Análise:** {stats['check_interval']}s
+
+📈 **Taxa de Detecção:** {stats['value_bets_found'] / max(1, stats['matches_analyzed']) * 100:.1f}%
+
+🔄 *Atualizado em tempo real*"""
+
+        keyboard = [
+            [InlineKeyboardButton("🔥 Configurar Alerts", callback_data="value_betting")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def help_command(self, update: Update, context):
         """Comando /help"""
@@ -1341,21 +1455,21 @@ Use os botões ou comandos:
 • `/start` - Menu principal
 
 💡 **Dica:** Use a interface com botões para melhor experiência!"""
-
-            keyboard = [
+                
+                keyboard = [
                 [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def run(self):
         """Executa o bot"""
         if not TELEGRAM_AVAILABLE:
             print("🔧 Modo teste - Telegram não disponível")
-            return
-
+                return
+            
         try:
             # Criar aplicação
             application = Application.builder().token(TOKEN).build()
@@ -1363,6 +1477,14 @@ Use os botões ou comandos:
 
             # Configurar handlers
             self.setup_handlers()
+
+            # Inicializar sistema de Value Betting
+            if VALUE_BETTING_AVAILABLE:
+                try:
+                    await initialize_value_bet_system(self, self.riot_api, self.prediction_system)
+                    logger.info("🔥 Sistema de Value Betting inicializado!")
+                except Exception as e:
+                    logger.error(f"❌ Erro ao inicializar Value Betting: {e}")
 
             # Inicializar e executar
             print("🚀 Iniciando Bot V3 Melhorado...")
@@ -1375,12 +1497,65 @@ Use os botões ou comandos:
             # Manter rodando
             while True:
                 await asyncio.sleep(1)
-
+            
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
         finally:
             if self.app:
                 await self.app.stop()
+
+    async def subscribe_value_callback(self, query):
+        """Callback para inscrever usuário nas notificações de value betting"""
+        user_id = query.from_user.id
+        
+        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
+            await query.edit_message_text("❌ Sistema não disponível")
+            return
+            
+        self.value_monitor.notification_system.subscribe_user(user_id)
+        
+        text = """✅ **INSCRITO NAS VALUE BETS!**
+
+Você receberá notificações automáticas quando encontrarmos:
+• 🎯 Apostas com alta probabilidade
+• 💰 Odds desreguladas (>1.5x)
+• ⚡ Edge de +15% ou mais
+
+🔔 As notificações chegam em tempo real durante as partidas!
+
+⚠️ **Lembre-se:** Aposte sempre com responsabilidade."""
+
+        keyboard = [
+            [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+
+    async def unsubscribe_value_callback(self, query):
+        """Callback para cancelar inscrição nas notificações"""
+        user_id = query.from_user.id
+        
+        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
+            await query.edit_message_text("❌ Sistema não disponível")
+            return
+            
+        self.value_monitor.notification_system.unsubscribe_user(user_id)
+        
+        text = """❌ **INSCRIÇÃO CANCELADA**
+
+Você não receberá mais notificações de value bets.
+
+💡 Você pode reativar a qualquer momento através do menu "🔥 VALUE BETS"."""
+
+        keyboard = [
+            [InlineKeyboardButton("🔥 Reativar", callback_data="value_betting")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
 
 # Função principal
@@ -1393,7 +1568,7 @@ async def main():
 # Flask App para Railway deployment
 if FLASK_AVAILABLE:
     app = Flask(__name__)
-
+    
     @app.route('/')
     def home():
         return jsonify({
@@ -1408,7 +1583,7 @@ if FLASK_AVAILABLE:
             },
             "telegram_available": TELEGRAM_AVAILABLE
         })
-
+    
     @app.route('/health')
     def health():
         return jsonify({
@@ -1432,7 +1607,7 @@ if __name__ == "__main__":
 
     # Iniciar Flask app para Railway
     if FLASK_AVAILABLE:
-        port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8080))
         print(f"🚀 Iniciando Flask server na porta {port}")
         app.run(host="0.0.0.0", port=port, debug=False)
     else:
