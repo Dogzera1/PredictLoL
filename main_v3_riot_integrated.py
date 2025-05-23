@@ -638,23 +638,24 @@ class DynamicPredictionSystem:
             )
 
             return {
-    'team1': team1_name,
-    'team2': team2_name,
-    'team1_win_probability': final_prob,
-    'team2_win_probability': 1 - final_prob,
-    'team1_odds': team1_odds,
-    'team2_odds': team2_odds,
-    'confidence': self._calculate_confidence(
-        team1_data,
-        team2_data,
-        draft_analysis),
-        'analysis': analysis,
-        'draft_analysis': draft_analysis,
-         'last_updated': datetime.now().isoformat()}
+                'team1': team1_name,
+                'team2': team2_name,
+                'team1_win_probability': final_prob,
+                'team2_win_probability': 1 - final_prob,
+                'team1_odds': team1_odds,
+                'team2_odds': team2_odds,
+                'confidence': self._calculate_confidence(
+                    team1_data,
+                    team2_data,
+                    draft_analysis),
+                'analysis': analysis,
+                'draft_analysis': draft_analysis,
+                'last_updated': datetime.now().isoformat()
+            }
 
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
-                return self._get_fallback_prediction()
+            return self._get_fallback_prediction()
 
     def _get_team_data(self, team_name: str) -> Dict:
         """Busca dados do time com fallback"""
@@ -1004,16 +1005,12 @@ Não há partidas acontecendo neste momento.
                         score_text = f" ({wins1}-{wins2})"
 
                     text += f"{state_emoji} **{league}**\n"
-                    text += f"⚔️ {team1.get('code',
-    team1.get('name',
-     'Team1'))} vs "
-                    text += f"{team2.get('code',
-    team2.get('name',
-     'Team2'))}{score_text}\n\n"
+                    text += f"⚔️ {team1.get('code', team1.get('name', 'Team1'))} vs "
+                    text += f"{team2.get('code', team2.get('name', 'Team2'))}{score_text}\n\n"
 
             # Criar botões para cada partida
-        keyboard = []
-           for match in live_matches[:8]:  # Máximo 8 partidas
+            keyboard = []
+            for match in live_matches[:8]:  # Máximo 8 partidas
                 teams = match.get('teams', [])
                 if len(teams) >= 2:
                     team1_name = teams[0].get(
@@ -1023,8 +1020,8 @@ Não há partidas acontecendo neste momento.
 
                     button_text = f"🔮 {team1_name} vs {team2_name}"
                     callback_data = f"predict_match_{match['id']}"
-                keyboard.append([InlineKeyboardButton(
-                    button_text, callback_data=callback_data)])
+                    keyboard.append([InlineKeyboardButton(
+                        button_text, callback_data=callback_data)])
 
             # Botões de ação
             keyboard.append([
@@ -1075,22 +1072,22 @@ Não há partidas acontecendo neste momento.
             text = self._format_match_prediction(prediction, match_data)
 
             # Botões de ação
-        keyboard = [
-            [
+            keyboard = [
+                [
                     InlineKeyboardButton("🏆 Ver Draft", callback_data=f"draft_{match_id}"),
                     InlineKeyboardButton("💰 Análise Odds", callback_data=f"odds_{match_id}")
                 ],
-            [
+                [
                     InlineKeyboardButton("🔄 Atualizar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Comparar Times", callback_data=f"compare_{match_id}")
                 ],
-            [
+                [
                     InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
                 ]
-        ]
+            ]
 
-           reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
         except Exception as e:
@@ -1167,18 +1164,18 @@ Não há partidas acontecendo neste momento.
                 text = self._format_draft_analysis(draft_analysis, match_data)
 
             # Botões
-        keyboard = [
-            [
+            keyboard = [
+                [
                     InlineKeyboardButton("🔮 Ver Predição", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Fases do Jogo", callback_data=f"phases_{match_id}")
                 ],
-            [
+                [
                     InlineKeyboardButton("🔙 Voltar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
                 ]
-        ]
+            ]
 
-           reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
         except Exception as e:
@@ -1353,7 +1350,7 @@ Não há partidas acontecendo neste momento.
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
         ]
 
-           reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def betting_tips_callback(self, query):
@@ -1431,7 +1428,7 @@ baseado em performance recente"""
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
         ]
 
-           reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(rankings_text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def value_betting_callback(self, query):
@@ -1468,17 +1465,17 @@ Sistema que monitora TODAS as partidas ao vivo em busca de apostas de valor - qu
 
         # Botões baseados no status de inscrição
         if is_subscribed:
-        keyboard = [
-            [InlineKeyboardButton("❌ Cancelar Inscrição", callback_data="unsubscribe_value")],
+            keyboard = [
+                [InlineKeyboardButton("❌ Cancelar Inscrição", callback_data="unsubscribe_value")],
                 [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
+            ]
         else:
-        keyboard = [
-            [InlineKeyboardButton("✅ Ativar Notificações", callback_data="subscribe_value")],
+            keyboard = [
+                [InlineKeyboardButton("✅ Ativar Notificações", callback_data="subscribe_value")],
                 [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
+            ]
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -1542,7 +1539,7 @@ Use os botões ou comandos:
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
             ]
 
-               reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def run(self):
