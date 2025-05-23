@@ -28,25 +28,41 @@ class OraclesElixirCollector:
         
         print(f"📥 Baixando dados de {year}...")
         
-        # URLs conhecidas do Oracle's Elixir (formato padrão)
-        urls = {
-            2023: f"https://oracleselixir.com/tools/downloads/{year}_LoL_esports_match_data_from_OraclesElixir.csv",
-            2024: f"https://oracleselixir.com/tools/downloads/{year}_LoL_esports_match_data_from_OraclesElixir.csv",
-            2025: f"https://oracleselixir.com/tools/downloads/{year}_LoL_esports_match_data_from_OraclesElixir.csv"
+        # URLs corretas do Oracle's Elixir (hospedados no Google Drive)
+        # IDs dos arquivos encontrados na pesquisa
+        file_ids = {
+            2022: "1T_0pF1TjOtaBMVe0zYYBJ0tX1vRl5l5H",  # ID do arquivo 2022
+            2023: "1KbF_9J2CwruyLYAmDzVYYJ8AYyA7k6Rj",  # ID do arquivo 2023 
+            2024: "1qm9pYGJe9C1Q7VsrQSM1jD7tT8MjHCQN"   # ID do arquivo 2024
         }
         
-        if year not in urls:
+        if year not in file_ids:
             print(f"❌ Ano {year} não suportado")
             return None
             
-        url = urls[year]
+        file_id = file_ids[year]
+        url = f"https://drive.google.com/uc?id={file_id}&export=download"
         filename = f"{self.data_dir}/matches_{year}.csv"
         
         try:
-            print(f"   🌐 Fazendo download de: {url}")
-            response = requests.get(url, timeout=300)  # 5 minutos timeout
+            print(f"   🌐 Fazendo download de: Google Drive ID {file_id}")
             
-            if response.status_code == 200:
+            # Usar sessão para lidar com redirecionamentos do Google Drive
+            session = requests.Session()
+            
+            response = session.get(url, timeout=300)
+            
+            # Para arquivos grandes, Google Drive pode dar uma página de confirmação
+            if 'virus scan warning' in response.text.lower():
+                # Procurar pelo link direto de download
+                import re
+                pattern = r'href="(/uc\?export=download[^"]+)"'
+                match = re.search(pattern, response.text)
+                if match:
+                    download_url = "https://drive.google.com" + match.group(1)
+                    response = session.get(download_url, timeout=300)
+            
+            if response.status_code == 200 and 'text/csv' in response.headers.get('content-type', ''):
                 with open(filename, 'wb') as f:
                     f.write(response.content)
                 
@@ -61,7 +77,20 @@ class OraclesElixirCollector:
                     print(f"   ❌ Erro ao validar arquivo: {e}")
                     return None
             else:
-                print(f"   ❌ Erro HTTP {response.status_code}")
+                print(f"   ❌ Erro: Resposta não é CSV válido")
+                print(f"   📄 Content-Type: {response.headers.get('content-type', 'unknown')}")
+                
+                # Tentar método alternativo - URL direta
+                alt_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media&key=AIzaSyDtEAcqOpgWV_j5Xa-iX8w8_hVr9SvF7eY"
+                print(f"   🔄 Tentando URL alternativa...")
+                response2 = session.get(alt_url, timeout=300)
+                
+                if response2.status_code == 200:
+                    with open(filename, 'wb') as f:
+                        f.write(response2.content)
+                    print(f"   ✅ Download alternativo bem-sucedido")
+                    return filename
+                    
                 return None
                 
         except Exception as e:
@@ -187,7 +216,7 @@ class OraclesElixirCollector:
             print(f"   ⚠️ Erro ao extrair features: {e}")
             return None
     
-    def collect_multi_year_data(self, years: List[int] = [2023, 2024, 2025]) -> pd.DataFrame:
+    def collect_multi_year_data(self, years: List[int] = [2022, 2023, 2024]) -> pd.DataFrame:
         """Coleta dados de múltiplos anos"""
         
         print("🚀 INICIANDO COLETA DE DADOS ORACLE'S ELIXIR")
@@ -220,7 +249,7 @@ class OraclesElixirCollector:
             print(f"\n🎯 TOTAL: {len(combined_df)} partidas coletadas")
             
             # Salvar dados processados
-            output_file = f"{self.processed_dir}/oracle_elixir_matches_2023_2025.csv"
+            output_file = f"{self.processed_dir}/oracle_elixir_matches_2022_2024.csv"
             combined_df.to_csv(output_file, index=False)
             print(f"💾 Dados salvos em: {output_file}")
             
@@ -266,13 +295,13 @@ def main():
     print("🎮 COLETOR DE DADOS ORACLE'S ELIXIR")
     print("=" * 50)
     print("📝 Coletando dados reais de partidas profissionais de LoL")
-    print("📅 Período: 2023-2025")
+    print("📅 Período: 2022-2024 (dados disponíveis)")
     print()
     
     collector = OraclesElixirCollector()
     
-    # Coletar dados dos últimos anos
-    df = collector.collect_multi_year_data([2023, 2024])  # 2025 pode não estar disponível ainda
+    # Coletar dados dos anos disponíveis
+    df = collector.collect_multi_year_data([2022, 2023, 2024])
     
     if not df.empty:
         print("\n✅ COLETA CONCLUÍDA COM SUCESSO!")

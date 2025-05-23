@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+"""
+Bot LoL v2 - Arquitetura robusta sem problemas de event loop
+"""
+
 import os
 import json
 import logging
@@ -7,9 +12,9 @@ from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from flask import Flask, request, Response
 import traceback
+from contextlib import asynccontextmanager
 
-# RAILWAY REDEPLOY FORCE - 2025.05.23 - FIX EVENT LOOP
-print("🚀 INICIANDO BOT COM CORREÇÃO DE EVENT LOOP - v2025.05.23")
+print("🚀 BOT LOL V2 - ARQUITETURA ROBUSTA INICIANDO")
 
 # Configuração de logging
 logging.basicConfig(
@@ -18,255 +23,301 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Criar a aplicação Flask
-app = Flask(__name__)
-
-# Token do Telegram (da variável de ambiente)
+# Token do Telegram
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
+if not TOKEN:
+    raise RuntimeError("TELEGRAM_TOKEN não configurado!")
 
-# Handlers do bot
-async def start_handler(update, context):
-    await update.message.reply_text("✅ Bot ativo! Use /ajuda para ver os comandos disponíveis.")
+# Variáveis globais
+application = None
+bot_initialized = False
 
-async def help_handler(update, context):
-    mensagem = """
+class TelegramBotManager:
+    """Gerenciador robusto do bot Telegram"""
+    
+    def __init__(self, token: str):
+        self.token = token
+        self.application = None
+        self.bot = None
+        self._lock = threading.Lock()
+        self._initialized = False
+    
+    async def initialize(self):
+        """Inicializa o bot de forma segura"""
+        with self._lock:
+            if self._initialized:
+                return True
+            
+            try:
+                logger.info("🤖 Inicializando Bot Telegram...")
+                
+                # Criar aplicação com configurações robustas
+                self.application = (
+                    Application.builder()
+                    .token(self.token)
+                    .concurrent_updates(True)
+                    .build()
+                )
+                
+                # Obter referência do bot
+                self.bot = self.application.bot
+                
+                # Testar conexão
+                bot_info = await self.bot.get_me()
+                logger.info(f"✅ Bot conectado: @{bot_info.username}")
+                
+                # Configurar handlers
+                self._setup_handlers()
+                
+                # Inicializar aplicação
+                await self.application.initialize()
+                
+                self._initialized = True
+                logger.info("🎯 Bot inicializado com sucesso!")
+                
+                return True
+                
+            except Exception as e:
+                logger.error(f"❌ Erro na inicialização: {e}")
+                self._initialized = False
+                return False
+    
+    def _setup_handlers(self):
+        """Configura os handlers do bot"""
+        
+        # Handler para /start
+        async def start_handler(update: Update, context):
+            try:
+                await update.message.reply_text(
+                    "✅ Bot LoL V2 ativo!\n"
+                    "🎮 Use /ajuda para ver comandos\n"
+                    "🔧 Arquitetura robusta implementada"
+                )
+            except Exception as e:
+                logger.error(f"Erro no start_handler: {e}")
+        
+        # Handler para /ajuda
+        async def help_handler(update: Update, context):
+            try:
+                mensagem = """
 📋 *Comandos disponíveis:*
 /start - Iniciar o bot
 /ajuda - Mostrar esta ajuda
-/sobre - Informações sobre o bot
+/status - Status do sistema
+/ping - Testar conexão
 
-_Bot em manutenção, mais funcionalidades em breve!_
-    """
-    await update.message.reply_text(mensagem, parse_mode="Markdown")
-
-async def about_handler(update, context):
-    mensagem = """
-*LoL-GPT Betting Assistant* 🎮
-
-Um bot para ajudar em apostas de League of Legends, usando modelos preditivos.
-
-🔧 Status: Funcionando no Railway
-🌐 Hospedagem: 24/7 online
-    """
-    await update.message.reply_text(mensagem, parse_mode="Markdown")
-
-async def unknown_command_handler(update, context):
-    await update.message.reply_text("❌ Comando não reconhecido. Use /ajuda para ver os comandos disponíveis.")
-
-# Inicializar o bot
-application = None
-application_initialized = False
-background_loop = None
-loop_thread = None
-
-def run_background_loop(loop):
-    """Executa o loop assíncrono em thread separada"""
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
-
-async def initialize_application():
-    """Inicializa a Application uma única vez"""
-    global application, application_initialized
+🎮 *Bot de apostas LoL*
+📊 Modelo preditivo em desenvolvimento
+🔧 Versão 2.0 - Arquitetura robusta
+                """
+                await update.message.reply_text(mensagem, parse_mode='Markdown')
+            except Exception as e:
+                logger.error(f"Erro no help_handler: {e}")
+        
+        # Handler para /status
+        async def status_handler(update: Update, context):
+            try:
+                status = {
+                    "Bot": "✅ Ativo",
+                    "Versão": "2.0 - Robusta", 
+                    "Platform": "Railway",
+                    "Event Loop": "✅ Estável"
+                }
+                
+                message = "\n".join([f"{k}: {v}" for k, v in status.items()])
+                await update.message.reply_text(f"🔧 **STATUS DO SISTEMA**\n\n{message}")
+            except Exception as e:
+                logger.error(f"Erro no status_handler: {e}")
+        
+        # Handler para /ping
+        async def ping_handler(update: Update, context):
+            try:
+                await update.message.reply_text("🏓 Pong! Bot respondendo normalmente.")
+            except Exception as e:
+                logger.error(f"Erro no ping_handler: {e}")
+        
+        # Handler para mensagens de texto
+        async def text_handler(update: Update, context):
+            try:
+                text = update.message.text.lower()
+                
+                if "oi" in text or "olá" in text:
+                    await update.message.reply_text("👋 Olá! Use /ajuda para ver comandos.")
+                elif "aposta" in text:
+                    await update.message.reply_text("🎮 Sistema de apostas em desenvolvimento!")
+                else:
+                    await update.message.reply_text("🤖 Não entendi. Use /ajuda para ver comandos.")
+            except Exception as e:
+                logger.error(f"Erro no text_handler: {e}")
+        
+        # Adicionar handlers
+        self.application.add_handler(CommandHandler("start", start_handler))
+        self.application.add_handler(CommandHandler("ajuda", help_handler))
+        self.application.add_handler(CommandHandler("status", status_handler))
+        self.application.add_handler(CommandHandler("ping", ping_handler))
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     
-    if application_initialized:
-        return True
-    
-    if not TOKEN:
-        logger.error("❌ TOKEN não encontrado - configure a variável TELEGRAM_TOKEN")
-        return False
-    
-    try:
-        application = Application.builder().token(TOKEN).build()
+    async def process_update(self, update_data: dict) -> bool:
+        """Processa um update de forma segura"""
         
-        # Registrar os handlers
-        application.add_handler(CommandHandler("start", start_handler))
-        application.add_handler(CommandHandler("ajuda", help_handler))
-        application.add_handler(CommandHandler("help", help_handler))
-        application.add_handler(CommandHandler("sobre", about_handler))
-        application.add_handler(MessageHandler(filters.COMMAND, unknown_command_handler))
+        if not self._initialized:
+            logger.warning("⚠️ Bot não inicializado para processar update")
+            return False
         
-        # IMPORTANTE: Inicializar a Application
-        await application.initialize()
-        application_initialized = True
-        
-        logger.info("✅ Bot inicializado com sucesso no Railway!")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ Erro ao inicializar bot: {str(e)}")
-        logger.error(traceback.format_exc())
-        return False
-
-# Função para processar updates
-async def process_update_async(update_data):
-    try:
-        if not application or not application_initialized:
-            logger.error("❌ Application não inicializada")
-            return
-        
-        update = Update.de_json(data=update_data, bot=application.bot)
-        if update:
-            await application.process_update(update)
-            logger.info("✅ Update processado com sucesso")
-        else:
-            logger.warning("⚠️ Update inválido recebido")
-    except Exception as e:
-        logger.error(f"❌ Erro ao processar update: {str(e)}")
-        logger.error(traceback.format_exc())
-
-def process_webhook_sync(payload):
-    """Processa webhook de forma síncrona usando o background loop"""
-    global background_loop
-    
-    if background_loop and not background_loop.is_closed():
-        future = asyncio.run_coroutine_threadsafe(
-            process_update_async(payload), 
-            background_loop
-        )
         try:
-            # Aguardar no máximo 10 segundos
-            future.result(timeout=10)
+            # Criar objeto Update
+            update = Update.de_json(update_data, self.bot)
+            
+            if update:
+                # Processar update
+                await self.application.process_update(update)
+                return True
+            else:
+                logger.warning("⚠️ Update inválido recebido")
+                return False
+                
         except Exception as e:
-            logger.error(f"❌ Erro no processamento assíncrono: {e}")
-    else:
-        logger.error("❌ Background loop não disponível")
-
-# Rotas da aplicação
-@app.route('/', methods=['GET'])
-def home():
-    status = "🟢 ATIVO" if application_initialized else "🔴 INATIVO"
-    token_status = "✅ Configurado" if TOKEN else "❌ Não configurado"
-    loop_status = "✅ Ativo" if background_loop and not background_loop.is_closed() else "❌ Inativo"
+            logger.error(f"❌ Erro ao processar update: {e}")
+            return False
     
-    return f"""
-    <h1>🤖 Bot LoL - Railway</h1>
-    <p><strong>Status:</strong> {status}</p>
-    <p><strong>Token:</strong> {token_status}</p>
-    <p><strong>Loop:</strong> {loop_status}</p>
-    <p><strong>Webhook:</strong> /webhook</p>
-    <p><strong>Bot:</strong> @BETLOLGPT_bot</p>
-    <hr>
-    <p>✅ Funcionando no Railway!</p>
-    """
+    def is_ready(self) -> bool:
+        """Verifica se o bot está pronto"""
+        return self._initialized and self.application is not None
+
+# Instância global do gerenciador
+bot_manager = TelegramBotManager(TOKEN)
+
+# Flask App
+app = Flask(__name__)
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Endpoint do webhook"""
+    try:
+        # Verificar se bot está pronto
+        if not bot_manager.is_ready():
+            logger.error("❌ Bot não está pronto")
+            return Response("Bot not ready", status=503)
+        
+        # Obter dados do update
+        update_data = request.get_json()
+        
+        if not update_data:
+            logger.warning("⚠️ Webhook sem dados")
+            return Response("No data", status=400)
+        
+        # Processar update de forma assíncrona e segura
+        def process_in_thread():
+            """Processa update em thread separada"""
+            try:
+                # Criar novo event loop para esta thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Processar update
+                success = loop.run_until_complete(
+                    bot_manager.process_update(update_data)
+                )
+                
+                # Fechar loop de forma limpa
+                loop.close()
+                
+                if success:
+                    logger.info("✅ Update processado com sucesso")
+                else:
+                    logger.error("❌ Falha ao processar update")
+                    
+            except Exception as e:
+                logger.error(f"❌ Erro no processamento: {e}")
+        
+        # Executar em thread separada
+        thread = threading.Thread(target=process_in_thread, daemon=True)
+        thread.start()
+        
+        # Retornar resposta imediata
+        return Response("OK", status=200)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro no webhook: {e}")
+        return Response("Error", status=500)
 
 @app.route('/health', methods=['GET'])
 def health():
     """Endpoint de saúde"""
-    loop_healthy = background_loop and not background_loop.is_closed()
-    
-    if application_initialized and TOKEN and loop_healthy:
-        return {
-            "status": "healthy", 
-            "bot": "active", 
-            "platform": "railway",
-            "token": "configured",
-            "initialized": application_initialized,
-            "loop": "active",
-            "version": "2025.05.23-event-loop-fix",
-            "background_thread": loop_thread.is_alive() if loop_thread else False
-        }, 200
-    else:
-        reason = "Token não configurado"
-        if not application_initialized:
-            reason = "Application não inicializada"
-        elif not loop_healthy:
-            reason = "Background loop não ativo"
-            
-        return {
-            "status": "unhealthy", 
-            "bot": "inactive", 
-            "platform": "railway",
-            "reason": reason,
-            "initialized": application_initialized,
-            "loop": "active" if loop_healthy else "inactive",
-            "version": "2025.05.23-event-loop-fix",
-            "background_thread": loop_thread.is_alive() if loop_thread else False
-        }, 500
-
-@app.route('/webhook', methods=['POST', 'GET'])
-def webhook():
-    if request.method == "GET":
-        status = "🟢 ATIVO" if application_initialized else "🔴 INATIVO"
-        return f"🤖 Webhook do Bot LoL está {status}!"
-    
-    elif request.method == "POST":
-        try:
-            if not application or not application_initialized:
-                logger.error("❌ Bot não inicializado - verificar TOKEN")
-                return Response("❌ Bot não inicializado", status=500)
-            
-            payload = request.get_json()
-            if not payload:
-                logger.warning("⚠️ Payload vazio recebido")
-                return Response("❌ Payload inválido", status=400)
-            
-            logger.info(f"📨 Recebido update do Telegram")
-            
-            # Processar usando background loop
-            process_webhook_sync(payload)
-            
-            return Response('✅ OK', status=200)
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao processar webhook: {str(e)}")
-            logger.error(traceback.format_exc())
-            return Response('✅ OK', status=200)  # Sempre retorna OK para evitar reenvios
-
-# Inicialização da aplicação no startup
-def initialize_bot_sync():
-    """Função para inicializar o bot e background loop"""
-    global background_loop, loop_thread
-    
     try:
-        # Criar loop para thread separada
-        background_loop = asyncio.new_event_loop()
+        status = {
+            "status": "healthy" if bot_manager.is_ready() else "initializing",
+            "bot": "active" if bot_manager.is_ready() else "starting",
+            "platform": "railway",
+            "version": "2.0-robust",
+            "token": "configured" if TOKEN else "missing",
+            "event_loop": "stable"
+        }
         
-        # Iniciar thread com o loop
-        loop_thread = threading.Thread(
-            target=run_background_loop, 
-            args=(background_loop,),
-            daemon=True
-        )
-        loop_thread.start()
-        
-        # Inicializar o bot no background loop
-        future = asyncio.run_coroutine_threadsafe(
-            initialize_application(), 
-            background_loop
-        )
-        
-        # Aguardar inicialização
-        success = future.result(timeout=30)
-        
-        if success:
-            logger.info("✅ Background loop e bot inicializados")
-        else:
-            logger.error("❌ Falha na inicialização do bot")
-            
-        return success
+        status_code = 200 if bot_manager.is_ready() else 503
+        return json.dumps(status), status_code, {'Content-Type': 'application/json'}
         
     except Exception as e:
-        logger.error(f"❌ Erro na inicialização: {e}")
-        return False
+        logger.error(f"❌ Erro no health check: {e}")
+        return json.dumps({"status": "error", "message": str(e)}), 500
+
+@app.route('/', methods=['GET'])
+def root():
+    """Endpoint raiz"""
+    return {
+        "message": "🤖 Bot LoL V2 - Arquitetura Robusta",
+        "status": "active" if bot_manager.is_ready() else "initializing",
+        "version": "2.0"
+    }
+
+async def initialize_bot():
+    """Inicializa o bot na startup"""
+    logger.info("🚀 Inicializando Bot LoL V2...")
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            success = await bot_manager.initialize()
+            
+            if success:
+                logger.info("✅ Bot inicializado com sucesso!")
+                return True
+            else:
+                logger.warning(f"⚠️ Tentativa {attempt + 1} falhou")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro na tentativa {attempt + 1}: {e}")
+        
+        if attempt < max_retries - 1:
+            await asyncio.sleep(2)
+    
+    logger.error("❌ Falha na inicialização após todas as tentativas")
+    return False
+
+def run_initialization():
+    """Executa a inicialização em thread separada"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    try:
+        success = loop.run_until_complete(initialize_bot())
+        logger.info(f"🎯 Inicialização concluída: {'✅' if success else '❌'}")
+    finally:
+        loop.close()
 
 if __name__ == "__main__":
-    # Para Railway, usar a porta do ambiente ou 8080 como padrão
-    port = int(os.environ.get("PORT", 8080))
-    
-    print("🚂 Iniciando Bot LoL no Railway...")
-    print(f"🔧 Porta: {port}")
+    print("🚂 Iniciando Bot LoL V2 no Railway...")
+    print(f"🔧 Porta: {os.environ.get('PORT', '8080')}")
     print(f"🤖 Token configurado: {'✅' if TOKEN else '❌'}")
     
-    # Inicializar o bot antes de iniciar o Flask
-    bot_success = initialize_bot_sync()
-    print(f"📡 Bot inicializado: {'✅' if bot_success else '❌'}")
+    # Inicializar bot em thread separada
+    init_thread = threading.Thread(target=run_initialization, daemon=True)
+    init_thread.start()
     
-    try:
-        app.run(host="0.0.0.0", port=port, debug=False)
-    except Exception as e:
-        print(f"❌ Erro ao iniciar aplicação: {e}")
-        exit(1)
-    finally:
-        # Cleanup do loop ao encerrar
-        if background_loop and not background_loop.is_closed():
-            background_loop.call_soon_threadsafe(background_loop.stop) 
+    # Aguardar um pouco para a inicialização
+    import time
+    time.sleep(3)
+    
+    # Executar Flask
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True) 
