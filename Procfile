@@ -1,2 +1,2 @@
-web: python main_integrated.py
+web: python main.py
 release: echo "Starting Flask app" 

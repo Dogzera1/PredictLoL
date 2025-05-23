@@ -23,4 +23,7 @@ gunicorn>=21.0.0
 
 # Force redeploy 2025.05.23 - 23:16 UTC
 # Railway auto-deploy trigger attempt
-setuptools>=65.0.0 
+setuptools>=65.0.0
+
+# Additional dependency
+numpy>=1.24.0 

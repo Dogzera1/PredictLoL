@@ -14,7 +14,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from flask import Flask, request, Response
 import traceback
 import random
-import numpy as np
 
 print("🚀 BOT LOL INTEGRADO - SISTEMA DE PREDIÇÃO ATIVO")
 
