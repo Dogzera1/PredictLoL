@@ -391,6 +391,254 @@ class RiotDataProcessor:
         return mappings.get(key, key)
 
 
+class LiveMatchAnalyzer:
+    """Analisador avançado de partidas ao vivo com timing de apostas"""
+    
+    def __init__(self, prediction_system):
+        self.prediction_system = prediction_system
+        
+        # Fatores de timing para apostas
+        self.timing_factors = {
+            'pre_game': {'multiplier': 1.0, 'confidence_bonus': 0.1},
+            'early_game': {'multiplier': 1.15, 'confidence_bonus': 0.05},
+            'mid_game': {'multiplier': 1.3, 'confidence_bonus': 0.0},
+            'late_game': {'multiplier': 1.5, 'confidence_bonus': -0.05},
+            'overtime': {'multiplier': 2.0, 'confidence_bonus': -0.1}
+        }
+    
+    async def analyze_live_match(self, match_data: Dict) -> Dict:
+        """Análise completa de partida ao vivo"""
+        
+        # Extrair informações básicas
+        teams = match_data.get('match', {}).get('teams', [])
+        if len(teams) < 2:
+            return {'error': 'Dados de times insuficientes'}
+        
+        team1 = teams[0]
+        team2 = teams[1]
+        
+        # Buscar dados dos times no sistema
+        team1_data = self.prediction_system.get_team_by_key(team1.get('code', ''))
+        team2_data = self.prediction_system.get_team_by_key(team2.get('code', ''))
+        
+        if not team1_data or not team2_data:
+            # Criar dados básicos se não encontrar
+            team1_data = {'name': team1.get('name', 'Team 1'), 'rating': 70, 'region': 'Unknown'}
+            team2_data = {'name': team2.get('name', 'Team 2'), 'rating': 70, 'region': 'Unknown'}
+        
+        # Fazer predição base
+        match_type = self._detect_match_type(match_data)
+        prediction = await self.prediction_system.predict_match(
+            team1_data['name'], team2_data['name'], match_type
+        )
+        
+        if 'error' in prediction:
+            return prediction
+        
+        # Análise de timing
+        timing_analysis = self._analyze_betting_timing(match_data, prediction)
+        
+        # Análise de momentum (simulada para demo)
+        momentum_analysis = self._analyze_momentum(match_data, prediction)
+        
+        # Odds em tempo real
+        live_odds = self._calculate_live_odds(prediction, timing_analysis)
+        
+        return {
+            'match_id': match_data.get('id', ''),
+            'teams': {
+                'team1': team1_data,
+                'team2': team2_data
+            },
+            'prediction': prediction,
+            'timing_analysis': timing_analysis,
+            'momentum': momentum_analysis,
+            'live_odds': live_odds,
+            'match_status': match_data.get('state', 'unknown'),
+            'league': match_data.get('league', {}).get('name', 'Unknown League'),
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    def _detect_match_type(self, match_data: Dict) -> str:
+        """Detecta tipo de partida (bo1, bo3, bo5)"""
+        strategy = match_data.get('strategy', {})
+        if strategy:
+            strategy_type = strategy.get('type', '').lower()
+            if 'best_of' in strategy_type:
+                count = strategy.get('count', 1)
+                return f"bo{count}"
+        return "bo1"
+    
+    def _analyze_betting_timing(self, match_data: Dict, prediction: Dict) -> Dict:
+        """Análise do melhor timing para apostar"""
+        
+        match_state = match_data.get('state', 'unstarted').lower()
+        
+        # Determinar fase do jogo
+        if match_state in ['unstarted', 'unscheduled']:
+            game_phase = 'pre_game'
+            timing_recommendation = "⭐ IDEAL - Aposte AGORA"
+            reasoning = "Odds mais estáveis, máxima confiança na predição"
+        elif match_state in ['inprogress']:
+            # Simular tempo de jogo para demo
+            game_time = self._estimate_game_time(match_data)
+            if game_time < 15:
+                game_phase = 'early_game'
+                timing_recommendation = "✅ BOM - Ainda vale apostar"
+                reasoning = "Início do jogo, predições ainda válidas"
+            elif game_time < 30:
+                game_phase = 'mid_game'
+                timing_recommendation = "⚠️ MODERADO - Aposte com cautela"
+                reasoning = "Mid game, mudanças táticas podem afetar resultado"
+            else:
+                game_phase = 'late_game'
+                timing_recommendation = "❌ ARRISCADO - Evite apostar"
+                reasoning = "Late game, alta variabilidade e reversals"
+        else:
+            game_phase = 'post_game'
+            timing_recommendation = "🚫 ENCERRADO"
+            reasoning = "Partida finalizada"
+        
+        timing_factor = self.timing_factors.get(game_phase, self.timing_factors['pre_game'])
+        
+        # Calcular confiança ajustada
+        base_confidence = prediction.get('confidence', 0.5)
+        adjusted_confidence = min(0.98, base_confidence + timing_factor['confidence_bonus'])
+        
+        return {
+            'game_phase': game_phase,
+            'recommendation': timing_recommendation,
+            'reasoning': reasoning,
+            'confidence_adjustment': timing_factor['confidence_bonus'],
+            'adjusted_confidence': adjusted_confidence,
+            'risk_level': self._calculate_risk_level(game_phase, adjusted_confidence),
+            'multiplier': timing_factor['multiplier']
+        }
+    
+    def _analyze_momentum(self, match_data: Dict, prediction: Dict) -> Dict:
+        """Análise de momentum da partida"""
+        
+        # Para demo, simular momentum baseado em dados disponíveis
+        team1_momentum = 0.5  # Neutro
+        team2_momentum = 0.5  # Neutro
+        
+        # Simular mudanças de momentum baseado no status
+        match_state = match_data.get('state', '').lower()
+        if match_state == 'inprogress':
+            # Adicionar variação aleatória simulando o jogo real
+            import random
+            momentum_shift = (random.random() - 0.5) * 0.3
+            team1_momentum += momentum_shift
+            team2_momentum -= momentum_shift
+        
+        # Garantir range 0-1
+        team1_momentum = max(0, min(1, team1_momentum))
+        team2_momentum = max(0, min(1, team2_momentum))
+        
+        # Determinar direção do momentum
+        if abs(team1_momentum - team2_momentum) < 0.1:
+            momentum_direction = "⚖️ EQUILIBRADO"
+            momentum_strength = "Neutro"
+        elif team1_momentum > team2_momentum:
+            momentum_direction = f"📈 {prediction['team1']['name']} FAVORITO"
+            momentum_strength = "Forte" if abs(team1_momentum - team2_momentum) > 0.3 else "Moderado"
+        else:
+            momentum_direction = f"📈 {prediction['team2']['name']} FAVORITO"
+            momentum_strength = "Forte" if abs(team1_momentum - team2_momentum) > 0.3 else "Moderado"
+        
+        return {
+            'team1_momentum': team1_momentum,
+            'team2_momentum': team2_momentum,
+            'direction': momentum_direction,
+            'strength': momentum_strength,
+            'confidence_impact': abs(team1_momentum - team2_momentum) * 0.1
+        }
+    
+    def _calculate_live_odds(self, prediction: Dict, timing_analysis: Dict) -> Dict:
+        """Calcula odds em tempo real"""
+        
+        base_prob1 = prediction['team1_probability']
+        base_prob2 = prediction['team2_probability']
+        
+        # Ajustar com timing
+        timing_multiplier = timing_analysis['multiplier']
+        
+        # Simular volatilidade baseada na fase do jogo
+        volatility = {
+            'pre_game': 0.02,
+            'early_game': 0.05,
+            'mid_game': 0.08,
+            'late_game': 0.12,
+            'overtime': 0.20
+        }.get(timing_analysis['game_phase'], 0.02)
+        
+        # Calcular odds decimais
+        odds1 = 1 / (base_prob1 * timing_multiplier)
+        odds2 = 1 / (base_prob2 * timing_multiplier)
+        
+        # Value betting analysis
+        value1 = self._calculate_value_bet(base_prob1, odds1)
+        value2 = self._calculate_value_bet(base_prob2, odds2)
+        
+        return {
+            'team1': {
+                'probability': base_prob1 * 100,
+                'decimal_odds': round(odds1, 2),
+                'value_rating': value1
+            },
+            'team2': {
+                'probability': base_prob2 * 100,
+                'decimal_odds': round(odds2, 2),
+                'value_rating': value2
+            },
+            'volatility': volatility,
+            'market_confidence': timing_analysis['adjusted_confidence']
+        }
+    
+    def _calculate_value_bet(self, true_prob: float, decimal_odds: float) -> str:
+        """Calcula se é uma value bet"""
+        implied_prob = 1 / decimal_odds
+        edge = true_prob - implied_prob
+        
+        if edge > 0.05:
+            return "🟢 ALTA VALUE"
+        elif edge > 0.02:
+            return "🟡 BOA VALUE"
+        elif edge > -0.02:
+            return "⚪ NEUTRA"
+        else:
+            return "🔴 SEM VALUE"
+    
+    def _calculate_risk_level(self, game_phase: str, confidence: float) -> str:
+        """Calcula nível de risco da aposta"""
+        
+        phase_risk = {
+            'pre_game': 0.1,
+            'early_game': 0.2,
+            'mid_game': 0.4,
+            'late_game': 0.7,
+            'overtime': 0.9
+        }.get(game_phase, 0.5)
+        
+        confidence_risk = 1 - confidence
+        total_risk = (phase_risk + confidence_risk) / 2
+        
+        if total_risk < 0.3:
+            return "🟢 BAIXO"
+        elif total_risk < 0.5:
+            return "🟡 MODERADO"
+        elif total_risk < 0.7:
+            return "🟠 ALTO"
+        else:
+            return "🔴 MUITO ALTO"
+    
+    def _estimate_game_time(self, match_data: Dict) -> int:
+        """Estima tempo de jogo em minutos (simulado)"""
+        # Para demo, retornar tempo aleatório
+        import random
+        return random.randint(5, 45)
+
+
 class RiotIntegratedPredictionSystem:
     """Sistema de predição integrado com dados reais da Riot API"""
     
@@ -407,6 +655,9 @@ class RiotIntegratedPredictionSystem:
         # Cache de predições
         self.prediction_count = 0
         self.prediction_history = []
+        
+        # Analisador de partidas ao vivo
+        self.live_analyzer = LiveMatchAnalyzer(self)
     
     async def initialize(self):
         """Inicializa sistema com dados da API"""
@@ -698,6 +949,77 @@ class RiotIntegratedPredictionSystem:
             'version': '3.0-riot-integrated',
             'cache_entries': len(self.data_processor.api_client.cache)
         }
+    
+    async def analyze_live_match_detailed(self, match_id: str) -> Dict:
+        """Análise detalhada de partida ao vivo"""
+        
+        try:
+            # Buscar partidas ao vivo
+            live_matches = await self.data_processor.api_client.get_live_matches()
+            
+            # Encontrar partida específica
+            target_match = None
+            for match in live_matches:
+                if str(match.get('id', '')) == str(match_id):
+                    target_match = match
+                    break
+            
+            if not target_match:
+                return {'error': 'Partida não encontrada ou não está mais ao vivo'}
+            
+            # Fazer análise completa
+            analysis = await self.live_analyzer.analyze_live_match(target_match)
+            
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"Erro na análise de partida ao vivo: {e}")
+            return {'error': f'Erro na análise: {str(e)}'}
+    
+    async def get_live_matches_interactive(self) -> List[Dict]:
+        """Busca partidas ao vivo formatadas para interface interativa"""
+        
+        try:
+            live_matches = await self.data_processor.api_client.get_live_matches()
+            
+            interactive_matches = []
+            
+            for match in live_matches:
+                teams = match.get('match', {}).get('teams', [])
+                if len(teams) >= 2:
+                    team1 = teams[0]
+                    team2 = teams[1]
+                    
+                    # Buscar dados dos times
+                    team1_data = self.get_team_by_key(team1.get('code', ''))
+                    team2_data = self.get_team_by_key(team2.get('code', ''))
+                    
+                    # Criar match info para interface
+                    match_info = {
+                        'id': match.get('id', ''),
+                        'team1': {
+                            'name': team1.get('name', 'Team 1'),
+                            'code': team1.get('code', 'T1'),
+                            'rating': team1_data.get('rating', 70) if team1_data else 70
+                        },
+                        'team2': {
+                            'name': team2.get('name', 'Team 2'),
+                            'code': team2.get('code', 'T2'),
+                            'rating': team2_data.get('rating', 70) if team2_data else 70
+                        },
+                        'league': match.get('league', {}).get('name', 'Unknown League'),
+                        'state': match.get('state', 'unknown'),
+                        'start_time': match.get('startTime', ''),
+                        'strategy': match.get('strategy', {})
+                    }
+                    
+                    interactive_matches.append(match_info)
+            
+            return interactive_matches
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar partidas interativas: {e}")
+            return []
 
 
 # Instância global do sistema integrado
