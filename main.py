@@ -8,6 +8,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from flask import Flask, request, Response
 import traceback
 
+# RAILWAY REDEPLOY FORCE - 2025.05.23 - FIX EVENT LOOP
+print("🚀 INICIANDO BOT COM CORREÇÃO DE EVENT LOOP - v2025.05.23")
+
 # Configuração de logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
@@ -158,7 +161,9 @@ def health():
             "platform": "railway",
             "token": "configured",
             "initialized": application_initialized,
-            "loop": "active"
+            "loop": "active",
+            "version": "2025.05.23-event-loop-fix",
+            "background_thread": loop_thread.is_alive() if loop_thread else False
         }, 200
     else:
         reason = "Token não configurado"
@@ -173,7 +178,9 @@ def health():
             "platform": "railway",
             "reason": reason,
             "initialized": application_initialized,
-            "loop": "active" if loop_healthy else "inactive"
+            "loop": "active" if loop_healthy else "inactive",
+            "version": "2025.05.23-event-loop-fix",
+            "background_thread": loop_thread.is_alive() if loop_thread else False
         }, 500
 
 @app.route('/webhook', methods=['POST', 'GET'])
