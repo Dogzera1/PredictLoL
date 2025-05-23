@@ -1135,17 +1135,56 @@ def create_flask_app():
                 
                 update = Update.de_json(json_data, telegram_bot_v3.app.bot)
                 
-                # Processar update de forma síncrona (Flask-compatible)
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                # Processar update com loop dedicado e timeout
+                import threading
+                import time
                 
-                try:
-                    loop.run_until_complete(telegram_bot_v3.app.process_update(update))
-                    logger.info("✅ Webhook: Update processado com sucesso")
-                finally:
-                    loop.close()
+                result = {"success": False, "error": None}
                 
-                return "OK"
+                def process_update():
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            # Processar update com timeout
+                            loop.run_until_complete(
+                                asyncio.wait_for(
+                                    telegram_bot_v3.app.process_update(update),
+                                    timeout=30.0
+                                )
+                            )
+                            result["success"] = True
+                            logger.info("✅ Webhook: Update processado com sucesso")
+                        except asyncio.TimeoutError:
+                            result["error"] = "timeout"
+                            logger.error("⏰ Webhook: Timeout ao processar update")
+                        except Exception as e:
+                            result["error"] = str(e)
+                            logger.error(f"❌ Webhook: Erro no processamento: {e}")
+                        finally:
+                            # Aguardar um pouco antes de fechar o loop
+                            time.sleep(0.1)
+                            try:
+                                loop.close()
+                            except:
+                                pass
+                    except Exception as e:
+                        result["error"] = str(e)
+                        logger.error(f"❌ Webhook: Erro geral: {e}")
+                
+                # Executar em thread separada para evitar conflitos de loop
+                thread = threading.Thread(target=process_update)
+                thread.start()
+                thread.join(timeout=35.0)  # Aguardar até 35 segundos
+                
+                if result["success"]:
+                    return "OK"
+                elif result["error"] == "timeout":
+                    return "TIMEOUT", 408
+                elif result["error"]:
+                    return f"ERROR: {result['error']}", 500
+                else:
+                    return "UNKNOWN ERROR", 500
                 
             except Exception as e:
                 logger.error(f"Erro no webhook: {e}")
