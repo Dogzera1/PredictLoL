@@ -1055,6 +1055,9 @@ if FLASK_AVAILABLE:
 else:
     app = None
 
+# Instância do bot V3 - DEVE VIR ANTES da criação do Flask app
+telegram_bot_v3 = TelegramBotV3()
+
 def create_flask_app():
     """Cria app Flask se disponível"""
     if not FLASK_AVAILABLE:
@@ -1113,9 +1116,6 @@ def create_flask_app():
 # Instanciar app
 if FLASK_AVAILABLE:
     app = create_flask_app()
-
-# Instância do bot V3
-telegram_bot_v3 = TelegramBotV3()
 
 if __name__ == "__main__":
     print("🚀 Iniciando LOL Predictor V3 - Riot API Integration...")
