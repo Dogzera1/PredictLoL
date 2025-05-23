@@ -222,12 +222,12 @@ Olá {user.mention_markdown_v2()}!
 • Cronograma de jogos oficial
 
 🎯 **LIGAS SUPORTADAS:**
-• 🇰🇷 LCK \\(Korea\\)
-• 🇨🇳 LPL \\(China\\)  
-• 🇪🇺 LEC \\(Europe\\)
-• 🇺🇸 LCS \\(North America\\)
+• 🇰🇷 LCK (Korea)
+• 🇨🇳 LPL (China)  
+• 🇪🇺 LEC (Europe)
+• 🇺🇸 LCS (North America)
 
-Use o menu abaixo ou digite `/help` para começar!"""
+Use o menu abaixo ou digite /help para começar!"""
 
         # Inline keyboard com novas opções
         keyboard = [
@@ -250,7 +250,7 @@ Use o menu abaixo ou digite `/help` para começar!"""
         await update.message.reply_text(
             welcome_msg,
             reply_markup=reply_markup,
-            parse_mode='MarkdownV2'
+            parse_mode='Markdown'
         )
     
     async def help_command(self, update: Update, context):
