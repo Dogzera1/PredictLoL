@@ -1,4 +1,6 @@
-RAILWAY_DEPLOY_VERSION=2025-01-23_14-30-00
+RAILWAY_DEPLOY_VERSION=2025-05-23_23-17-00
 BOT_VERSION=integrated-v1.0
-LAST_DEPLOY_ATTEMPT=force-redeploy-commit-empty
-STATUS=forcing-auto-deploy-activation 
+LAST_DEPLOY_ATTEMPT=requirements-txt-update
+STATUS=trying-multiple-deploy-triggers
+GITHUB_COMMITS_PUSHED=5
+DEPLOY_METHODS_TRIED=empty-commit,version-file,requirements-update,new-branch 
