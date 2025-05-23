@@ -1,6 +1,8 @@
-RAILWAY_DEPLOY_VERSION=2025-05-23_23-17-00
+RAILWAY_DEPLOY_VERSION=2025-05-23_23-23-00
 BOT_VERSION=integrated-v1.0
-LAST_DEPLOY_ATTEMPT=requirements-txt-update
-STATUS=trying-multiple-deploy-triggers
-GITHUB_COMMITS_PUSHED=5
-DEPLOY_METHODS_TRIED=empty-commit,version-file,requirements-update,new-branch 
+LAST_DEPLOY_ATTEMPT=new-url-detected
+STATUS=railway-working-forcing-integrated-version
+GITHUB_COMMITS_PUSHED=6
+DEPLOY_METHODS_TRIED=empty-commit,version-file,requirements-update,new-branch,railway-config
+NEW_URL=spectacular-wonder-production-4fb2.up.railway.app
+WEBHOOK_CONFIGURED=true 
