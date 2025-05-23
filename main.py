@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import asyncio
+import threading
 from telegram import Bot, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from flask import Flask, request, Response
@@ -52,6 +53,13 @@ async def unknown_command_handler(update, context):
 # Inicializar o bot
 application = None
 application_initialized = False
+background_loop = None
+loop_thread = None
+
+def run_background_loop(loop):
+    """Executa o loop assíncrono em thread separada"""
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
 
 async def initialize_application():
     """Inicializa a Application uma única vez"""
@@ -103,16 +111,35 @@ async def process_update_async(update_data):
         logger.error(f"❌ Erro ao processar update: {str(e)}")
         logger.error(traceback.format_exc())
 
+def process_webhook_sync(payload):
+    """Processa webhook de forma síncrona usando o background loop"""
+    global background_loop
+    
+    if background_loop and not background_loop.is_closed():
+        future = asyncio.run_coroutine_threadsafe(
+            process_update_async(payload), 
+            background_loop
+        )
+        try:
+            # Aguardar no máximo 10 segundos
+            future.result(timeout=10)
+        except Exception as e:
+            logger.error(f"❌ Erro no processamento assíncrono: {e}")
+    else:
+        logger.error("❌ Background loop não disponível")
+
 # Rotas da aplicação
 @app.route('/', methods=['GET'])
 def home():
     status = "🟢 ATIVO" if application_initialized else "🔴 INATIVO"
     token_status = "✅ Configurado" if TOKEN else "❌ Não configurado"
+    loop_status = "✅ Ativo" if background_loop and not background_loop.is_closed() else "❌ Inativo"
     
     return f"""
     <h1>🤖 Bot LoL - Railway</h1>
     <p><strong>Status:</strong> {status}</p>
     <p><strong>Token:</strong> {token_status}</p>
+    <p><strong>Loop:</strong> {loop_status}</p>
     <p><strong>Webhook:</strong> /webhook</p>
     <p><strong>Bot:</strong> @BETLOLGPT_bot</p>
     <hr>
@@ -122,21 +149,31 @@ def home():
 @app.route('/health', methods=['GET'])
 def health():
     """Endpoint de saúde"""
-    if application_initialized and TOKEN:
+    loop_healthy = background_loop and not background_loop.is_closed()
+    
+    if application_initialized and TOKEN and loop_healthy:
         return {
             "status": "healthy", 
             "bot": "active", 
             "platform": "railway",
             "token": "configured",
-            "initialized": application_initialized
+            "initialized": application_initialized,
+            "loop": "active"
         }, 200
     else:
+        reason = "Token não configurado"
+        if not application_initialized:
+            reason = "Application não inicializada"
+        elif not loop_healthy:
+            reason = "Background loop não ativo"
+            
         return {
             "status": "unhealthy", 
             "bot": "inactive", 
             "platform": "railway",
-            "reason": "Application não inicializada" if not application_initialized else "Token não configurado",
-            "initialized": application_initialized
+            "reason": reason,
+            "initialized": application_initialized,
+            "loop": "active" if loop_healthy else "inactive"
         }, 500
 
 @app.route('/webhook', methods=['POST', 'GET'])
@@ -158,11 +195,8 @@ def webhook():
             
             logger.info(f"📨 Recebido update do Telegram")
             
-            # Processar update de forma assíncrona
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(process_update_async(payload))
-            loop.close()
+            # Processar usando background loop
+            process_webhook_sync(payload)
             
             return Response('✅ OK', status=200)
             
@@ -173,12 +207,40 @@ def webhook():
 
 # Inicialização da aplicação no startup
 def initialize_bot_sync():
-    """Função para inicializar o bot de forma síncrona"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    success = loop.run_until_complete(initialize_application())
-    loop.close()
-    return success
+    """Função para inicializar o bot e background loop"""
+    global background_loop, loop_thread
+    
+    try:
+        # Criar loop para thread separada
+        background_loop = asyncio.new_event_loop()
+        
+        # Iniciar thread com o loop
+        loop_thread = threading.Thread(
+            target=run_background_loop, 
+            args=(background_loop,),
+            daemon=True
+        )
+        loop_thread.start()
+        
+        # Inicializar o bot no background loop
+        future = asyncio.run_coroutine_threadsafe(
+            initialize_application(), 
+            background_loop
+        )
+        
+        # Aguardar inicialização
+        success = future.result(timeout=30)
+        
+        if success:
+            logger.info("✅ Background loop e bot inicializados")
+        else:
+            logger.error("❌ Falha na inicialização do bot")
+            
+        return success
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na inicialização: {e}")
+        return False
 
 if __name__ == "__main__":
     # Para Railway, usar a porta do ambiente ou 8080 como padrão
@@ -196,4 +258,8 @@ if __name__ == "__main__":
         app.run(host="0.0.0.0", port=port, debug=False)
     except Exception as e:
         print(f"❌ Erro ao iniciar aplicação: {e}")
-        exit(1) 
+        exit(1)
+    finally:
+        # Cleanup do loop ao encerrar
+        if background_loop and not background_loop.is_closed():
+            background_loop.call_soon_threadsafe(background_loop.stop) 
