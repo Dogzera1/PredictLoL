@@ -208,7 +208,7 @@ class TelegramBotV3:
         
         welcome_msg = f"""🎮 **BEM-VINDO AO LOL PREDICTOR V3!**
 
-Olá {user.mention_markdown_v2()}! 
+Olá {user.first_name}! 
 
 🚀 **NOVA VERSÃO COM RIOT API:**
 {api_status}
@@ -249,8 +249,7 @@ Use o menu abaixo ou digite /help para começar!"""
         
         await update.message.reply_text(
             welcome_msg,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
+            reply_markup=reply_markup
         )
     
     async def help_command(self, update: Update, context):
@@ -295,7 +294,7 @@ Use o menu abaixo ou digite /help para começar!"""
 
 🚀 **POWERED BY RIOT GAMES API**"""
 
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+        await update.message.reply_text(help_text)
     
     async def predict_command(self, update: Update, context):
         """Comando /predict com Riot API"""
@@ -345,7 +344,7 @@ Use o menu abaixo ou digite /help para começar!"""
         ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+        await update.message.reply_text(text, reply_markup=reply_markup)
     
     async def ranking_command(self, update: Update, context):
         """Comando /ranking com dados da Riot API"""
@@ -412,7 +411,7 @@ Use o menu abaixo ou digite /help para começar!"""
         ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+        await update.message.reply_text(text, reply_markup=reply_markup)
     
     async def live_command(self, update: Update, context):
         """Comando /live para partidas ao vivo com interface interativa"""
@@ -440,7 +439,7 @@ Não há partidas acontecendo neste momento.
                 ]
                 
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+                await update.message.reply_text(text, reply_markup=reply_markup)
                 return
             
             # Mostrar partidas ao vivo com botões interativos
@@ -477,12 +476,12 @@ Não há partidas acontecendo neste momento.
             ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            await update.message.reply_text(text, reply_markup=reply_markup)
         
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
             text = f"❌ Erro ao buscar partidas ao vivo: {str(e)}"
-            await update.message.reply_text(text, parse_mode='Markdown')
+            await update.message.reply_text(text)
     
     async def analyze_live_match_callback(self, query, match_id: str):
         """Callback para análise detalhada de partida ao vivo"""
@@ -518,7 +517,7 @@ Não há partidas acontecendo neste momento.
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            await query.edit_message_text(text, reply_markup=reply_markup)
             
         except Exception as e:
             logger.error(f"Erro na análise de partida: {e}")
@@ -629,7 +628,7 @@ Não há partidas acontecendo neste momento.
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            await query.edit_message_text(text, reply_markup=reply_markup)
             
         except Exception as e:
             logger.error(f"Erro ao mostrar odds: {e}")
@@ -687,7 +686,7 @@ Não há partidas acontecendo neste momento.
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            await query.edit_message_text(text, reply_markup=reply_markup)
             
         except Exception as e:
             logger.error(f"Erro ao mostrar timing: {e}")
@@ -755,7 +754,7 @@ Não há partidas acontecendo neste momento.
             ]
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            await query.edit_message_text(text, reply_markup=reply_markup)
             
         except Exception as e:
             logger.error(f"Erro ao mostrar momentum: {e}")
@@ -777,9 +776,7 @@ Não há partidas acontecendo neste momento.
                 "• `T1 vs G2 bo3` - Com dados oficiais\n"
                 "• `JDG vs TES` - Standings atuais LPL\n"
                 "• `Cloud9 vs Team Liquid` - Records reais\n\n"
-                "Digite `/help` para ver todos os comandos V3!",
-                parse_mode='Markdown'
-            )
+                "Digite `/help` para ver todos os comandos V3!")
     
     async def handle_riot_prediction(self, update, text):
         """Processa predição com dados da Riot API"""
@@ -889,8 +886,7 @@ Não há partidas acontecendo neste momento.
             
             await update.message.reply_text(
                 full_text,
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
+                reply_markup=reply_markup
             )
             
         except Exception as e:
@@ -960,7 +956,7 @@ Não há partidas acontecendo neste momento.
                 ]
                 
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+                await query.edit_message_text(text, reply_markup=reply_markup)
                 return
             
             # Mesmo formato do comando /live
@@ -994,7 +990,7 @@ Não há partidas acontecendo neste momento.
             ])
             
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            await query.edit_message_text(text, reply_markup=reply_markup)
             
         except Exception as e:
             logger.error(f"Erro ao atualizar partidas: {e}")
