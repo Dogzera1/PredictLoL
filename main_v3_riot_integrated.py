@@ -383,7 +383,7 @@ class ImprovedRiotAPI:
                         'image': '',
                         'result': {'gameWins': random.randint(0, 2)}
                     }
-                ],
+            ],
                 'games': [
                     {
                         'id': f"game_{i//2+1}_1",
@@ -397,9 +397,9 @@ class ImprovedRiotAPI:
                                 'side': 'red',
                                 'participants': self._generate_mock_composition()
                             }
-                        ]
+                    ]
                     }
-                ]
+            ]
             }
             matches.append(match)
         
@@ -817,11 +817,11 @@ class TelegramBotV3Improved:
             [
                 InlineKeyboardButton("📊 Análise de Draft", callback_data="draft_analysis"),
                 InlineKeyboardButton("🎯 Predições Rápidas", callback_data="quick_predictions")
-            ],
+        ],
             [
                 InlineKeyboardButton("💰 Dicas de Apostas", callback_data="betting_tips"),
                 InlineKeyboardButton("📈 Rankings Atuais", callback_data="current_rankings")
-            ],
+        ],
             [InlineKeyboardButton("ℹ️ Ajuda", callback_data="help")]
         ]
         
@@ -859,12 +859,12 @@ Não há partidas acontecendo neste momento.
 
 🔄 Atualize em alguns minutos!"""
                 
-                keyboard = [
+            keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all")],
                     [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-                ]
+            ]
                 
-                reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 if is_callback:
                     await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -902,7 +902,7 @@ Não há partidas acontecendo neste momento.
                     text += f"{team2.get('code', team2.get('name', 'Team2'))}{score_text}\n\n"
             
             # Criar botões para cada partida
-            keyboard = []
+        keyboard = []
             for match in live_matches[:8]:  # Máximo 8 partidas
                 teams = match.get('teams', [])
                 if len(teams) >= 2:
@@ -911,16 +911,16 @@ Não há partidas acontecendo neste momento.
                     
                     button_text = f"🔮 {team1_name} vs {team2_name}"
                     callback_data = f"predict_match_{match['id']}"
-                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+                    keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
             
             # Botões de ação
             keyboard.append([
                 InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all"),
                 InlineKeyboardButton("📊 Ver Rankings", callback_data="current_rankings")
-            ])
+        ])
             keyboard.append([InlineKeyboardButton("🏠 Menu Principal", callback_data="start")])
             
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
             
             if is_callback:
                 await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -961,22 +961,22 @@ Não há partidas acontecendo neste momento.
             text = self._format_match_prediction(prediction, match_data)
             
             # Botões de ação
-            keyboard = [
+        keyboard = [
                 [
                     InlineKeyboardButton("🏆 Ver Draft", callback_data=f"draft_{match_id}"),
                     InlineKeyboardButton("💰 Análise Odds", callback_data=f"odds_{match_id}")
-                ],
+            ],
                 [
                     InlineKeyboardButton("🔄 Atualizar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Comparar Times", callback_data=f"compare_{match_id}")
-                ],
+            ],
                 [
                     InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
-                ]
             ]
+        ]
             
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
             
         except Exception as e:
@@ -1048,18 +1048,18 @@ Não há partidas acontecendo neste momento.
                 text = self._format_draft_analysis(draft_analysis, match_data)
             
             # Botões
-            keyboard = [
+        keyboard = [
                 [
                     InlineKeyboardButton("🔮 Ver Predição", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Fases do Jogo", callback_data=f"phases_{match_id}")
-                ],
+            ],
                 [
                     InlineKeyboardButton("🔙 Voltar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
-                ]
             ]
+        ]
             
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
             
         except Exception as e:
@@ -1164,11 +1164,11 @@ Não há partidas acontecendo neste momento.
             [
                 InlineKeyboardButton("📊 Análise de Draft", callback_data="draft_analysis"),
                 InlineKeyboardButton("🎯 Predições Rápidas", callback_data="quick_predictions")
-            ],
+        ],
             [
                 InlineKeyboardButton("💰 Dicas de Apostas", callback_data="betting_tips"),
                 InlineKeyboardButton("📈 Rankings Atuais", callback_data="current_rankings")
-            ],
+        ],
             [InlineKeyboardButton("ℹ️ Ajuda", callback_data="help")]
         ]
         
@@ -1207,13 +1207,13 @@ Não há partidas acontecendo neste momento.
 • Comparação entre times
 • Histórico de performance
 • Análise de momentum"""
-            
-            keyboard = [
+        
+        keyboard = [
             [InlineKeyboardButton("🔴 Testar Agora", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
     
     async def betting_tips_callback(self, query):
@@ -1286,12 +1286,12 @@ Aposte com responsabilidade."""
 🔄 Rankings atualizados automaticamente
 baseado em performance recente"""
 
-            keyboard = [
+        keyboard = [
             [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(rankings_text, reply_markup=reply_markup, parse_mode='Markdown')
     
     async def help_command(self, update: Update, context):
@@ -1315,13 +1315,13 @@ Use os botões ou comandos:
 • `/start` - Menu principal
 
 💡 **Dica:** Use a interface com botões para melhor experiência!"""
-                
-                keyboard = [
+            
+        keyboard = [
                 [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-                ]
-                
-                reply_markup = InlineKeyboardMarkup(keyboard)
+        ]
+            
+        reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
     
     async def run(self):
