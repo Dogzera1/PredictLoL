@@ -1,0 +1,521 @@
+{
+  "timestamp": "2025-05-22T22:06:13.113508",
+  "model_info": {
+    "model_type": "RandomForestClassifier",
+    "features_count": 44,
+    "training_samples": 500,
+    "feature_names": [
+      "team1_kills",
+      "team1_gold",
+      "team1_towers",
+      "team1_dragons",
+      "team1_barons",
+      "team2_kills",
+      "team2_gold",
+      "team2_towers",
+      "team2_dragons",
+      "team2_barons",
+      "kill_diff",
+      "gold_diff",
+      "tower_diff",
+      "dragon_diff",
+      "baron_diff",
+      "gold_ratio",
+      "kill_ratio",
+      "objective_score_diff",
+      "games_count",
+      "game_duration",
+      "total_kills",
+      "total_gold",
+      "first_blood",
+      "first_tower",
+      "first_dragon",
+      "elder_dragons",
+      "herald_kills",
+      "avg_kills_per_min",
+      "gold_per_min_diff",
+      "vision_score_diff",
+      "cs_diff_15",
+      "gold_diff_15",
+      "team1_ad_count",
+      "team1_ap_count",
+      "team1_tank_count",
+      "team2_ad_count",
+      "team2_ap_count",
+      "team2_tank_count",
+      "early_game_lead",
+      "mid_game_lead",
+      "late_game_scaling",
+      "tournament",
+      "team1_side",
+      "patch"
+    ]
+  },
+  "performance_metrics": {
+    "auc_roc": 0.9998799519807923,
+    "log_loss": 0.10331104594213335,
+    "accuracy": 0.992,
+    "inference_time_ms": 0.08077621459960938,
+    "total_samples": 500,
+    "positive_rate": 0.49,
+    "prediction_mean": 0.49031869061326894,
+    "prediction_std": 0.42049918606889225,
+    "confident_accuracy_0.6": 1.0,
+    "confident_samples_0.6": 487,
+    "confident_accuracy_0.7": 1.0,
+    "confident_samples_0.7": 479,
+    "confident_accuracy_0.8": 1.0,
+    "confident_samples_0.8": 435,
+    "confident_accuracy_0.9": 1.0,
+    "confident_samples_0.9": 342
+  },
+  "context_analysis": {
+    "by_patch": {
+      "14.1": {
+        "auc_roc": 1.0,
+        "log_loss": 0.09315353386067807,
+        "accuracy": 0.95,
+        "samples": 20,
+        "positive_rate": 0.5,
+        "prediction_mean": 0.5178944080977421
+      },
+      "14.5": {
+        "auc_roc": 1.0,
+        "log_loss": 0.15425962382532765,
+        "accuracy": 0.9444444444444444,
+        "samples": 18,
+        "positive_rate": 0.5555555555555556,
+        "prediction_mean": 0.5733114660045107
+      },
+      "14.15": {
+        "auc_roc": 1.0,
+        "log_loss": 0.10217073382756313,
+        "accuracy": 1.0,
+        "samples": 27,
+        "positive_rate": 0.48148148148148145,
+        "prediction_mean": 0.47565605408341277
+      },
+      "14.4": {
+        "auc_roc": 1.0,
+        "log_loss": 0.1359913822663317,
+        "accuracy": 1.0,
+        "samples": 20,
+        "positive_rate": 0.4,
+        "prediction_mean": 0.42572509433565225
+      },
+      "14.7": {
+        "auc_roc": 1.0,
+        "log_loss": 0.07302844424198099,
+        "accuracy": 1.0,
+        "samples": 16,
+        "positive_rate": 0.3125,
+        "prediction_mean": 0.3233560833441581
+      },
+      "14.20": {
+        "auc_roc": 1.0,
+        "log_loss": 0.07937474259654616,
+        "accuracy": 1.0,
+        "samples": 24,
+        "positive_rate": 0.5,
+        "prediction_mean": 0.5111007179633421
+      },
+      "14.22": {
+        "auc_roc": 1.0,
+        "log_loss": 0.06720529099660578,
+        "accuracy": 1.0,
+        "samples": 21,
+        "positive_rate": 0.5714285714285714,
+        "prediction_mean": 0.5604416402724903
+      },
+      "14.18": {
+        "auc_roc": 1.0,
+        "log_loss": 0.13543422148313522,
+        "accuracy": 0.9444444444444444,
+        "samples": 18,
+        "positive_rate": 0.3888888888888889,
+        "prediction_mean": 0.43721114886676815
+      },
+      "14.11": {
+        "auc_roc": 1.0,
+        "log_loss": 0.15596743817445152,
+        "accuracy": 1.0,
+        "samples": 23,
+        "positive_rate": 0.43478260869565216,
+        "prediction_mean": 0.44347908943047754
+      },
+      "14.10": {
+        "auc_roc": 1.0,
+        "log_loss": 0.08597138492886447,
+        "accuracy": 1.0,
+        "samples": 21,
+        "positive_rate": 0.6190476190476191,
+        "prediction_mean": 0.5840493560937761
+      },
+      "14.14": {
+        "auc_roc": 1.0,
+        "log_loss": 0.08837708116242964,
+        "accuracy": 1.0,
+        "samples": 19,
+        "positive_rate": 0.47368421052631576,
+        "prediction_mean": 0.4996893454294488
+      },
+      "14.23": {
+        "auc_roc": 1.0,
+        "log_loss": 0.05972047407328203,
+        "accuracy": 1.0,
+        "samples": 26,
+        "positive_rate": 0.34615384615384615,
+        "prediction_mean": 0.36290341386212854
+      },
+      "14.2": {
+        "auc_roc": 1.0,
+        "log_loss": 0.09801976499132965,
+        "accuracy": 1.0,
+        "samples": 21,
+        "positive_rate": 0.5238095238095238,
+        "prediction_mean": 0.5053006135609743
+      },
+      "14.8": {
+        "auc_roc": 1.0,
+        "log_loss": 0.09213303321207282,
+        "accuracy": 1.0,
+        "samples": 19,
+        "positive_rate": 0.5789473684210527,
+        "prediction_mean": 0.5358531933236911
+      },
+      "14.16": {
+        "auc_roc": 1.0,
+        "log_loss": 0.0901370646481114,
+        "accuracy": 1.0,
+        "samples": 27,
+        "positive_rate": 0.7407407407407407,
+        "prediction_mean": 0.695902923110924
+      },
+      "14.6": {
+        "auc_roc": 1.0,
+        "log_loss": 0.087204871252285,
+        "accuracy": 1.0,
+        "samples": 19,
+        "positive_rate": 0.3684210526315789,
+        "prediction_mean": 0.38927081610045894
+      },
+      "14.13": {
+        "auc_roc": 1.0,
+        "log_loss": 0.07216541532728608,
+        "accuracy": 1.0,
+        "samples": 21,
+        "positive_rate": 0.3333333333333333,
+        "prediction_mean": 0.33786534284002195
+      },
+      "14.21": {
+        "auc_roc": 1.0,
+        "log_loss": 0.0954699092474676,
+        "accuracy": 1.0,
+        "samples": 18,
+        "positive_rate": 0.6111111111111112,
+        "prediction_mean": 0.5707760254634988
+      },
+      "14.3": {
+        "auc_roc": 1.0,
+        "log_loss": 0.09700068949349502,
+        "accuracy": 1.0,
+        "samples": 29,
+        "positive_rate": 0.5172413793103449,
+        "prediction_mean": 0.5079802691892342
+      },
+      "14.17": {
+        "auc_roc": 1.0,
+        "log_loss": 0.15015161384631495,
+        "accuracy": 1.0,
+        "samples": 31,
+        "positive_rate": 0.6451612903225806,
+        "prediction_mean": 0.6253714604854784
+      },
+      "14.9": {
+        "auc_roc": 1.0,
+        "log_loss": 0.11971125417123606,
+        "accuracy": 1.0,
+        "samples": 21,
+        "positive_rate": 0.42857142857142855,
+        "prediction_mean": 0.4452112769170527
+      },
+      "14.12": {
+        "auc_roc": 1.0,
+        "log_loss": 0.12211638469436153,
+        "accuracy": 0.9545454545454546,
+        "samples": 22,
+        "positive_rate": 0.45454545454545453,
+        "prediction_mean": 0.46211193230998987
+      },
+      "14.19": {
+        "auc_roc": 1.0,
+        "log_loss": 0.1151859810587474,
+        "accuracy": 1.0,
+        "samples": 19,
+        "positive_rate": 0.3157894736842105,
+        "prediction_mean": 0.3510406740949485
+      }
+    },
+    "by_duration": {
+      "0-25min": {
+        "auc_roc": 1.0,
+        "log_loss": 0.12495110740341078,
+        "accuracy": 0.983739837398374,
+        "samples": 123,
+        "positive_rate": 0.45528455284552843,
+        "prediction_mean": 0.47967564944610114
+      },
+      "25-35min": {
+        "auc_roc": 1.0,
+        "log_loss": 0.09859112465747286,
+        "accuracy": 1.0,
+        "samples": 187,
+        "positive_rate": 0.47593582887700536,
+        "prediction_mean": 0.46293969371932675
+      },
+      "35-999+min": {
+        "auc_roc": 1.0,
+        "log_loss": 0.09394734973420905,
+        "accuracy": 0.9894736842105263,
+        "samples": 190,
+        "positive_rate": 0.5263157894736842,
+        "prediction_mean": 0.5241553563118415
+      }
+    },
+    "by_side": {
+      "blue": {
+        "auc_roc": 0.9996795328300813,
+        "log_loss": 0.10385800922893812,
+        "accuracy": 0.9873417721518988,
+        "samples": 237,
+        "positive_rate": 0.4978902953586498,
+        "prediction_mean": 0.5001129104990278
+      },
+      "red": {
+        "auc_roc": 1.0,
+        "log_loss": 0.10281815507151461,
+        "accuracy": 0.9961977186311787,
+        "samples": 263,
+        "positive_rate": 0.4828897338403042,
+        "prediction_mean": 0.4814927206021476
+      }
+    }
+  },
+  "worst_scenarios": {
+    "worst_predictions": [
+      {
+        "index": 337,
+        "true_label": 0,
+        "prediction": 0.34509999999999996,
+        "error": 0.34509999999999996,
+        "patch": "14.16",
+        "duration": 19.0
+      },
+      {
+        "index": 468,
+        "true_label": 1,
+        "prediction": 0.64,
+        "error": 0.36,
+        "patch": "14.12",
+        "duration": 35.0
+      },
+      {
+        "index": 19,
+        "true_label": 1,
+        "prediction": 0.63,
+        "error": 0.37,
+        "patch": "14.16",
+        "duration": 33.0
+      },
+      {
+        "index": 296,
+        "true_label": 1,
+        "prediction": 0.63,
+        "error": 0.37,
+        "patch": "14.17",
+        "duration": 34.0
+      },
+      {
+        "index": 322,
+        "true_label": 0,
+        "prediction": 0.38,
+        "error": 0.38,
+        "patch": "14.20",
+        "duration": 41.0
+      },
+      {
+        "index": 49,
+        "true_label": 0,
+        "prediction": 0.38975956820412166,
+        "error": 0.38975956820412166,
+        "patch": "14.11",
+        "duration": 19.0
+      },
+      {
+        "index": 400,
+        "true_label": 0,
+        "prediction": 0.39,
+        "error": 0.39,
+        "patch": "14.5",
+        "duration": 19.0
+      },
+      {
+        "index": 74,
+        "true_label": 1,
+        "prediction": 0.59,
+        "error": 0.41000000000000003,
+        "patch": "14.19",
+        "duration": 29.0
+      },
+      {
+        "index": 179,
+        "true_label": 1,
+        "prediction": 0.5898342354533153,
+        "error": 0.41016576454668474,
+        "patch": "14.16",
+        "duration": 27.0
+      },
+      {
+        "index": 1,
+        "true_label": 1,
+        "prediction": 0.58,
+        "error": 0.42000000000000004,
+        "patch": "14.5",
+        "duration": 32.0
+      },
+      {
+        "index": 281,
+        "true_label": 1,
+        "prediction": 0.5796390347536778,
+        "error": 0.42036096524632216,
+        "patch": "14.10",
+        "duration": 20.0
+      },
+      {
+        "index": 264,
+        "true_label": 0,
+        "prediction": 0.42675496688741726,
+        "error": 0.42675496688741726,
+        "patch": "14.17",
+        "duration": 23.0
+      },
+      {
+        "index": 498,
+        "true_label": 0,
+        "prediction": 0.43,
+        "error": 0.43,
+        "patch": "14.9",
+        "duration": 36.0
+      },
+      {
+        "index": 88,
+        "true_label": 1,
+        "prediction": 0.57,
+        "error": 0.43000000000000005,
+        "patch": "14.8",
+        "duration": 34.0
+      },
+      {
+        "index": 227,
+        "true_label": 1,
+        "prediction": 0.54,
+        "error": 0.45999999999999996,
+        "patch": "14.15",
+        "duration": 24.0
+      },
+      {
+        "index": 427,
+        "true_label": 1,
+        "prediction": 0.53,
+        "error": 0.47,
+        "patch": "14.4",
+        "duration": 33.0
+      },
+      {
+        "index": 144,
+        "true_label": 0,
+        "prediction": 0.52,
+        "error": 0.52,
+        "patch": "14.5",
+        "duration": 24.0
+      },
+      {
+        "index": 495,
+        "true_label": 0,
+        "prediction": 0.53,
+        "error": 0.53,
+        "patch": "14.1",
+        "duration": 19.0
+      },
+      {
+        "index": 460,
+        "true_label": 0,
+        "prediction": 0.56,
+        "error": 0.56,
+        "patch": "14.18",
+        "duration": 35.0
+      },
+      {
+        "index": 216,
+        "true_label": 0,
+        "prediction": 0.5890354330708661,
+        "error": 0.5890354330708661,
+        "patch": "14.12",
+        "duration": 38.0
+      }
+    ],
+    "common_patterns": {
+      "problematic_patches": {
+        "14.16": 3,
+        "14.5": 3,
+        "14.12": 2,
+        "14.17": 2,
+        "14.20": 1
+      },
+      "duration_stats": {
+        "count": 20.0,
+        "mean": 28.7,
+        "std": 7.277217513366089,
+        "min": 19.0,
+        "25%": 22.25,
+        "50%": 30.5,
+        "75%": 34.25,
+        "max": 41.0
+      }
+    }
+  },
+  "calibration_analysis": {
+    "brier_score": 0.018380992658976372,
+    "ece": 0.08267155769065042,
+    "calibration_slope": 0.902666821841009,
+    "reliability_data": {
+      "fraction_positives": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.6363636363636364,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "mean_predicted_value": [
+        0.03887493185830684,
+        0.14741635352272725,
+        0.23939270219293782,
+        0.3762148920510304,
+        0.42837748344370863,
+        0.5616826093888962,
+        0.6475,
+        0.7555975422706261,
+        0.8558917895917351,
+        0.9605595863312002
+      ]
+    }
+  },
+  "recommendations": [
+    "🎯 Analise cenários de pior performance para feature engineering direcionada"
+  ]
+}
