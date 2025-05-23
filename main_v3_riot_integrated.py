@@ -1101,8 +1101,8 @@ def create_flask_app():
         @app.route('/webhook', methods=['POST'])
         def webhook():
             try:
-                update = Update.de_json(request.get_json(), bot.bot)
-                asyncio.create_task(bot.process_update(update))
+                update = Update.de_json(request.get_json(), telegram_bot_v3.app.bot)
+                asyncio.create_task(telegram_bot_v3.app.process_update(update))
                 return "OK"
             except Exception as e:
                 logger.error(f"Erro no webhook: {e}")
