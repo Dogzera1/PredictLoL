@@ -40,20 +40,20 @@ except ImportError:
     # Modo teste - usar classes mock do arquivo original
     logger.warning("⚠️ Telegram libraries não encontradas - modo teste ativo")
     TELEGRAM_AVAILABLE = False
-    
+
     # Classes mock (same as original)
     class Update:
         pass
-    
+
     class InlineKeyboardButton:
         def __init__(self, text, callback_data=None):
             self.text = text
             self.callback_data = callback_data
-    
+
     class InlineKeyboardMarkup:
         def __init__(self, keyboard):
             self.keyboard = keyboard
-    
+
     # [resto das classes mock...]
 
 try:
@@ -85,6 +85,7 @@ try:
 except ImportError:
     VALUE_BETTING_AVAILABLE = False
     logger.warning("⚠️ Sistema de Value Betting não disponível")
+
 
 class ChampionAnalyzer:
     """Analisador avançado de composições de campeões"""
@@ -138,7 +139,10 @@ class ChampionAnalyzer:
             ('fighter', 'engage'): 0.7
         }
 
-    def analyze_draft(self, team1_comp: List[str], team2_comp: List[str]) -> Dict:
+    def analyze_draft(
+    self,
+    team1_comp: List[str],
+     team2_comp: List[str]) -> Dict:
         """Analisa o draft completo entre dois times"""
         team1_analysis = self._analyze_team_composition(team1_comp)
         team2_analysis = self._analyze_team_composition(team2_comp)
@@ -148,13 +152,18 @@ class ChampionAnalyzer:
             team1_analysis, team2_analysis)
 
         return {
-            'team1': team1_analysis,
-            'team2': team2_analysis,
-            'draft_advantage': draft_advantage,
-            'phase_analysis': self._analyze_game_phases(team1_analysis, team2_analysis),
-            'key_matchups': self._identify_key_matchups(team1_comp, team2_comp),
-            'win_conditions': self._identify_win_conditions(team1_analysis, team2_analysis)
-        }
+    'team1': team1_analysis,
+    'team2': team2_analysis,
+    'draft_advantage': draft_advantage,
+    'phase_analysis': self._analyze_game_phases(
+        team1_analysis,
+        team2_analysis),
+        'key_matchups': self._identify_key_matchups(
+            team1_comp,
+            team2_comp),
+            'win_conditions': self._identify_win_conditions(
+                team1_analysis,
+                 team2_analysis)}
 
     def _analyze_team_composition(self, composition: List[str]) -> Dict:
         """Analisa uma composição de time"""
@@ -237,7 +246,7 @@ class ChampionAnalyzer:
                     composition[j], {'type': 'balanced'})['type']
 
                 synergy = self.synergies.get((champ1_type, champ2_type),
-                                            self.synergies.get((champ2_type, champ1_type), 0.5))
+                                             self.synergies.get((champ2_type, champ1_type), 0.5))
                 total_synergy += synergy
                 comparisons += 1
 
@@ -265,9 +274,9 @@ class ChampionAnalyzer:
         return spikes if spikes else ['mid_game']
 
     def _calculate_draft_advantage(
-    self,
-    team1_analysis: Dict,
-     team2_analysis: Dict) -> Dict:
+        self,
+        team1_analysis: Dict,
+        team2_analysis: Dict) -> Dict:
         """Calcula vantagem de draft entre dois times"""
         # Comparar em diferentes fases
         early_diff = team1_analysis['early_game'] - \
@@ -295,9 +304,9 @@ class ChampionAnalyzer:
         }
 
     def _analyze_game_phases(
-    self,
-    team1_analysis: Dict,
-     team2_analysis: Dict) -> Dict:
+        self,
+        team1_analysis: Dict,
+        team2_analysis: Dict) -> Dict:
         """Analisa qual time é favorito em cada fase"""
         return {
             'early_game': {
@@ -315,9 +324,9 @@ class ChampionAnalyzer:
         }
 
     def _identify_key_matchups(
-    self,
-    team1_comp: List[str],
-     team2_comp: List[str]) -> List[str]:
+        self,
+        team1_comp: List[str],
+        team2_comp: List[str]) -> List[str]:
         """Identifica matchups chave entre as composições"""
         matchups = []
 
@@ -330,9 +339,9 @@ class ChampionAnalyzer:
         return matchups
 
     def _identify_win_conditions(
-    self,
-    team1_analysis: Dict,
-     team2_analysis: Dict) -> Dict:
+        self,
+        team1_analysis: Dict,
+        team2_analysis: Dict) -> Dict:
         """Identifica condições de vitória para cada time"""
         team1_conditions = []
         team2_conditions = []
@@ -367,7 +376,7 @@ class ChampionAnalyzer:
 
 class ImprovedRiotAPI:
     """Cliente melhorado para API da Riot com análise de composições"""
-    
+
     def __init__(self):
         self.base_url = "https://esports-api.lolesports.com/persisted/gw"
         self.api_key = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
@@ -423,7 +432,7 @@ class ImprovedRiotAPI:
                         'image': '',
                         'result': {'gameWins': random.randint(0, 2)}
                     }
-            ],
+                    ],
                 'games': [
                     {
                         'id': f"game_{i // 2 + 1}_1",
@@ -437,9 +446,9 @@ class ImprovedRiotAPI:
                                 'side': 'red',
                                 'participants': self._generate_mock_composition()
                             }
-        ]
+                            ]
                     }
-        ]
+                    ]
             }
             matches.append(match)
 
@@ -462,13 +471,15 @@ class ImprovedRiotAPI:
             live_matches = await self._get_live_from_api()
 
             if live_matches:
-                logger.info(f"✅ {len(live_matches)} partidas ao vivo da API oficial")
-                return live_matches
+                logger.info(
+    f"✅ {
+        len(live_matches)} partidas ao vivo da API oficial")
+            return live_matches
 
             # Se API falhar, usar dados de fallback
             logger.warning("⚠️ API não disponível, usando dados simulados")
             return self.fallback_live_matches
-                
+
         except Exception as e:
             logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
@@ -492,9 +503,9 @@ class ImprovedRiotAPI:
                                 enriched_match = await self._enrich_match_with_compositions(event)
                                 enriched_matches.append(enriched_match)
 
-                            return enriched_matches
+                        return enriched_matches
 
-                    return []
+                return []
         except Exception as e:
             logger.error(f"❌ Erro na API request: {e}")
             return []
@@ -508,7 +519,8 @@ class ImprovedRiotAPI:
                 for game in games:
                     if game.get('state') == 'inProgress':
                         # Extrair composições do jogo ativo
-                        team1_comp, team2_comp = self._extract_compositions_from_game(game)
+                        team1_comp, team2_comp = self._extract_compositions_from_game(
+                            game)
 
                         # Adicionar aos dados da partida
                         match_data['team1_composition'] = team1_comp
@@ -517,8 +529,10 @@ class ImprovedRiotAPI:
 
             # Se não conseguiu extrair, usar composições mock
             if 'team1_composition' not in match_data:
-                match_data['team1_composition'] = [champ['championId'] for champ in self._generate_mock_composition()]
-                match_data['team2_composition'] = [champ['championId'] for champ in self._generate_mock_composition()]
+                match_data['team1_composition'] = [champ['championId']
+                    for champ in self._generate_mock_composition()]
+                match_data['team2_composition'] = [champ['championId']
+                    for champ in self._generate_mock_composition()]
 
             return match_data
 
@@ -536,7 +550,8 @@ class ImprovedRiotAPI:
                 for team in game_data['teams']:
                     side = team.get('side', '')
                     participants = team.get('participants', [])
-                    comp = [p.get('championId', 'Unknown') for p in participants]
+                    comp = [p.get('championId', 'Unknown')
+                                  for p in participants]
 
                     if side == 'blue':
                         team1_comp = comp
@@ -591,10 +606,12 @@ class DynamicPredictionSystem:
 
             draft_analysis = None
             if team1_comp and team2_comp:
-                draft_analysis = self.champion_analyzer.analyze_draft(team1_comp, team2_comp)
+                draft_analysis = self.champion_analyzer.analyze_draft(
+                    team1_comp, team2_comp)
 
             # Calcular probabilidades base
-            base_prob = self._calculate_base_probability(team1_data, team2_data)
+            base_prob = self._calculate_base_probability(
+                team1_data, team2_data)
 
             # Ajustar por draft
             if draft_analysis:
@@ -602,7 +619,8 @@ class DynamicPredictionSystem:
                 base_prob += draft_adjustment
 
             # Ajustar por momentum da partida
-            momentum_adjustment = self._calculate_momentum_adjustment(match_data)
+            momentum_adjustment = self._calculate_momentum_adjustment(
+                match_data)
             final_prob = base_prob + momentum_adjustment
 
             # Garantir que probabilidade está entre 0.1 e 0.9
@@ -620,21 +638,23 @@ class DynamicPredictionSystem:
             )
 
             return {
-                'team1': team1_name,
-                'team2': team2_name,
-                'team1_win_probability': final_prob,
-                'team2_win_probability': 1 - final_prob,
-                'team1_odds': team1_odds,
-                'team2_odds': team2_odds,
-                'confidence': self._calculate_confidence(team1_data, team2_data, draft_analysis),
-                'analysis': analysis,
-                'draft_analysis': draft_analysis,
-                'last_updated': datetime.now().isoformat()
-            }
+    'team1': team1_name,
+    'team2': team2_name,
+    'team1_win_probability': final_prob,
+    'team2_win_probability': 1 - final_prob,
+    'team1_odds': team1_odds,
+    'team2_odds': team2_odds,
+    'confidence': self._calculate_confidence(
+        team1_data,
+        team2_data,
+        draft_analysis),
+        'analysis': analysis,
+        'draft_analysis': draft_analysis,
+         'last_updated': datetime.now().isoformat()}
 
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
-            return self._get_fallback_prediction()
+                return self._get_fallback_prediction()
 
     def _get_team_data(self, team_name: str) -> Dict:
         """Busca dados do time com fallback"""
@@ -654,7 +674,10 @@ class DynamicPredictionSystem:
             'region': 'UNKNOWN'
         }
 
-    def _calculate_base_probability(self, team1_data: Dict, team2_data: Dict) -> float:
+    def _calculate_base_probability(
+    self,
+    team1_data: Dict,
+     team2_data: Dict) -> float:
         """Calcula probabilidade base entre dois times"""
         rating1 = team1_data['rating']
         rating2 = team2_data['rating']
@@ -669,11 +692,15 @@ class DynamicPredictionSystem:
         form_diff = (form1 - form2) * 0.1
 
         # Ajuste por região (inter-regional matches)
-        region_adjustment = self._calculate_region_adjustment(team1_data, team2_data)
+        region_adjustment = self._calculate_region_adjustment(
+            team1_data, team2_data)
 
         return elo_prob + form_diff + region_adjustment
 
-    def _calculate_region_adjustment(self, team1_data: Dict, team2_data: Dict) -> float:
+    def _calculate_region_adjustment(
+    self,
+    team1_data: Dict,
+     team2_data: Dict) -> float:
         """Calcula ajuste por diferença de região"""
         region1 = team1_data['region']
         region2 = team2_data['region']
@@ -723,7 +750,11 @@ class DynamicPredictionSystem:
         except Exception:
             return 0
 
-    def _calculate_confidence(self, team1_data: Dict, team2_data: Dict, draft_analysis: Dict = None) -> str:
+    def _calculate_confidence(
+    self,
+    team1_data: Dict,
+    team2_data: Dict,
+     draft_analysis: Dict = None) -> str:
         """Calcula nível de confiança da predição"""
         rating_diff = abs(team1_data['rating'] - team2_data['rating'])
         form_diff = abs(team1_data['form'] - team2_data['form'])
@@ -745,8 +776,14 @@ class DynamicPredictionSystem:
         else:
             return 'muito baixa'
 
-    def _generate_match_analysis(self, team1: str, team2: str, team1_data: Dict, team2_data: Dict,
-                                draft_analysis: Dict = None, win_prob: float = 0.5) -> str:
+    def _generate_match_analysis(
+    self,
+    team1: str,
+    team2: str,
+    team1_data: Dict,
+    team2_data: Dict,
+    draft_analysis: Dict = None,
+     win_prob: float = 0.5) -> str:
         """Gera análise detalhada da partida"""
         analysis = []
 
@@ -760,39 +797,48 @@ class DynamicPredictionSystem:
             underdog = team1
             favorite_prob = (1 - win_prob) * 100
 
-        analysis.append(f"🎯 **{favorite}** é favorito com {favorite_prob:.1f}% de chance")
+        analysis.append(
+            f"🎯 **{favorite}** é favorito com {favorite_prob:.1f}% de chance")
 
         # Análise de ratings
         rating_diff = abs(team1_data['rating'] - team2_data['rating'])
         if rating_diff > 100:
             stronger_team = team1 if team1_data['rating'] > team2_data['rating'] else team2
-            analysis.append(f"💪 **{stronger_team}** tem vantagem significativa de rating ({rating_diff:.0f} pontos)")
+            analysis.append(
+                f"💪 **{stronger_team}** tem vantagem significativa de rating ({rating_diff:.0f} pontos)")
 
         # Análise de forma
         form_diff = abs(team1_data['form'] - team2_data['form'])
         if form_diff > 0.15:
             better_form = team1 if team1_data['form'] > team2_data['form'] else team2
-            analysis.append(f"📈 **{better_form}** está em melhor forma recente")
+            analysis.append(
+    f"📈 **{better_form}** está em melhor forma recente")
 
         # Análise de draft
         if draft_analysis:
             draft_advantage = draft_analysis['draft_advantage']
             if abs(draft_advantage['overall']) > 0.3:
                 draft_favorite = team1 if draft_advantage['overall'] > 0 else team2
-                analysis.append(f"🎯 **{draft_favorite}** tem vantagem no draft")
+                analysis.append(
+    f"🎯 **{draft_favorite}** tem vantagem no draft")
 
             # Win conditions
             win_conditions = draft_analysis['win_conditions']
-            analysis.append(f"🏆 **{team1}** deve: {', '.join(win_conditions['team1'][:2])}")
-            analysis.append(f"🏆 **{team2}** deve: {', '.join(win_conditions['team2'][:2])}")
+            analysis.append(
+                f"🏆 **{team1}** deve: {', '.join(win_conditions['team1'][:2])}")
+            analysis.append(
+                f"🏆 **{team2}** deve: {', '.join(win_conditions['team2'][:2])}")
 
         # Recomendação de aposta
         if favorite_prob > 70:
-            analysis.append(f"💰 **APOSTA RECOMENDADA:** {favorite} (alta confiança)")
+            analysis.append(
+    f"💰 **APOSTA RECOMENDADA:** {favorite} (alta confiança)")
         elif favorite_prob > 60:
-            analysis.append(f"💰 **APOSTA RECOMENDADA:** {favorite} (confiança moderada)")
-            else:
-            analysis.append(f"💰 **RECOMENDAÇÃO:** Partida equilibrada, aposte com cautela")
+            analysis.append(
+    f"💰 **APOSTA RECOMENDADA:** {favorite} (confiança moderada)")
+        else:
+            analysis.append(
+    f"💰 **RECOMENDAÇÃO:** Partida equilibrada, aposte com cautela")
 
         return "\n".join(analysis)
 
@@ -836,7 +882,10 @@ class TelegramBotV3Improved:
         self.app.add_handler(CommandHandler("live", self.live_command))
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
-        self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.text_message_handler))
+        self.app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+         self.text_message_handler))
 
     async def start_command(self, update: Update, context):
         """Comando /start melhorado"""
@@ -852,25 +901,36 @@ class TelegramBotV3Improved:
 👆 **Clique nos botões abaixo para navegar:**"""
 
         keyboard = [
-            [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
+            [InlineKeyboardButton("🔴 PARTIDAS AO VIVO",
+                                  callback_data="live_matches_all")],
             [
-                InlineKeyboardButton("📊 Análise de Draft", callback_data="draft_analysis"),
-                InlineKeyboardButton("🎯 Predições Rápidas", callback_data="quick_predictions")
+                InlineKeyboardButton(
+    "📊 Análise de Draft",
+     callback_data="draft_analysis"),
+                InlineKeyboardButton(
+    "🎯 Predições Rápidas",
+     callback_data="quick_predictions")
             ],
             [
-                InlineKeyboardButton("💰 Dicas de Apostas", callback_data="betting_tips"),
-                InlineKeyboardButton("📈 Rankings Atuais", callback_data="current_rankings")
+                InlineKeyboardButton(
+    "💰 Dicas de Apostas",
+     callback_data="betting_tips"),
+                InlineKeyboardButton(
+    "📈 Rankings Atuais",
+     callback_data="current_rankings")
             ],
             [
-                InlineKeyboardButton("🔥 VALUE BETS", callback_data="value_betting"),
-                InlineKeyboardButton("📊 Stats Value", callback_data="value_stats")
+                InlineKeyboardButton(
+    "🔥 VALUE BETS", callback_data="value_betting"),
+                InlineKeyboardButton(
+    "📊 Stats Value", callback_data="value_stats")
             ],
             [InlineKeyboardButton("ℹ️ Ajuda", callback_data="help")]
         ]
-        
+
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
-    
+
     async def live_command(self, update: Update, context):
         """Comando /live melhorado - mostra TODAS as partidas"""
         await self.show_all_live_matches(update)
@@ -901,20 +961,22 @@ Não há partidas acontecendo neste momento.
 • 🏆 Ligas regionais menores
 
 🔄 Atualize em alguns minutos!"""
-                
-                keyboard = [
-                    [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all")],
-                    [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-                ]
-                
-                reply_markup = InlineKeyboardMarkup(keyboard)
+
+            keyboard = [
+                [InlineKeyboardButton(
+                    "🔄 Atualizar", callback_data="live_matches_all")],
+                    [InlineKeyboardButton(
+                        "🏠 Menu Principal", callback_data="start")]
+            ]
+
+               reply_markup = InlineKeyboardMarkup(keyboard)
 
                 if is_callback:
                     await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
                 else:
                     await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-                return
-            
+            return
+
             # Formatar lista de partidas
             text = f"🔴 **PARTIDAS AO VIVO ({len(live_matches)})**\n\n"
             text += "👆 **Clique em uma partida para ver:**\n"
@@ -931,7 +993,8 @@ Não há partidas acontecendo neste momento.
                     team2 = teams[1]
 
                     league = match.get('league', 'LoL Esports')
-                    state_emoji = '🔴' if match.get('state') == 'inProgress' else '⏳'
+                    state_emoji = '🔴' if match.get(
+                        'state') == 'inProgress' else '⏳'
 
                     # Placar se disponível
                     score_text = ""
@@ -941,35 +1004,43 @@ Não há partidas acontecendo neste momento.
                         score_text = f" ({wins1}-{wins2})"
 
                     text += f"{state_emoji} **{league}**\n"
-                    text += f"⚔️ {team1.get('code', team1.get('name', 'Team1'))} vs "
-                    text += f"{team2.get('code', team2.get('name', 'Team2'))}{score_text}\n\n"
-            
+                    text += f"⚔️ {team1.get('code',
+    team1.get('name',
+     'Team1'))} vs "
+                    text += f"{team2.get('code',
+    team2.get('name',
+     'Team2'))}{score_text}\n\n"
+
             # Criar botões para cada partida
-            keyboard = []
-            for match in live_matches[:8]:  # Máximo 8 partidas
+        keyboard = []
+           for match in live_matches[:8]:  # Máximo 8 partidas
                 teams = match.get('teams', [])
                 if len(teams) >= 2:
-                    team1_name = teams[0].get('code', teams[0].get('name', 'T1'))
-                    team2_name = teams[1].get('code', teams[1].get('name', 'T2'))
+                    team1_name = teams[0].get(
+                        'code', teams[0].get('name', 'T1'))
+                    team2_name = teams[1].get(
+                        'code', teams[1].get('name', 'T2'))
 
                     button_text = f"🔮 {team1_name} vs {team2_name}"
                     callback_data = f"predict_match_{match['id']}"
-                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-            
+                keyboard.append([InlineKeyboardButton(
+                    button_text, callback_data=callback_data)])
+
             # Botões de ação
             keyboard.append([
                 InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all"),
                 InlineKeyboardButton("📊 Ver Rankings", callback_data="current_rankings")
             ])
-            keyboard.append([InlineKeyboardButton("🏠 Menu Principal", callback_data="start")])
-            
+            keyboard.append([InlineKeyboardButton(
+                "🏠 Menu Principal", callback_data="start")])
+
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if is_callback:
                 await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
             else:
                 await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-        
+
         except Exception as e:
             logger.error(f"❌ Erro ao mostrar partidas: {e}")
             error_text = f"❌ Erro ao buscar partidas: {str(e)}"
@@ -995,38 +1066,41 @@ Não há partidas acontecendo neste momento.
 
             if not match_data:
                 await query.edit_message_text("❌ Partida não encontrada")
-                return
-            
+            return
+
             # Gerar predição
             prediction = await self.prediction_system.predict_live_match(match_data)
 
             # Formatar resultado
             text = self._format_match_prediction(prediction, match_data)
-            
+
             # Botões de ação
-            keyboard = [
-                [
+        keyboard = [
+            [
                     InlineKeyboardButton("🏆 Ver Draft", callback_data=f"draft_{match_id}"),
                     InlineKeyboardButton("💰 Análise Odds", callback_data=f"odds_{match_id}")
                 ],
-                [
+            [
                     InlineKeyboardButton("🔄 Atualizar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Comparar Times", callback_data=f"compare_{match_id}")
                 ],
-                [
+            [
                     InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
                 ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        ]
+
+           reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             await query.edit_message_text(f"❌ Erro na predição: {str(e)}")
 
-    def _format_match_prediction(self, prediction: Dict, match_data: Dict) -> str:
+    def _format_match_prediction(
+    self,
+    prediction: Dict,
+     match_data: Dict) -> str:
         """Formata predição da partida"""
         team1 = prediction['team1']
         team2 = prediction['team2']
@@ -1035,7 +1109,7 @@ Não há partidas acontecendo neste momento.
         odds1 = prediction['team1_odds']
         odds2 = prediction['team2_odds']
         confidence = prediction['confidence']
-        
+
         # Header
         text = f"🔮 **PREDIÇÃO EM TEMPO REAL**\n\n"
 
@@ -1057,11 +1131,12 @@ Não há partidas acontecendo neste momento.
         text += f"📝 **ANÁLISE:**\n{prediction['analysis']}\n\n"
 
         # Timing
-        text += f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {datetime.now().strftime('%H:%M:%S')}\n"
+        text += f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {
+    datetime.now().strftime('%H:%M:%S')}\n"
         text += f"🔄 *Probabilidades atualizadas dinamicamente*"
-        
+
         return text
-    
+
     async def show_draft_analysis(self, query, match_id: str):
         """Mostra análise detalhada do draft"""
         try:
@@ -1078,8 +1153,8 @@ Não há partidas acontecendo neste momento.
 
             if not match_data:
                 await query.edit_message_text("❌ Partida não encontrada")
-                return
-            
+            return
+
             # Análise de draft
             team1_comp = match_data.get('team1_composition', [])
             team2_comp = match_data.get('team2_composition', [])
@@ -1087,33 +1162,39 @@ Não há partidas acontecendo neste momento.
             if not team1_comp or not team2_comp:
                 text = "❌ Dados de draft não disponíveis para esta partida"
             else:
-                draft_analysis = self.prediction_system.champion_analyzer.analyze_draft(team1_comp, team2_comp)
+                draft_analysis = self.prediction_system.champion_analyzer.analyze_draft(
+                    team1_comp, team2_comp)
                 text = self._format_draft_analysis(draft_analysis, match_data)
 
             # Botões
-            keyboard = [
-                [
+        keyboard = [
+            [
                     InlineKeyboardButton("🔮 Ver Predição", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Fases do Jogo", callback_data=f"phases_{match_id}")
                 ],
-                [
+            [
                     InlineKeyboardButton("🔙 Voltar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
                 ]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        ]
+
+           reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-            
+
         except Exception as e:
             logger.error(f"❌ Erro na análise de draft: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
-    
-    def _format_draft_analysis(self, draft_analysis: Dict, match_data: Dict) -> str:
+
+    def _format_draft_analysis(
+    self,
+    draft_analysis: Dict,
+     match_data: Dict) -> str:
         """Formata análise de draft"""
         teams = match_data.get('teams', [])
-        team1_name = teams[0].get('code', 'Team 1') if len(teams) > 0 else 'Team 1'
-        team2_name = teams[1].get('code', 'Team 2') if len(teams) > 1 else 'Team 2'
+        team1_name = teams[0].get(
+    'code', 'Team 1') if len(teams) > 0 else 'Team 1'
+        team2_name = teams[1].get(
+    'code', 'Team 2') if len(teams) > 1 else 'Team 2'
 
         team1_analysis = draft_analysis['team1']
         team2_analysis = draft_analysis['team2']
@@ -1122,8 +1203,12 @@ Não há partidas acontecendo neste momento.
         text = f"🏆 **ANÁLISE DE DRAFT**\n\n"
 
         # Composições
-        text += f"🔵 **{team1_name}:** {', '.join(team1_analysis['champions'])}\n"
-        text += f"🔴 **{team2_name}:** {', '.join(team2_analysis['champions'])}\n\n"
+        text += f"🔵 **{team1_name}:** {
+    ', '.join(
+        team1_analysis['champions'])}\n"
+        text += f"🔴 **{team2_name}:** {
+    ', '.join(
+        team2_analysis['champions'])}\n\n"
 
         # Vantagem de draft
         favored_team = team1_name if advantage['favored_team'] == 1 else team2_name
@@ -1188,11 +1273,11 @@ Não há partidas acontecendo neste momento.
                 await self.unsubscribe_value_callback(query)
             else:
                 await query.edit_message_text("⚠️ Funcionalidade em desenvolvimento")
-            
+
         except Exception as e:
             logger.error(f"❌ Erro no callback: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
-    
+
     async def start_command_callback(self, query):
         """Callback para comando start"""
         await self.start_command_text(query)
@@ -1215,11 +1300,11 @@ Não há partidas acontecendo neste momento.
             [
                 InlineKeyboardButton("📊 Análise de Draft", callback_data="draft_analysis"),
                 InlineKeyboardButton("🎯 Predições Rápidas", callback_data="quick_predictions")
-        ],
+            ],
             [
                 InlineKeyboardButton("💰 Dicas de Apostas", callback_data="betting_tips"),
                 InlineKeyboardButton("📈 Rankings Atuais", callback_data="current_rankings")
-        ],
+            ],
             [
                 InlineKeyboardButton("🔥 VALUE BETS", callback_data="value_betting"),
                 InlineKeyboardButton("📊 Stats Value", callback_data="value_stats")
@@ -1262,13 +1347,13 @@ Não há partidas acontecendo neste momento.
 • Comparação entre times
 • Histórico de performance
 • Análise de momentum"""
-            
-            keyboard = [
+
+        keyboard = [
             [InlineKeyboardButton("🔴 Testar Agora", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        ]
+
+           reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def betting_tips_callback(self, query):
@@ -1341,28 +1426,28 @@ Aposte com responsabilidade."""
 🔄 Rankings atualizados automaticamente
 baseado em performance recente"""
 
-            keyboard = [
+        keyboard = [
             [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        ]
+
+           reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(rankings_text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def value_betting_callback(self, query):
         """Callback para sistema de value betting"""
         user_id = query.from_user.id
-        
+
         # Verificar se sistema está disponível
         if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
             await query.edit_message_text(
                 "❌ Sistema de Value Betting não disponível"
             )
             return
-        
+
         # Verificar se usuário já está inscrito
         is_subscribed = user_id in self.value_monitor.notification_system.subscribers
-        
+
         text = """🔥 **SISTEMA VALUE BETTING AUTOMÁTICO**
 
 🎯 **O QUE É:**
@@ -1370,7 +1455,7 @@ Sistema que monitora TODAS as partidas ao vivo em busca de apostas de valor - qu
 
 💰 **QUANDO ALERTA:**
 • Probabilidade real ≥ 55%
-• Odds atuais ≥ 1.5x  
+• Odds atuais ≥ 1.5x
 • Edge de +15% ou mais
 • Durante partidas em andamento
 
@@ -1383,18 +1468,18 @@ Sistema que monitora TODAS as partidas ao vivo em busca de apostas de valor - qu
 
         # Botões baseados no status de inscrição
         if is_subscribed:
-            keyboard = [
-                [InlineKeyboardButton("❌ Cancelar Inscrição", callback_data="unsubscribe_value")],
+        keyboard = [
+            [InlineKeyboardButton("❌ Cancelar Inscrição", callback_data="unsubscribe_value")],
                 [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
+        ]
         else:
-            keyboard = [
-                [InlineKeyboardButton("✅ Ativar Notificações", callback_data="subscribe_value")],
+        keyboard = [
+            [InlineKeyboardButton("✅ Ativar Notificações", callback_data="subscribe_value")],
                 [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-        
+        ]
+
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
@@ -1405,9 +1490,9 @@ Sistema que monitora TODAS as partidas ao vivo em busca de apostas de valor - qu
                 "❌ Sistema de Value Betting não disponível"
             )
             return
-            
+
         stats = self.value_monitor.get_stats()
-        
+
         text = f"""📊 **ESTATÍSTICAS VALUE BETTING**
 
 🎯 **Value Bets Encontradas:** {stats['value_bets_found']}
@@ -1426,7 +1511,7 @@ Sistema que monitora TODAS as partidas ao vivo em busca de apostas de valor - qu
             [InlineKeyboardButton("🔥 Configurar Alerts", callback_data="value_betting")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
         ]
-        
+
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
@@ -1451,21 +1536,21 @@ Use os botões ou comandos:
 • `/start` - Menu principal
 
 💡 **Dica:** Use a interface com botões para melhor experiência!"""
-                
-                keyboard = [
+
+            keyboard = [
                 [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-                ]
-                
-                reply_markup = InlineKeyboardMarkup(keyboard)
+            ]
+
+               reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def run(self):
         """Executa o bot"""
         if not TELEGRAM_AVAILABLE:
             print("🔧 Modo teste - Telegram não disponível")
-                return
-            
+            return
+
         try:
             # Criar aplicação
             application = Application.builder().token(TOKEN).build()
@@ -1493,7 +1578,7 @@ Use os botões ou comandos:
             # Manter rodando
             while True:
                 await asyncio.sleep(1)
-            
+
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
         finally:
@@ -1503,13 +1588,13 @@ Use os botões ou comandos:
     async def subscribe_value_callback(self, query):
         """Callback para inscrever usuário nas notificações de value betting"""
         user_id = query.from_user.id
-        
+
         if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
             await query.edit_message_text("❌ Sistema não disponível")
             return
-            
+
         self.value_monitor.notification_system.subscribe_user(user_id)
-        
+
         text = """✅ **INSCRITO NAS VALUE BETS!**
 
 Você receberá notificações automáticas quando encontrarmos:
@@ -1525,20 +1610,20 @@ Você receberá notificações automáticas quando encontrarmos:
             [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
         ]
-        
+
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def unsubscribe_value_callback(self, query):
         """Callback para cancelar inscrição nas notificações"""
         user_id = query.from_user.id
-        
+
         if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
             await query.edit_message_text("❌ Sistema não disponível")
             return
-            
+
         self.value_monitor.notification_system.unsubscribe_user(user_id)
-        
+
         text = """❌ **INSCRIÇÃO CANCELADA**
 
 Você não receberá mais notificações de value bets.
@@ -1549,7 +1634,7 @@ Você não receberá mais notificações de value bets.
             [InlineKeyboardButton("🔥 Reativar", callback_data="value_betting")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
         ]
-        
+
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
@@ -1564,7 +1649,7 @@ async def main():
 # Flask App para Railway deployment
 if FLASK_AVAILABLE:
     app = Flask(__name__)
-    
+
     @app.route('/')
     def home():
         return jsonify({
@@ -1579,7 +1664,7 @@ if FLASK_AVAILABLE:
             },
             "telegram_available": TELEGRAM_AVAILABLE
         })
-    
+
     @app.route('/health')
     def health():
         return jsonify({
@@ -1597,13 +1682,14 @@ if __name__ == "__main__":
         def run_telegram_bot():
             asyncio.run(main())
 
-        telegram_thread = threading.Thread(target=run_telegram_bot, daemon=True)
+        telegram_thread = threading.Thread(
+    target=run_telegram_bot, daemon=True)
         telegram_thread.start()
         print("🤖 Bot Telegram iniciado em background")
 
     # Iniciar Flask app para Railway
     if FLASK_AVAILABLE:
-    port = int(os.environ.get("PORT", 8080))
+        port = int(os.environ.get("PORT", 8080))
         print(f"🚀 Iniciando Flask server na porta {port}")
         app.run(host="0.0.0.0", port=port, debug=False)
     else:

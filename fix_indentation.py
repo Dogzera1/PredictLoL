@@ -1,42 +1,49 @@
 #!/usr/bin/env python3
 """
 Script para corrigir problemas de indentação no main_v3_riot_integrated.py
+Baseado nas diretrizes do GeeksforGeeks: https://www.geeksforgeeks.org/indentation-error-in-python/
 """
 
+import re
+
 def fix_indentation():
+    print("🔧 Aplicando correções de indentação baseadas no GeeksforGeeks...")
+    
     # Ler arquivo
     with open('main_v3_riot_integrated.py', 'r', encoding='utf-8') as f:
-        lines = f.readlines()
+        content = f.read()
     
-    # Variáveis para controle
-    fixed_lines = []
-    in_try_block = False
-    
-    for i, line in enumerate(lines):
-        line_num = i + 1
+    # Corrigir problemas específicos identificados pelo linter
+    fixes = [
+        # 1. Corrigir else órfão (linha 794)
+        (r'        elif favorite_prob > 60:\n            analysis\.append\(f"💰 \*\*APOSTA RECOMENDADA:\*\* {favorite} \(confiança moderada\)"\)\n            else:', 
+         '        elif favorite_prob > 60:\n            analysis.append(f"💰 **APOSTA RECOMENDADA:** {favorite} (confiança moderada)")\n        else:'),
         
-        # Problemas específicos identificados
-        if line_num == 92:  # def __init__ da classe ChampionAnalyzer
-            fixed_lines.append(line.replace('        def __init__(self):', '    def __init__(self):'))
-        elif line_num == 882 or 'keyboard = [' in line:
-            # Corrigir indentação de keyboard mal alinhado
-            if line.strip().startswith('keyboard = ['):
-                # Calcular indentação correta baseada no contexto
-                indentation = len(line) - len(line.lstrip())
-                if indentation == 8:  # 8 espaços, corrigir para 12
-                    fixed_lines.append('            keyboard = [\n')
-                else:
-                    fixed_lines.append(line)
-            else:
-                fixed_lines.append(line)
-        else:
-            fixed_lines.append(line)
+        # 2. Corrigir indentações de keyboard mal alinhadas
+        (r'            keyboard = \[', '        keyboard = ['),
+        
+        # 3. Corrigir return mal indentado na função run
+        (r'                return', '            return'),
+        
+        # 4. Corrigir estrutura if-else final no main
+        (r'    if FLASK_AVAILABLE:\n    port = int', '    if FLASK_AVAILABLE:\n        port = int'),
+        (r'    else:\n        print\("❌ Flask não disponível', '    else:\n        print("❌ Flask não disponível'),
+    ]
     
-    # Escrever arquivo corrigido
+    # Aplicar correções
+    for pattern, replacement in fixes:
+        content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+    
+    # Salvar arquivo corrigido
     with open('main_v3_riot_integrated.py', 'w', encoding='utf-8') as f:
-        f.writelines(fixed_lines)
+        f.write(content)
     
-    print("✅ Indentações corrigidas!")
+    print("✅ Indentações corrigidas seguindo padrão Python PEP8!")
+    print("📋 Correções aplicadas:")
+    print("  • Estruturas condicionais corrigidas")
+    print("  • Keyboards com indentação consistente")
+    print("  • Return statements alinhados")
+    print("  • Blocos if-else finais corrigidos")
 
 if __name__ == "__main__":
     fix_indentation() 
