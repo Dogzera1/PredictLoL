@@ -1,4 +1,4 @@
-# Bot Telegram V3 - Riot API Integration
+# Requirements para Windows - versões pré-compiladas
 python-telegram-bot>=20.0
 flask>=2.3.0
 
@@ -9,18 +9,14 @@ requests>=2.31.0
 # Async support
 typing-extensions>=4.0.0
 
+# JSON/Data
+orjson>=3.9.0
+
 # Date/time
 python-dateutil>=2.8.0
 
 # Environment
 python-dotenv>=1.0.0
 
-# Security
-cryptography>=42.0.0
-
-# Web server
-gunicorn>=21.0.0
-
-# Force redeploy 2025.05.23 - 23:16 UTC
-# Railway auto-deploy trigger attempt
-setuptools>=65.0.0 
+# Security - versão flexível
+cryptography>=42.0.0 
