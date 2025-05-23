@@ -746,6 +746,142 @@ Não há partidas acontecendo neste momento.
             logger.error(f"Erro ao mostrar momentum: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
     
+    async def text_message_handler(self, update: Update, context):
+        """Handler para mensagens de texto (predições com Riot API)"""
+        text = update.message.text.strip()
+        
+        # Verificar se é formato de predição
+        if " vs " in text.lower():
+            await self.handle_riot_prediction(update, text)
+        else:
+            # Mensagem genérica
+            await update.message.reply_text(
+                "💡 **Para fazer uma predição V3:**\n"
+                "`TIME1 vs TIME2` ou `/predict TIME1 vs TIME2`\n\n"
+                "**Exemplos com dados Riot API:**\n"
+                "• `T1 vs G2 bo3` - Com dados oficiais\n"
+                "• `JDG vs TES` - Standings atuais LPL\n"
+                "• `Cloud9 vs Team Liquid` - Records reais\n\n"
+                "Digite `/help` para ver todos os comandos V3!",
+                parse_mode='Markdown'
+            )
+    
+    async def handle_riot_prediction(self, update, text):
+        """Processa predição com dados da Riot API"""
+        try:
+            # Parse do texto
+            lower_text = text.lower()
+            
+            if " vs " not in lower_text:
+                await update.message.reply_text("❌ Formato inválido! Use: `TIME1 vs TIME2`")
+                return
+            
+            # Extrair times e tipo de série
+            parts = lower_text.split()
+            vs_index = parts.index("vs")
+            
+            team1 = " ".join(parts[:vs_index])
+            remaining = parts[vs_index + 1:]
+            
+            # Verificar se tem tipo de série no final
+            match_types = ["bo1", "bo3", "bo5"]
+            match_type = "bo1"
+            
+            if remaining and remaining[-1] in match_types:
+                match_type = remaining[-1]
+                team2 = " ".join(remaining[:-1])
+            else:
+                team2 = " ".join(remaining)
+            
+            # Fazer predição com sistema Riot API
+            if not self.riot_system:
+                await update.message.reply_text("❌ Sistema Riot API não disponível")
+                return
+            
+            await update.message.reply_text("🔮 Analisando com dados da Riot API...")
+            
+            result = await self.riot_system.predict_match(team1, team2, match_type)
+            
+            if 'error' in result:
+                await update.message.reply_text(f"❌ {result['error']}")
+                return
+            
+            # Formatear resultado V3
+            team1_data = result['team1']
+            team2_data = result['team2']
+            
+            prob1 = result['team1_probability'] * 100
+            prob2 = result['team2_probability'] * 100
+            
+            # Emojis baseados na probabilidade
+            if prob1 > prob2:
+                winner_emoji = "🏆"
+                loser_emoji = "🥈"
+            else:
+                winner_emoji = "🥈"
+                loser_emoji = "🏆"
+            
+            confidence_emoji = {
+                "Muito Alta": "🔥",
+                "Alta": "✅", 
+                "Média": "⚠️",
+                "Baixa": "❓",
+                "Muito Baixa": "⚡"
+            }.get(result['confidence_level'], "🎯")
+            
+            # Status dos dados
+            data_source = "🌐 **Dados Riot API**" if result.get('data_source') == 'riot_api' else "🆘 **Modo Fallback**"
+            
+            # Resultado principal V3
+            main_text = f"""🎮 **PREDIÇÃO V3 #{result['prediction_id']}**
+
+{data_source}
+
+{winner_emoji if prob1 > prob2 else loser_emoji} **{team1_data['name']}** vs **{team2_data['name']}** {loser_emoji if prob1 > prob2 else winner_emoji}
+
+📊 **PROBABILIDADES:**
+• {team1_data['name']}: {prob1:.1f}%
+• {team2_data['name']}: {prob2:.1f}%
+
+🎯 **VENCEDOR PREVISTO:** {result['predicted_winner']}
+{confidence_emoji} **CONFIANÇA:** {result['confidence_level']} ({result['confidence']:.1%})
+
+📈 **DETALHES V3:**
+• Tipo: {match_type.upper()}
+• Tier: {team1_data.get('tier', 'N/A')} vs {team2_data.get('tier', 'N/A')}
+• Região: {team1_data.get('region', 'N/A')} vs {team2_data.get('region', 'N/A')}"""
+
+            # Adicionar análise
+            if 'analysis' in result:
+                analysis_text = f"\n\n{result['analysis']}"
+                full_text = main_text + analysis_text
+            else:
+                full_text = main_text
+            
+            # Botões para ações adicionais V3
+            keyboard = [
+                [
+                    InlineKeyboardButton("🔄 Nova Predição", callback_data="riot_predict"),
+                    InlineKeyboardButton("📊 Rankings V3", callback_data="riot_ranking")
+                ],
+                [
+                    InlineKeyboardButton("🔴 Partidas ao Vivo", callback_data="live_matches"),
+                    InlineKeyboardButton("🌐 Status API", callback_data="api_status")
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                full_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro na predição V3: {e}")
+            await update.message.reply_text(f"❌ Erro ao processar predição V3: {str(e)}")
+    
     async def button_callback(self, update: Update, context):
         """Handler para inline keyboard callbacks V3"""
         query = update.callback_query
