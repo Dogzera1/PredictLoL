@@ -1,0 +1,4 @@
+RAILWAY_DEPLOY_VERSION=2025-01-23_14-30-00
+BOT_VERSION=integrated-v1.0
+LAST_DEPLOY_ATTEMPT=force-redeploy-commit-empty
+STATUS=forcing-auto-deploy-activation 
