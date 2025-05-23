@@ -1104,9 +1104,34 @@ def create_flask_app():
         @app.route('/webhook', methods=['POST'])
         def webhook():
             try:
-                update = Update.de_json(request.get_json(), telegram_bot_v3.app.bot)
-                asyncio.create_task(telegram_bot_v3.app.process_update(update))
+                # Verificar se temos dados
+                json_data = request.get_json()
+                if not json_data:
+                    logger.error("❌ Webhook: Dados JSON vazios")
+                    return "NO DATA", 400
+                
+                # Verificar se o bot está disponível
+                if not telegram_bot_v3 or not telegram_bot_v3.app or not telegram_bot_v3.app.bot:
+                    logger.error("❌ Webhook: Bot não disponível")
+                    return "BOT NOT AVAILABLE", 500
+                
+                # Processar update
+                logger.info(f"📨 Webhook: Processando update {json_data.get('update_id', 'unknown')}")
+                
+                update = Update.de_json(json_data, telegram_bot_v3.app.bot)
+                
+                # Processar update de forma síncrona (Flask-compatible)
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    loop.run_until_complete(telegram_bot_v3.app.process_update(update))
+                    logger.info("✅ Webhook: Update processado com sucesso")
+                finally:
+                    loop.close()
+                
                 return "OK"
+                
             except Exception as e:
                 logger.error(f"Erro no webhook: {e}")
                 return "ERROR", 500
