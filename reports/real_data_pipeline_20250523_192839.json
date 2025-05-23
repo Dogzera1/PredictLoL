@@ -1,0 +1,35 @@
+{
+  "timestamp": "2025-05-23T19:28:39.259139",
+  "data_source": "real_only",
+  "phases": {
+    "data_loading": {
+      "status": "SUCCESS",
+      "samples": 500,
+      "features": 46,
+      "target_balance": {
+        "0": 255,
+        "1": 245
+      },
+      "win_rate": 0.49
+    },
+    "feature_engineering": {
+      "status": "FAILED",
+      "error": "'tuple' object has no attribute 'shape'",
+      "fallback": "original_features"
+    },
+    "model_optimization": {
+      "status": "FAILED",
+      "error": "'AdvancedModelOptimizer' object has no attribute 'optimize_complete_pipeline'"
+    },
+    "infrastructure": {
+      "status": "PARTIAL",
+      "error": "'InfrastructureManager' object has no attribute 'setup_monitoring'"
+    }
+  },
+  "final_metrics": {
+    "duration_seconds": 0.262811,
+    "phases_completed": 4,
+    "success_rate": 25.0,
+    "end_time": "2025-05-23T19:28:39.521950"
+  }
+}

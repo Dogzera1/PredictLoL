@@ -1,0 +1,44 @@
+{
+  "pipeline_info": {
+    "start_time": "2025-05-23T19:20:07.332621",
+    "end_time": "2025-05-23T19:24:25.656284",
+    "total_duration": "0:04:18.323631",
+    "phases_completed": 1,
+    "phases_failed": 1,
+    "success_rate": 20.0
+  },
+  "phase_results": {
+    "phase_3": {
+      "original_features": 10,
+      "advanced_features": 18,
+      "samples": 1000,
+      "feature_improvement_ratio": 1.8,
+      "top_features": [
+        "team1_kills",
+        "team1_gold",
+        "team1_towers",
+        "team2_kills",
+        "team2_gold",
+        "team2_towers",
+        "game_duration",
+        "patch_major",
+        "patch_minor",
+        "days_since_patch"
+      ],
+      "status": "completed"
+    },
+    "phase_4": {
+      "status": "failed",
+      "error": "Object of type ndarray is not JSON serializable"
+    }
+  },
+  "improvements_summary": {
+    "feature_expansion": 1.8
+  },
+  "recommendations": [
+    "⚠️ Performance baixa - revise dados e features",
+    "📊 Monitore drift de dados regularmente",
+    "🔄 Retreine modelo mensalmente",
+    "📈 Implemente A/B testing para novas features"
+  ]
+}

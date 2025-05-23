@@ -75,7 +75,7 @@ if not TOKEN:
 class ChampionAnalyzer:
     """Analisador avançado de composições de campeões"""
     
-    def __init__(self):
+        def __init__(self):
         # Base de dados de campeões com ratings e synergias
         self.champion_stats = {
             # Top laners
@@ -429,7 +429,7 @@ class ImprovedRiotAPI:
             logger.warning("⚠️ API não disponível, usando dados simulados")
             return self.fallback_live_matches
         
-        except Exception as e:
+            except Exception as e:
             logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
     
@@ -484,7 +484,7 @@ class ImprovedRiotAPI:
             
             return match_data
         
-        except Exception as e:
+            except Exception as e:
             logger.error(f"❌ Erro ao enriquecer partida: {e}")
             return match_data
     
@@ -505,8 +505,8 @@ class ImprovedRiotAPI:
                         team1_comp = comp
                     elif side == 'red':
                         team2_comp = comp
-        
-        except Exception as e:
+                    
+            except Exception as e:
             logger.error(f"❌ Erro ao extrair composições: {e}")
         
         return team1_comp, team2_comp
@@ -706,7 +706,7 @@ class DynamicPredictionSystem:
             return 'média'
         elif confidence_score >= 20:
             return 'baixa'
-        else:
+            else:
             return 'muito baixa'
     
     def _generate_match_analysis(self, team1: str, team2: str, team1_data: Dict, team2_data: Dict, 
@@ -719,7 +719,7 @@ class DynamicPredictionSystem:
             favorite = team1
             underdog = team2
             favorite_prob = win_prob * 100
-        else:
+            else:
             favorite = team2
             underdog = team1
             favorite_prob = (1 - win_prob) * 100
@@ -911,7 +911,7 @@ Não há partidas acontecendo neste momento.
                     
                     button_text = f"🔮 {team1_name} vs {team2_name}"
                     callback_data = f"predict_match_{match['id']}"
-                    keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
             
             # Botões de ação
             keyboard.append([
@@ -978,7 +978,7 @@ Não há partidas acontecendo neste momento.
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-        
+            
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             await query.edit_message_text(f"❌ Erro na predição: {str(e)}")
@@ -1061,7 +1061,7 @@ Não há partidas acontecendo neste momento.
             
             reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-        
+            
         except Exception as e:
             logger.error(f"❌ Erro na análise de draft: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
@@ -1137,7 +1137,7 @@ Não há partidas acontecendo neste momento.
                 await self.current_rankings_callback(query)
             else:
                 await query.edit_message_text("⚠️ Funcionalidade em desenvolvimento")
-        
+            
         except Exception as e:
             logger.error(f"❌ Erro no callback: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
@@ -1207,13 +1207,13 @@ Não há partidas acontecendo neste momento.
 • Comparação entre times
 • Histórico de performance
 • Análise de momentum"""
-
-        keyboard = [
+            
+            keyboard = [
             [InlineKeyboardButton("🔴 Testar Agora", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
     
     async def betting_tips_callback(self, query):
@@ -1286,12 +1286,12 @@ Aposte com responsabilidade."""
 🔄 Rankings atualizados automaticamente
 baseado em performance recente"""
 
-        keyboard = [
+            keyboard = [
             [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(rankings_text, reply_markup=reply_markup, parse_mode='Markdown')
     
     async def help_command(self, update: Update, context):
@@ -1315,21 +1315,21 @@ Use os botões ou comandos:
 • `/start` - Menu principal
 
 💡 **Dica:** Use a interface com botões para melhor experiência!"""
-            
-            keyboard = [
+                
+                keyboard = [
                 [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
                 [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
     
     async def run(self):
         """Executa o bot"""
         if not TELEGRAM_AVAILABLE:
             print("🔧 Modo teste - Telegram não disponível")
-            return
-        
+                return
+            
         try:
             # Criar aplicação
             application = Application.builder().token(TOKEN).build()
@@ -1349,7 +1349,7 @@ Use os botões ou comandos:
             # Manter rodando
             while True:
                 await asyncio.sleep(1)
-                
+            
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
         finally:
@@ -1406,7 +1406,7 @@ if __name__ == "__main__":
     
     # Iniciar Flask app para Railway
     if FLASK_AVAILABLE:
-        port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8080))
         print(f"🚀 Iniciando Flask server na porta {port}")
         app.run(host="0.0.0.0", port=port, debug=False)
     else:
