@@ -397,9 +397,9 @@ class ImprovedRiotAPI:
                                 'side': 'red',
                                 'participants': self._generate_mock_composition()
                             }
-                    ]
+        ]
                     }
-            ]
+        ]
             }
             matches.append(match)
         
@@ -859,14 +859,14 @@ Não há partidas acontecendo neste momento.
 
 🔄 Atualize em alguns minutos!"""
                 
-            keyboard = [
+        keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all")],
                     [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
+        ]
                 
-            reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                if is_callback:
+            if is_callback:
                     await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
                 else:
                     await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -973,7 +973,7 @@ Não há partidas acontecendo neste momento.
                 [
                     InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
-            ]
+        ]
         ]
             
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1056,7 +1056,7 @@ Não há partidas acontecendo neste momento.
                 [
                     InlineKeyboardButton("🔙 Voltar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
-            ]
+        ]
         ]
             
         reply_markup = InlineKeyboardMarkup(keyboard)
