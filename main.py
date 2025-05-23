@@ -51,7 +51,19 @@ async def unknown_command_handler(update, context):
 
 # Inicializar o bot
 application = None
-if TOKEN:
+application_initialized = False
+
+async def initialize_application():
+    """Inicializa a Application uma única vez"""
+    global application, application_initialized
+    
+    if application_initialized:
+        return True
+    
+    if not TOKEN:
+        logger.error("❌ TOKEN não encontrado - configure a variável TELEGRAM_TOKEN")
+        return False
+    
     try:
         application = Application.builder().token(TOKEN).build()
         
@@ -62,17 +74,22 @@ if TOKEN:
         application.add_handler(CommandHandler("sobre", about_handler))
         application.add_handler(MessageHandler(filters.COMMAND, unknown_command_handler))
         
+        # IMPORTANTE: Inicializar a Application
+        await application.initialize()
+        application_initialized = True
+        
         logger.info("✅ Bot inicializado com sucesso no Railway!")
+        return True
+        
     except Exception as e:
         logger.error(f"❌ Erro ao inicializar bot: {str(e)}")
         logger.error(traceback.format_exc())
-else:
-    logger.error("❌ TOKEN não encontrado - configure a variável TELEGRAM_TOKEN")
+        return False
 
 # Função para processar updates
 async def process_update_async(update_data):
     try:
-        if not application:
+        if not application or not application_initialized:
             logger.error("❌ Application não inicializada")
             return
         
@@ -89,7 +106,7 @@ async def process_update_async(update_data):
 # Rotas da aplicação
 @app.route('/', methods=['GET'])
 def home():
-    status = "🟢 ATIVO" if application else "🔴 INATIVO"
+    status = "🟢 ATIVO" if application_initialized else "🔴 INATIVO"
     token_status = "✅ Configurado" if TOKEN else "❌ Não configurado"
     
     return f"""
@@ -105,30 +122,32 @@ def home():
 @app.route('/health', methods=['GET'])
 def health():
     """Endpoint de saúde"""
-    if application and TOKEN:
+    if application_initialized and TOKEN:
         return {
             "status": "healthy", 
             "bot": "active", 
             "platform": "railway",
-            "token": "configured"
+            "token": "configured",
+            "initialized": application_initialized
         }, 200
     else:
         return {
             "status": "unhealthy", 
             "bot": "inactive", 
             "platform": "railway",
-            "reason": "Token não configurado"
+            "reason": "Application não inicializada" if not application_initialized else "Token não configurado",
+            "initialized": application_initialized
         }, 500
 
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook():
     if request.method == "GET":
-        status = "🟢 ATIVO" if application else "🔴 INATIVO"
+        status = "🟢 ATIVO" if application_initialized else "🔴 INATIVO"
         return f"🤖 Webhook do Bot LoL está {status}!"
     
     elif request.method == "POST":
         try:
-            if not application:
+            if not application or not application_initialized:
                 logger.error("❌ Bot não inicializado - verificar TOKEN")
                 return Response("❌ Bot não inicializado", status=500)
             
@@ -152,6 +171,15 @@ def webhook():
             logger.error(traceback.format_exc())
             return Response('✅ OK', status=200)  # Sempre retorna OK para evitar reenvios
 
+# Inicialização da aplicação no startup
+def initialize_bot_sync():
+    """Função para inicializar o bot de forma síncrona"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    success = loop.run_until_complete(initialize_application())
+    loop.close()
+    return success
+
 if __name__ == "__main__":
     # Para Railway, usar a porta do ambiente ou 8080 como padrão
     port = int(os.environ.get("PORT", 8080))
@@ -159,7 +187,10 @@ if __name__ == "__main__":
     print("🚂 Iniciando Bot LoL no Railway...")
     print(f"🔧 Porta: {port}")
     print(f"🤖 Token configurado: {'✅' if TOKEN else '❌'}")
-    print(f"📡 Bot inicializado: {'✅' if application else '❌'}")
+    
+    # Inicializar o bot antes de iniciar o Flask
+    bot_success = initialize_bot_sync()
+    print(f"📡 Bot inicializado: {'✅' if bot_success else '❌'}")
     
     try:
         app.run(host="0.0.0.0", port=port, debug=False)
