@@ -75,7 +75,7 @@ if not TOKEN:
 class ChampionAnalyzer:
     """Analisador avançado de composições de campeões"""
     
-        def __init__(self):
+    def __init__(self):
         # Base de dados de campeões com ratings e synergias
         self.champion_stats = {
             # Top laners
@@ -427,9 +427,10 @@ class ImprovedRiotAPI:
             
             # Se API falhar, usar dados de fallback
             logger.warning("⚠️ API não disponível, usando dados simulados")
+            logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
         
-            except Exception as e:
+        except Exception as e:
             logger.error(f"❌ Erro ao buscar partidas: {e}")
             return self.fallback_live_matches
     
@@ -484,7 +485,7 @@ class ImprovedRiotAPI:
             
             return match_data
         
-            except Exception as e:
+        except Exception as e:
             logger.error(f"❌ Erro ao enriquecer partida: {e}")
             return match_data
     
@@ -505,8 +506,7 @@ class ImprovedRiotAPI:
                         team1_comp = comp
                     elif side == 'red':
                         team2_comp = comp
-                    
-            except Exception as e:
+        except Exception as e:
             logger.error(f"❌ Erro ao extrair composições: {e}")
         
         return team1_comp, team2_comp
@@ -706,7 +706,7 @@ class DynamicPredictionSystem:
             return 'média'
         elif confidence_score >= 20:
             return 'baixa'
-            else:
+        else:
             return 'muito baixa'
     
     def _generate_match_analysis(self, team1: str, team2: str, team1_data: Dict, team2_data: Dict, 
@@ -719,7 +719,7 @@ class DynamicPredictionSystem:
             favorite = team1
             underdog = team2
             favorite_prob = win_prob * 100
-            else:
+        else:
             favorite = team2
             underdog = team1
             favorite_prob = (1 - win_prob) * 100
@@ -1328,7 +1328,7 @@ Use os botões ou comandos:
         """Executa o bot"""
         if not TELEGRAM_AVAILABLE:
             print("🔧 Modo teste - Telegram não disponível")
-                return
+            return
             
         try:
             # Criar aplicação
@@ -1406,7 +1406,7 @@ if __name__ == "__main__":
     
     # Iniciar Flask app para Railway
     if FLASK_AVAILABLE:
-    port = int(os.environ.get("PORT", 8080))
+        port = int(os.environ.get("PORT", 8080))
         print(f"🚀 Iniciando Flask server na porta {port}")
         app.run(host="0.0.0.0", port=port, debug=False)
     else:
