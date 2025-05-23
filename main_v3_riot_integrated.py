@@ -900,7 +900,6 @@ Não há partidas acontecendo neste momento.
     async def button_callback(self, update: Update, context):
         """Handler para inline keyboard callbacks V3"""
         query = update.callback_query
-        await query.answer()
         
         data = query.data
         
