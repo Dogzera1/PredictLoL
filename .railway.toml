@@ -3,14 +3,14 @@ builder = "nixpacks"
 buildCommand = "pip install -r requirements.txt"
 
 [deploy]
-startCommand = "python main.py"
+startCommand = "python main_v3_riot_integrated.py"
 restartPolicyType = "always"
 restartPolicyMaxRetries = 10
 
 [services.web]
 source = "."
 buildCommand = "pip install -r requirements.txt"
-startCommand = "python main.py"
+startCommand = "python main_v3_riot_integrated.py"
 
 [environment]
 PORT = "8080"

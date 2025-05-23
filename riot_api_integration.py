@@ -688,24 +688,44 @@ class RiotIntegratedPredictionSystem:
     
     def _initialize_fallback_data(self):
         """Inicializa com dados fictícios como fallback"""
-        # Usar dados do sistema anterior como fallback
-        from main_v2_expanded import AdvancedPredictionSystem
+        # Dados de fallback independentes
+        fallback_teams = {
+            # LCK
+            't1': {'name': 'T1', 'region': 'LCK', 'rating': 95, 'tier': 'S'},
+            'gen.g': {'name': 'Gen.G', 'region': 'LCK', 'rating': 92, 'tier': 'S'},
+            'drx': {'name': 'DRX', 'region': 'LCK', 'rating': 88, 'tier': 'A'},
+            'kt': {'name': 'KT Rolster', 'region': 'LCK', 'rating': 85, 'tier': 'A'},
+            
+            # LPL
+            'jdg': {'name': 'JD Gaming', 'region': 'LPL', 'rating': 94, 'tier': 'S'},
+            'tes': {'name': 'Top Esports', 'region': 'LPL', 'rating': 91, 'tier': 'S'},
+            'edg': {'name': 'EDward Gaming', 'region': 'LPL', 'rating': 89, 'tier': 'A'},
+            'rng': {'name': 'Royal Never Give Up', 'region': 'LPL', 'rating': 87, 'tier': 'A'},
+            
+            # LEC
+            'g2': {'name': 'G2 Esports', 'region': 'LEC', 'rating': 90, 'tier': 'A'},
+            'fnc': {'name': 'Fnatic', 'region': 'LEC', 'rating': 86, 'tier': 'A'},
+            'mad': {'name': 'MAD Lions', 'region': 'LEC', 'rating': 84, 'tier': 'B'},
+            
+            # LCS
+            'c9': {'name': 'Cloud9', 'region': 'LCS', 'rating': 82, 'tier': 'B'},
+            'tl': {'name': 'Team Liquid', 'region': 'LCS', 'rating': 80, 'tier': 'B'},
+            'eg': {'name': 'Evil Geniuses', 'region': 'LCS', 'rating': 78, 'tier': 'B'},
+        }
         
-        fallback_system = AdvancedPredictionSystem()
         self.teams_data = {}
         
         # Converter dados fictícios para formato da API
-        for key, team_data in fallback_system.teams_db.items():
-            if 'role' not in team_data:  # Só times, não players individuais
-                self.teams_data[key] = {
-                    'name': team_data['name'],
-                    'region': team_data['region'],
-                    'rating': team_data['rating'],
-                    'tier': team_data['tier'],
-                    'players': team_data.get('players', []),
-                    'source': 'fallback',
-                    'last_updated': datetime.now().isoformat()
-                }
+        for key, team_data in fallback_teams.items():
+            self.teams_data[key] = {
+                'name': team_data['name'],
+                'region': team_data['region'],
+                'rating': team_data['rating'],
+                'tier': team_data['tier'],
+                'players': [],
+                'source': 'fallback',
+                'last_updated': datetime.now().isoformat()
+            }
         
         logger.info(f"🆘 Fallback ativo com {len(self.teams_data)} times fictícios")
     
