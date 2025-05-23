@@ -859,14 +859,14 @@ Não há partidas acontecendo neste momento.
 
 🔄 Atualize em alguns minutos!"""
                 
-        keyboard = [
+                keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all")],
                     [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
+                ]
                 
-        reply_markup = InlineKeyboardMarkup(keyboard)
+                reply_markup = InlineKeyboardMarkup(keyboard)
                 
-            if is_callback:
+                if is_callback:
                     await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
                 else:
                     await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -902,7 +902,7 @@ Não há partidas acontecendo neste momento.
                     text += f"{team2.get('code', team2.get('name', 'Team2'))}{score_text}\n\n"
             
             # Criar botões para cada partida
-        keyboard = []
+            keyboard = []
             for match in live_matches[:8]:  # Máximo 8 partidas
                 teams = match.get('teams', [])
                 if len(teams) >= 2:
@@ -917,10 +917,10 @@ Não há partidas acontecendo neste momento.
             keyboard.append([
                 InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all"),
                 InlineKeyboardButton("📊 Ver Rankings", callback_data="current_rankings")
-        ])
+            ])
             keyboard.append([InlineKeyboardButton("🏠 Menu Principal", callback_data="start")])
             
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             
             if is_callback:
                 await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
@@ -935,8 +935,8 @@ Não há partidas acontecendo neste momento.
                 await update_or_query.edit_message_text(error_text)
             else:
                 await update_or_query.message.reply_text(error_text)
-    
-    async def predict_match_callback(self, query, match_id: str):
+
+        async def predict_match_callback(self, query, match_id: str):
         """Callback para predição de partida específica"""
         try:
             await query.edit_message_text("🔄 Analisando partida e gerando predição...")
@@ -961,29 +961,29 @@ Não há partidas acontecendo neste momento.
             text = self._format_match_prediction(prediction, match_data)
             
             # Botões de ação
-        keyboard = [
+            keyboard = [
                 [
                     InlineKeyboardButton("🏆 Ver Draft", callback_data=f"draft_{match_id}"),
                     InlineKeyboardButton("💰 Análise Odds", callback_data=f"odds_{match_id}")
-            ],
+                ],
                 [
                     InlineKeyboardButton("🔄 Atualizar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Comparar Times", callback_data=f"compare_{match_id}")
-            ],
+                ],
                 [
                     InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
-        ]
-        ]
+                ]
+            ]
             
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
             
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             await query.edit_message_text(f"❌ Erro na predição: {str(e)}")
-    
-    def _format_match_prediction(self, prediction: Dict, match_data: Dict) -> str:
+
+        def _format_match_prediction(self, prediction: Dict, match_data: Dict) -> str:
         """Formata predição da partida"""
         team1 = prediction['team1']
         team2 = prediction['team2']
@@ -1048,25 +1048,25 @@ Não há partidas acontecendo neste momento.
                 text = self._format_draft_analysis(draft_analysis, match_data)
             
             # Botões
-        keyboard = [
+            keyboard = [
                 [
                     InlineKeyboardButton("🔮 Ver Predição", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("📊 Fases do Jogo", callback_data=f"phases_{match_id}")
-            ],
+                ],
                 [
                     InlineKeyboardButton("🔙 Voltar", callback_data=f"predict_match_{match_id}"),
                     InlineKeyboardButton("🏠 Menu", callback_data="start")
-        ]
-        ]
+                ]
+            ]
             
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
             await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
             
         except Exception as e:
             logger.error(f"❌ Erro na análise de draft: {e}")
             await query.edit_message_text(f"❌ Erro: {str(e)}")
-    
-    def _format_draft_analysis(self, draft_analysis: Dict, match_data: Dict) -> str:
+
+        def _format_draft_analysis(self, draft_analysis: Dict, match_data: Dict) -> str:
         """Formata análise de draft"""
         teams = match_data.get('teams', [])
         team1_name = teams[0].get('code', 'Team 1') if len(teams) > 0 else 'Team 1'
