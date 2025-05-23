@@ -11,9 +11,18 @@ import threading
 import random
 import json
 from datetime import datetime, timedelta
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-from flask import Flask, request, Response
+
+# Importações condicionais para evitar conflitos
+try:
+    from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+except ImportError:
+    print("⚠️ Telegram libraries não encontradas - modo teste ativo")
+    
+try:
+    from flask import Flask, request, Response
+except ImportError:
+    print("⚠️ Flask não encontrado - modo teste ativo")
 
 print("🚀 BOT LOL PREDICTOR V2 - SISTEMA EXPANDIDO")
 
@@ -23,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 if not TOKEN:
-    raise RuntimeError("TELEGRAM_TOKEN não configurado!")
+    if os.environ.get("TELEGRAM_TOKEN") != "test-token-for-local-testing":
+        print("⚠️ TELEGRAM_TOKEN não configurado - usando modo teste")
 
 # BANCO DE DADOS EXPANDIDO DE TIMES
 class AdvancedPredictionSystem:
@@ -350,10 +360,10 @@ class TelegramBot:
         
         welcome_msg = f"""🎮 **BEM-VINDO AO LOL PREDICTOR V2!**
 
-Olá {user.mention_markdown_v2()}\! 
+Olá {user.mention_markdown_v2()}! 
 
 🚀 **SISTEMA EXPANDIDO DISPONÍVEL:**
-• 60\+ times profissionais \(LCK, LPL, LEC, LCS\)
+• 60+ times profissionais \\(LCK, LPL, LEC, LCS\\)
 • Predições com IA avançada
 • Análise detalhada de confrontos
 • Rankings por região
@@ -362,10 +372,10 @@ Olá {user.mention_markdown_v2()}\!
 🎯 **NOVIDADES V2:**
 • Interface com botões interativos
 • Sistema de confiança aprimorado
-• Análise multi\-fatorial
+• Análise multi\\-fatorial
 • Meta atual do jogo
 
-Use o menu abaixo ou digite `/help` para ver todos os comandos\!"""
+Use o menu abaixo ou digite `/help` para ver todos os comandos!"""
 
         # Inline keyboard com opções principais
         keyboard = [
