@@ -130,6 +130,21 @@ class TelegramBotV3:
         self.riot_system = riot_prediction_system
         self.initialization_status = "pending"
         self.setup_handlers()
+        
+        # Inicializar Application de forma síncrona
+        if TELEGRAM_AVAILABLE and TOKEN:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(self.app.initialize())
+                    logger.info("✅ Application Telegram inicializada")
+                except Exception as e:
+                    logger.error(f"❌ Erro ao inicializar Application: {e}")
+                finally:
+                    loop.close()
+            except Exception as e:
+                logger.error(f"❌ Erro na inicialização do loop: {e}")
     
     async def initialize_riot_system(self):
         """Inicializa sistema Riot API em background"""
