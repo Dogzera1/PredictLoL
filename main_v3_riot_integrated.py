@@ -122,6 +122,74 @@ if not TOKEN:
         print("⚠️ TELEGRAM_TOKEN não configurado - usando modo teste")
 
 
+class BackgroundLoopManager:
+    """Singleton para gerenciar loop persistente global"""
+    _instance = None
+    _loop = None
+    _thread = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(BackgroundLoopManager, cls).__new__(cls)
+        return cls._instance
+    
+    def __init__(self):
+        if not hasattr(self, 'initialized'):
+            self.initialized = True
+            self.start_background_loop()
+    
+    def start_background_loop(self):
+        """Inicia loop persistente em thread separada"""
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(target=self._run_loop, daemon=True)
+            self._thread.start()
+            
+            # Aguardar loop estar pronto
+            import time
+            time.sleep(0.2)
+            logger.info("✅ Background loop singleton iniciado")
+    
+    def _run_loop(self):
+        """Executa loop que nunca termina"""
+        try:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            logger.info("🔄 Loop persistente iniciado")
+            self._loop.run_forever()
+        except Exception as e:
+            logger.error(f"❌ Erro no background loop: {e}")
+        finally:
+            if self._loop and not self._loop.is_closed():
+                self._loop.close()
+            logger.warning("⚠️ Background loop encerrado")
+    
+    def run_coroutine(self, coro):
+        """Executa corrotina no loop persistente"""
+        if self._loop is None or self._loop.is_closed():
+            logger.warning("⚠️ Loop não disponível, reiniciando...")
+            self.start_background_loop()
+            import time
+            time.sleep(0.2)
+        
+        try:
+            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+            result = future.result(timeout=30.0)
+            return result
+        except Exception as e:
+            logger.error(f"❌ Erro na execução assíncrona: {e}")
+            raise
+    
+    def is_healthy(self):
+        """Verifica se o loop está saudável"""
+        return (self._loop is not None and 
+                not self._loop.is_closed() and 
+                self._thread is not None and 
+                self._thread.is_alive())
+
+
+# Instância global do gerenciador de loop
+loop_manager = BackgroundLoopManager()
+
 class TelegramBotV3:
     """Bot Telegram V3 com integração Riot API"""
     
@@ -1076,49 +1144,6 @@ def create_flask_app():
     
     app = Flask(__name__)
     
-    # Loop persistente para operações assíncronas
-    background_loop = None
-    background_thread = None
-    
-    def setup_background_loop():
-        """Cria loop persistente em thread separada"""
-        nonlocal background_loop
-        background_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(background_loop)
-        try:
-            background_loop.run_forever()
-        except Exception as e:
-            logger.error(f"Erro no background loop: {e}")
-        finally:
-            background_loop.close()
-    
-    def start_background_loop():
-        """Inicia thread com loop persistente"""
-        nonlocal background_thread
-        if background_thread is None or not background_thread.is_alive():
-            background_thread = threading.Thread(target=setup_background_loop, daemon=True)
-            background_thread.start()
-            # Aguardar loop estar pronto
-            import time
-            time.sleep(0.1)
-            logger.info("✅ Background loop iniciado")
-    
-    def run_in_background_loop(coro):
-        """Executa corrotina no loop persistente"""
-        if background_loop is None or background_loop.is_closed():
-            start_background_loop()
-        
-        future = asyncio.run_coroutine_threadsafe(coro, background_loop)
-        try:
-            result = future.result(timeout=30.0)  # Timeout de 30 segundos
-            return result
-        except Exception as e:
-            logger.error(f"Erro na execução assíncrona: {e}")
-            raise e
-    
-    # Iniciar loop ao criar app
-    start_background_loop()
-    
     @app.route('/')
     def home():
         return jsonify({
@@ -1144,7 +1169,7 @@ def create_flask_app():
                 "telegram": TELEGRAM_AVAILABLE,
                 "riot_api": riot_prediction_system is not None,
                 "flask": True,
-                "background_loop": background_loop is not None and not background_loop.is_closed()
+                "background_loop": loop_manager.is_healthy()
             }
         }
         
@@ -1174,9 +1199,9 @@ def create_flask_app():
                 
                 update = Update.de_json(json_data, telegram_bot_v3.app.bot)
                 
-                # Usar loop persistente para processamento
+                # Usar singleton para processamento
                 try:
-                    run_in_background_loop(telegram_bot_v3.app.process_update(update))
+                    loop_manager.run_coroutine(telegram_bot_v3.app.process_update(update))
                     logger.info("✅ Webhook: Update processado com sucesso")
                     return "OK"
                 except Exception as e:
