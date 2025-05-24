@@ -1182,7 +1182,7 @@ Olá {user.first_name}! 👋
 
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
-                 InlineKeyboardButton("🔮 Portfolio", callback_data="predict_refresh")],
+                 InlineKeyboardButton("🔮 Predições", callback_data="predict_refresh")],
                 [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
                  InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
             ]
@@ -1236,7 +1236,7 @@ Olá {user.first_name}! 👋
             
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
-                 InlineKeyboardButton("🔮 Portfolio", callback_data="predict_refresh")],
+                 InlineKeyboardButton("🔮 Predições", callback_data="predict_refresh")],
                 [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
                  InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
             ]
@@ -1708,7 +1708,7 @@ O sistema monitora continuamente:
 • Veja fatores que influenciam cada resultado
 • Compare com value betting disponível
 
-⏰ Portfolio baseadas em dados reais da API Riot"""
+⏰ Predições baseadas em dados reais da API Riot"""
             
             keyboard = [
                 [InlineKeyboardButton("🔮 Predição Detalhada", callback_data="predict_detailed"),
@@ -1769,7 +1769,7 @@ O sistema monitora continuamente:
                 
                 keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
-                     InlineKeyboardButton("🔮 Portfolio", callback_data="predict_refresh")],
+                     InlineKeyboardButton("🔮 Predições", callback_data="predict_refresh")],
                     [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
                      InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
                 ]
