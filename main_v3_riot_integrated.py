@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 
 # Imports condicionais para modo teste
 try:
-    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-    from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
+    from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ChatMemberHandler
     TELEGRAM_AVAILABLE = True
     logger.info("✅ Telegram libraries carregadas")
 except ImportError:
@@ -53,6 +53,9 @@ except ImportError:
     class InlineKeyboardMarkup:
         def __init__(self, keyboard):
             self.keyboard = keyboard
+
+    class ChatMember:
+        pass
 
     # [resto das classes mock...]
 
@@ -876,6 +879,9 @@ class TelegramBotV3Improved:
 
         # Sistema de Value Betting (será inicializado depois)
         self.value_monitor = None
+        
+        # Sistema de Grupos Automáticos
+        self.group_manager = AutoGroupManager(self)
 
         logger.info("🤖 Bot V3 Melhorado inicializado")
 
@@ -886,9 +892,31 @@ class TelegramBotV3Improved:
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
         self.app.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-         self.text_message_handler))
+            MessageHandler(
+                filters.TEXT & ~filters.COMMAND,
+                self.text_message_handler))
+        
+        # Handler para quando bot é adicionado/removido de grupos
+        self.app.add_handler(ChatMemberHandler(
+            self.handle_chat_member_update, 
+            ChatMemberHandler.MY_CHAT_MEMBER
+        ))
+    
+    async def handle_chat_member_update(self, update: Update, context):
+        """Handler para mudanças de status do bot em chats"""
+        try:
+            chat_member_update = update.my_chat_member
+            
+            if chat_member_update.new_chat_member.status == ChatMember.MEMBER:
+                # Bot foi adicionado ao grupo
+                await self.group_manager.handle_bot_added_to_group(update, context)
+            elif chat_member_update.new_chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
+                # Bot foi removido do grupo
+                chat_id = update.effective_chat.id
+                self.group_manager.remove_group(chat_id)
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar mudança de chat member: {e}")
 
     async def start_command(self, update: Update, context):
         """Comando /start melhorado"""
@@ -1265,6 +1293,12 @@ Não há partidas acontecendo neste momento.
                 await self.subscribe_value_callback(query)
             elif data == "unsubscribe_value":
                 await self.unsubscribe_value_callback(query)
+            elif data.startswith("group_value_"):
+                chat_id = int(data.replace("group_value_", ""))
+                await self.activate_group_value_bets(query, chat_id)
+            elif data.startswith("group_config_"):
+                chat_id = int(data.replace("group_config_", ""))
+                await self.show_group_config(query, chat_id)
             else:
                 await query.edit_message_text("⚠️ Funcionalidade em desenvolvimento")
 
@@ -1631,6 +1665,273 @@ Você não receberá mais notificações de value bets.
 
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+
+    async def activate_group_value_bets(self, query, chat_id):
+        """Ativa notificações de value bets para um grupo"""
+        self.group_manager.activate_value_bets_for_group(chat_id)
+        
+        text = """✅ **VALUE BETS ATIVADO PARA O GRUPO!**
+
+🔥 **Notificações automáticas ativadas:**
+• 🚨 **Alertas em tempo real** quando odds estão desreguladas
+• 💰 **Edge de +15%** ou mais
+• ⚡ **Urgência** baseada no potencial de lucro
+• 🎯 **Recomendações específicas** de apostas
+
+⏰ **Funcionamento:**
+O bot irá enviar alertas automaticamente sempre que detectar uma oportunidade de value bet durante partidas ao vivo.
+
+🎮 **Aguarde os primeiros alertas!**"""
+        
+        keyboard = [
+            [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
+            [InlineKeyboardButton("⚙️ Configurações", callback_data=f"group_config_{chat_id}")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+    
+    async def show_group_config(self, query, chat_id):
+        """Mostra configurações do grupo"""
+        is_value_active = chat_id in self.group_manager.value_bet_groups
+        is_auto_tips_active = chat_id in self.group_manager.active_groups
+        
+        text = f"""⚙️ **CONFIGURAÇÕES DO GRUPO**
+
+📊 **Status Atual:**
+• 🔥 **Value Bets:** {'✅ Ativo' if is_value_active else '❌ Inativo'}
+• ⚡ **Dicas Automáticas:** {'✅ Ativo' if is_auto_tips_active else '❌ Inativo'}
+• ⏰ **Intervalo:** 30 minutos
+• 📈 **Monitoramento:** Tempo real
+
+🎯 **Funcionalidades Disponíveis:**
+• Predições automáticas das partidas ao vivo
+• Alertas de value betting em tempo real
+• Análises de draft e composições
+• Rankings e estatísticas atualizadas
+
+💡 **O bot funciona automaticamente sem comandos!**"""
+        
+        keyboard = []
+        if not is_value_active:
+            keyboard.append([InlineKeyboardButton("🔥 Ativar Value Bets", callback_data=f"group_value_{chat_id}")])
+        
+        keyboard.extend([
+            [InlineKeyboardButton("📊 Ver Stats", callback_data="value_stats")],
+            [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")]
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+
+
+class AutoGroupManager:
+    """Gerenciador automático para grupos - envia dicas sem comando start"""
+    
+    def __init__(self, bot_instance):
+        self.bot = bot_instance
+        self.active_groups = set()  # Chat IDs dos grupos ativos
+        self.last_tips_sent = {}    # Último envio de dicas por grupo
+        self.value_bet_groups = set()  # Grupos inscritos em value bets
+        self.auto_tips_interval = 1800  # 30 minutos entre dicas automáticas
+        
+    async def handle_bot_added_to_group(self, update: Update, context):
+        """Handler quando bot é adicionado a um grupo"""
+        try:
+            chat_id = update.effective_chat.id
+            chat_type = update.effective_chat.type
+            
+            # Verificar se é um grupo ou supergrupo
+            if chat_type in ['group', 'supergroup']:
+                self.active_groups.add(chat_id)
+                logger.info(f"🔥 Bot adicionado ao grupo {chat_id}")
+                
+                # Enviar mensagem de boas-vindas automática
+                welcome_text = """🚀 **LOL PREDICTOR V3 - MODO GRUPO ATIVO!**
+
+🔥 **FUNCIONALIDADES AUTOMÁTICAS ATIVADAS:**
+• ⚡ **Dicas automáticas** a cada 30 minutos
+• 🎯 **Notificações de Value Bets** em tempo real
+• 🏆 **Análise de partidas ao vivo** automaticamente
+• 💰 **Alertas de apostas** quando odds estão desreguladas
+
+📊 **O bot irá monitorar continuamente:**
+• Todas as partidas LoL ao vivo
+• Oportunidades de value betting
+• Análises de draft em tempo real
+• Rankings e estatísticas
+
+🎮 **Sem necessidade de comandos - tudo automático!**
+Aguarde as próximas dicas em alguns minutos..."""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔥 Ativar Value Bets", callback_data=f"group_value_{chat_id}")],
+                    [InlineKeyboardButton("⚙️ Configurações", callback_data=f"group_config_{chat_id}")]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=welcome_text,
+                    reply_markup=reply_markup,
+                    parse_mode='Markdown'
+                )
+                
+                # Iniciar envio automático após 5 minutos
+                asyncio.create_task(self._start_auto_tips_for_group(chat_id, context))
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar adição ao grupo: {e}")
+    
+    async def _start_auto_tips_for_group(self, chat_id: int, context):
+        """Inicia envio automático de dicas para um grupo"""
+        await asyncio.sleep(300)  # Aguarda 5 minutos
+        
+        while chat_id in self.active_groups:
+            try:
+                # Verificar se passou tempo suficiente desde última dica
+                last_sent = self.last_tips_sent.get(chat_id, 0)
+                now = datetime.now().timestamp()
+                
+                if now - last_sent >= self.auto_tips_interval:
+                    await self._send_auto_tips(chat_id, context)
+                    self.last_tips_sent[chat_id] = now
+                
+                # Aguardar 5 minutos antes de verificar novamente
+                await asyncio.sleep(300)
+                
+            except Exception as e:
+                logger.error(f"❌ Erro no loop automático do grupo {chat_id}: {e}")
+                await asyncio.sleep(600)  # Aguarda mais tempo em caso de erro
+    
+    async def _send_auto_tips(self, chat_id: int, context):
+        """Envia dicas automáticas para o grupo"""
+        try:
+            # Buscar partidas ao vivo
+            live_matches = await self.bot.riot_api.get_all_live_matches()
+            
+            if not live_matches:
+                # Se não há partidas, enviar update de status
+                status_text = """⏰ **UPDATE AUTOMÁTICO**
+
+🔍 **Status:** Monitorando partidas...
+📊 **Partidas ativas:** 0
+🎯 **Próxima verificação:** 30 minutos
+
+O bot continua monitorando todas as ligas em busca de:
+• 🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS
+• 🌍 Torneios internacionais • 🏆 Ligas regionais"""
+                
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=status_text,
+                    parse_mode='Markdown'
+                )
+                return
+            
+            # Gerar predições para as principais partidas
+            predictions = []
+            for match in live_matches[:3]:  # Top 3 partidas
+                prediction = await self.bot.prediction_system.predict_live_match(match)
+                predictions.append((match, prediction))
+            
+            # Formatar mensagem automática
+            auto_message = self._format_auto_tips_message(predictions)
+            
+            # Criar botões para ver mais detalhes
+            keyboard = [
+                [InlineKeyboardButton("🔴 Ver Todas as Partidas", callback_data="live_matches_all")],
+                [
+                    InlineKeyboardButton("🔥 Value Bets", callback_data="value_betting"),
+                    InlineKeyboardButton("📊 Rankings", callback_data="current_rankings")
+                ]
+            ]
+            
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=auto_message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            
+            logger.info(f"✅ Dicas automáticas enviadas para grupo {chat_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar dicas automáticas: {e}")
+    
+    def _format_auto_tips_message(self, predictions: List) -> str:
+        """Formata mensagem de dicas automáticas"""
+        text = "🔥 **DICAS AUTOMÁTICAS - LOL PREDICTOR**\n\n"
+        text += f"⏰ **{datetime.now().strftime('%H:%M:%S')}** | 📊 **{len(predictions)} partidas ativas**\n\n"
+        
+        for i, (match, prediction) in enumerate(predictions, 1):
+            team1 = prediction['team1']
+            team2 = prediction['team2']
+            prob1 = prediction['team1_win_probability'] * 100
+            confidence = prediction['confidence']
+            
+            # Determinar favorito
+            if prob1 > 50:
+                favorite = team1
+                favorite_prob = prob1
+            else:
+                favorite = team2
+                favorite_prob = 100 - prob1
+            
+            # Emoji baseado na confiança
+            confidence_emoji = "🔥" if confidence == "alta" or confidence == "muito alta" else "⚡" if confidence == "média" else "💡"
+            
+            text += f"{confidence_emoji} **PARTIDA {i}:** {team1} vs {team2}\n"
+            text += f"🎯 **Favorito:** {favorite} ({favorite_prob:.1f}%)\n"
+            text += f"🎲 **Confiança:** {confidence.upper()}\n\n"
+        
+        text += "💰 **DICA PRINCIPAL:** Aposte no favorito das partidas com confiança ALTA\n\n"
+        text += "🔄 **Próxima atualização:** 30 minutos\n"
+        text += "📱 Use os botões abaixo para análises detalhadas!"
+        
+        return text
+    
+    async def send_value_bet_alert(self, chat_id: int, value_bet_info: Dict, context):
+        """Envia alerta de value bet para grupo"""
+        if chat_id not in self.value_bet_groups:
+            return
+            
+        try:
+            alert_text = f"""🚨 **ALERTA VALUE BET AUTOMÁTICO** 🚨
+
+🎯 **{value_bet_info['team1']} vs {value_bet_info['team2']}**
+💰 **Probabilidade Real:** {value_bet_info['probability']:.1%}
+📊 **Odds Atuais:** {value_bet_info['odds']:.2f}
+⚡ **Edge:** +{value_bet_info['edge']:.1%}
+
+🔥 **URGÊNCIA:** {value_bet_info['urgency']}
+⏰ **AGIR AGORA** - Odds podem mudar rapidamente!
+
+💡 **Aposte em:** {value_bet_info['recommended_team']}"""
+            
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=alert_text,
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar alerta de value bet: {e}")
+    
+    def activate_value_bets_for_group(self, chat_id: int):
+        """Ativa notificações de value bets para um grupo"""
+        self.value_bet_groups.add(chat_id)
+        logger.info(f"🔥 Value bets ativado para grupo {chat_id}")
+    
+    def remove_group(self, chat_id: int):
+        """Remove grupo quando bot é removido"""
+        self.active_groups.discard(chat_id)
+        self.value_bet_groups.discard(chat_id)
+        self.last_tips_sent.pop(chat_id, None)
+        logger.info(f"❌ Grupo {chat_id} removido")
 
 
 # Função principal
