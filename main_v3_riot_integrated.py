@@ -966,16 +966,16 @@ Não há partidas acontecendo neste momento.
             keyboard = [
                 [InlineKeyboardButton(
                     "🔄 Atualizar", callback_data="live_matches_all")],
-                    [InlineKeyboardButton(
-                        "🏠 Menu Principal", callback_data="start")]
+                [InlineKeyboardButton(
+                    "🏠 Menu Principal", callback_data="start")]
             ]
 
-               reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
-                if is_callback:
-                    await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-                else:
-                    await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            if is_callback:
+                await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            else:
+                await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
             return
 
             # Formatar lista de partidas
