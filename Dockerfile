@@ -29,6 +29,10 @@ RUN pip install --no-cache-dir -r requirements_railway.txt
 
 # Copiar código da aplicação
 COPY bot_v13_railway.py .
+COPY start.sh .
+
+# Tornar script executável
+RUN chmod +x start.sh
 
 # Criar diretórios necessários
 RUN mkdir -p /app/logs /app/data /app/backups
@@ -50,5 +54,5 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
 # Expor porta para webhook (opcional)
 EXPOSE 5000
 
-# Comando principal
-CMD ["python", "bot_v13_railway.py"] 
+# Comando principal usando o script
+CMD ["./start.sh"] 

@@ -1,14 +1,12 @@
 [build]
-builder = "nixpacks"
+builder = "dockerFile"
 
 [deploy]
-startCommand = "python main_v3_riot_integrated.py"
+startCommand = "python bot_v13_railway.py"
 healthcheckPath = "/health"
-healthcheckTimeout = 300
-restartPolicyType = "on_failure"
+healthcheckTimeout = 10
+restartPolicyType = "never"
 
-[environments.production]
-variables = { PORT = "8080" }
-
-[variables]
-TELEGRAM_TOKEN = "${{TELEGRAM_TOKEN}}" 
+[env]
+TELEGRAM_TOKEN = "${{ secrets.TELEGRAM_TOKEN }}"
+OWNER_ID = "${{ secrets.OWNER_ID }}" 
