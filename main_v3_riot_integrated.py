@@ -471,10 +471,8 @@ class ImprovedRiotAPI:
             live_matches = await self._get_live_from_api()
 
             if live_matches:
-                logger.info(
-    f"✅ {
-        len(live_matches)} partidas ao vivo da API oficial")
-            return live_matches
+                logger.info(f"✅ {len(live_matches)} partidas ao vivo da API oficial")
+                return live_matches
 
             # Se API falhar, usar dados de fallback
             logger.warning("⚠️ API não disponível, usando dados simulados")
@@ -841,7 +839,11 @@ class DynamicPredictionSystem:
             analysis.append(
     f"💰 **RECOMENDAÇÃO:** Partida equilibrada, aposte com cautela")
 
-        return "\n".join(analysis)
+        # Timing
+        text = f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {datetime.now().strftime('%H:%M:%S')}\n"
+        text += f"🔄 *Probabilidades atualizadas dinamicamente*"
+
+        return text
 
     def _get_fallback_prediction(self) -> Dict:
         """Predição de fallback quando há erro"""
@@ -1128,8 +1130,7 @@ Não há partidas acontecendo neste momento.
         text += f"📝 **ANÁLISE:**\n{prediction['analysis']}\n\n"
 
         # Timing
-        text += f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {
-    datetime.now().strftime('%H:%M:%S')}\n"
+        text += f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {datetime.now().strftime('%H:%M:%S')}\n"
         text += f"🔄 *Probabilidades atualizadas dinamicamente*"
 
         return text
@@ -1200,12 +1201,8 @@ Não há partidas acontecendo neste momento.
         text = f"🏆 **ANÁLISE DE DRAFT**\n\n"
 
         # Composições
-        text += f"🔵 **{team1_name}:** {
-    ', '.join(
-        team1_analysis['champions'])}\n"
-        text += f"🔴 **{team2_name}:** {
-    ', '.join(
-        team2_analysis['champions'])}\n\n"
+        text += f"🔵 **{team1_name}:** {', '.join(team1_analysis['champions'])}\n"
+        text += f"🔴 **{team2_name}:** {', '.join(team2_analysis['champions'])}\n\n"
 
         # Vantagem de draft
         favored_team = team1_name if advantage['favored_team'] == 1 else team2_name
