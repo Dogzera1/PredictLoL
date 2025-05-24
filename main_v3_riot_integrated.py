@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Imports condicionais para modo teste
 try:
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
-    from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ChatMemberHandler
+    from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, ChatMemberHandler, CallbackContext
     TELEGRAM_AVAILABLE = True
     logger.info("✅ Telegram libraries carregadas")
 except ImportError:
@@ -2299,27 +2299,17 @@ Olá {user.first_name}! 👋
             # Verificar se o token é válido antes de continuar
             if not TOKEN or TOKEN in ['test-token-for-local-testing', 'test-token-for-testing']:
                 logger.error("❌ TELEGRAM_TOKEN inválido ou não configurado")
-                logger.error("🔧 SOLUÇÃO:")
-                logger.error("1. Acesse @BotFather no Telegram")
-                logger.error("2. Digite /newbot ou /token para obter token válido") 
-                logger.error("3. Configure a variável TELEGRAM_TOKEN com o novo token")
-                logger.error("4. Formato: TELEGRAM_TOKEN=1234567890:ABCDEF...")
                 return
             
-            # Testar token antes de inicializar sistemas avançados
+            # Testar token
             try:
                 test_bot = await self.application.bot.get_me()
                 logger.info(f"✅ Token válido - Bot: @{test_bot.username}")
             except Exception as e:
                 logger.error(f"❌ Token inválido: {e}")
-                logger.error("🔧 OBTENHA UM NOVO TOKEN:")
-                logger.error("1. Abra Telegram e procure por @BotFather")
-                logger.error("2. Digite /newbot e siga as instruções")
-                logger.error("3. Ou digite /token e selecione seu bot existente")
-                logger.error("4. Configure TELEGRAM_TOKEN=SEU_NOVO_TOKEN")
                 return
             
-            # Inicializar sistema de Value Betting apenas após verificar application
+            # Inicializar sistema de Value Betting
             if hasattr(self, 'prediction_system') and hasattr(self, 'riot_api'):
                 try:
                     import value_bet_system
@@ -2332,30 +2322,50 @@ Olá {user.first_name}! 👋
             
             logger.info("✅ Bot iniciado com sucesso! Pressione Ctrl+C para parar.")
             
-            # Executar o bot usando run_polling (método correto para versões recentes)
-            await self.application.run_polling(
-                poll_interval=2.0,  # Verificar updates a cada 2 segundos
-                timeout=10,         # Timeout de 10 segundos
-                drop_pending_updates=True  # Ignorar updates pendentes
-            )
+            # Abordagem simples e robusta - usar polling manual
+            last_update_id = 0
             
+            while True:
+                try:
+                    # Buscar updates manualmente
+                    updates = await self.application.bot.get_updates(
+                        offset=last_update_id + 1,
+                        timeout=30,
+                        allowed_updates=["message", "callback_query", "chat_member"]
+                    )
+                    
+                    # Processar cada update
+                    for update in updates:
+                        last_update_id = update.update_id
+                        
+                        # Processar update usando o sistema de handlers
+                        try:
+                            await self.application.process_update(update)
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao processar update: {e}")
+                    
+                    # Pequena pausa para não sobrecarregar
+                    if not updates:
+                        await asyncio.sleep(1)
+                        
+                except asyncio.CancelledError:
+                    logger.info("🛑 Operação cancelada")
+                    break
+                except KeyboardInterrupt:
+                    logger.info("🛑 Interrupção detectada")
+                    break
+                except Exception as e:
+                    logger.error(f"❌ Erro no polling: {e}")
+                    await asyncio.sleep(5)  # Pausa em caso de erro
+                    
         except KeyboardInterrupt:
             logger.info("🛑 Interrupção detectada, parando bot...")
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
             raise
         finally:
-            # Shutdown seguro
-            try:
-                if hasattr(self, 'application') and self.application:
-                    if hasattr(self.application, 'updater') and self.application.updater.running:
-                        await self.application.updater.stop()
-                    if hasattr(self.application, '_initialized') and self.application._initialized:
-                        await self.application.stop()
-                        await self.application.shutdown()
-                logger.info("✅ Bot finalizado corretamente")
-            except Exception as e:
-                logger.error(f"❌ Erro no shutdown: {e}")
+            # Shutdown simples
+            logger.info("✅ Bot finalizado corretamente")
 
     async def show_all_live_matches(self, update_or_query, context: ContextTypes.DEFAULT_TYPE = None, is_callback: bool = False):
         """Mostra todas as partidas ao vivo com predições"""
