@@ -2288,7 +2288,34 @@ Olá {user.first_name}! 👋
         try:
             logger.info("🚀 Iniciando bot...")
             
-            # Inicializar sistema de Value Betting automaticamente
+            # Configurar application se não estiver configurado
+            if not hasattr(self, 'application') or self.application is None:
+                await self.initialize_bot()
+            
+            # Verificar se o token é válido antes de continuar
+            if not TOKEN or TOKEN in ['test-token-for-local-testing', 'test-token-for-testing']:
+                logger.error("❌ TELEGRAM_TOKEN inválido ou não configurado")
+                logger.error("🔧 SOLUÇÃO:")
+                logger.error("1. Acesse @BotFather no Telegram")
+                logger.error("2. Digite /newbot ou /token para obter token válido") 
+                logger.error("3. Configure a variável TELEGRAM_TOKEN com o novo token")
+                logger.error("4. Formato: TELEGRAM_TOKEN=1234567890:ABCDEF...")
+                return
+            
+            # Testar token antes de inicializar sistemas avançados
+            try:
+                test_bot = await self.application.bot.get_me()
+                logger.info(f"✅ Token válido - Bot: @{test_bot.username}")
+            except Exception as e:
+                logger.error(f"❌ Token inválido: {e}")
+                logger.error("🔧 OBTENHA UM NOVO TOKEN:")
+                logger.error("1. Abra Telegram e procure por @BotFather")
+                logger.error("2. Digite /newbot e siga as instruções")
+                logger.error("3. Ou digite /token e selecione seu bot existente")
+                logger.error("4. Configure TELEGRAM_TOKEN=SEU_NOVO_TOKEN")
+                return
+            
+            # Inicializar sistema de Value Betting apenas após verificar application
             if hasattr(self, 'prediction_system') and hasattr(self, 'riot_api'):
                 try:
                     import value_bet_system
@@ -2298,10 +2325,6 @@ Olá {user.first_name}! 👋
                     logger.info("✅ Sistema de Value Betting iniciado automaticamente")
                 except Exception as e:
                     logger.warning(f"⚠️ Erro ao inicializar Value Betting: {e}")
-            
-            # Configurar application se não estiver configurado
-            if not hasattr(self, 'application') or self.application is None:
-                await self.initialize_bot()
             
             # Inicializar aplicação
             await self.application.initialize()
