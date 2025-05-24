@@ -86,104 +86,236 @@ class RiotAPIClient:
             'esports': 'https://esports-api.lolesports.com/persisted/gw',
             'schedule': 'https://esports-api.lolesports.com/persisted/gw/getSchedule'
         }
+        logger.info("🔗 RiotAPIClient inicializado - buscando dados reais")
     
     async def get_live_matches(self) -> List[Dict]:
-        """Busca partidas ao vivo com fallback para dados reais"""
-        logger.info("🔍 Buscando partidas ao vivo...")
+        """Busca partidas ao vivo REAIS com múltiplas fontes"""
+        logger.info("🔍 Buscando partidas ao vivo da API oficial...")
         
-        # Tentar buscar dados reais
-        real_matches = await self._try_fetch_real_data()
-        if real_matches:
-            logger.info(f"✅ {len(real_matches)} partidas reais encontradas")
-            return real_matches
-        
-        # Fallback: usar dados da API LoL Esports
-        try:
-            # Endpoint público da Riot para esports
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-            
-            # API pública de schedule
-            url = "https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR"
-            
-            response = requests.get(url, headers=headers, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                live_matches = self._extract_live_matches(data)
-                if live_matches:
-                    logger.info(f"✅ {len(live_matches)} partidas encontradas na API pública")
-                    return live_matches
-                    
-        except Exception as e:
-            logger.debug(f"⚠️ Erro na API pública: {e}")
-        
-        logger.info("🔄 API indisponível, usando dados de exemplo")
-        return []
-    
-    async def _try_fetch_real_data(self) -> List[Dict]:
-        """Tenta buscar dados reais de diferentes fontes"""
+        # Lista de endpoints para tentar
         endpoints = [
-            "https://feed.lolesports.com/livestats/v1/scheduleItems",
+            # Endpoint principal de live matches
             "https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR",
-            "https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR"
+            
+            # Endpoint de schedule (contém jogos em andamento)
+            "https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR",
+            
+            # Endpoint alternativo
+            "https://feed.lolesports.com/livestats/v1/scheduleItems",
+            
+            # Backup endpoints
+            "https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=en-US",
+            "https://esports-api.lolesports.com/persisted/gw/getLive?hl=en-US"
         ]
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+            'Referer': 'https://lolesports.com/',
+            'Origin': 'https://lolesports.com'
+        }
+        
+        all_matches = []
         
         for endpoint in endpoints:
             try:
-                response = requests.get(endpoint, timeout=5)
+                logger.info(f"🌐 Tentando endpoint: {endpoint}")
+                
+                response = requests.get(endpoint, headers=headers, timeout=15)
+                
                 if response.status_code == 200:
                     data = response.json()
+                    logger.info(f"✅ Resposta recebida do endpoint: {len(str(data))} caracteres")
+                    
                     matches = self._extract_live_matches(data)
                     if matches:
-                        return matches
-            except:
+                        logger.info(f"🎮 {len(matches)} partidas encontradas em {endpoint}")
+                        all_matches.extend(matches)
+                        
+                        # Se encontrou partidas, pode parar (ou continuar para mais dados)
+                        if len(all_matches) >= 3:  # Parar se já tem várias partidas
+                            break
+                    else:
+                        logger.info(f"ℹ️ Nenhuma partida ao vivo encontrada em {endpoint}")
+                else:
+                    logger.warning(f"⚠️ Endpoint retornou status {response.status_code}")
+                    
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"🌐 Erro de rede no endpoint {endpoint}: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"❌ Erro geral no endpoint {endpoint}: {e}")
                 continue
         
-        return []
+        # Remover duplicatas
+        unique_matches = []
+        seen_matches = set()
+        
+        for match in all_matches:
+            # Criar identificador único baseado nos times
+            teams = match.get('teams', [])
+            if len(teams) >= 2:
+                match_id = f"{teams[0].get('name', 'T1')}_{teams[1].get('name', 'T2')}"
+                if match_id not in seen_matches:
+                    seen_matches.add(match_id)
+                    unique_matches.append(match)
+        
+        if unique_matches:
+            logger.info(f"🎯 Total de {len(unique_matches)} partidas únicas encontradas")
+            return unique_matches
+        else:
+            logger.info("ℹ️ Nenhuma partida ao vivo encontrada em nenhum endpoint")
+            return []
     
     def _extract_live_matches(self, data: Dict) -> List[Dict]:
-        """Extrai partidas ao vivo dos dados da API"""
+        """Extrai partidas ao vivo dos dados da API com múltiplos formatos"""
         matches = []
         
         try:
-            # Estrutura da API de schedule
-            events = data.get('data', {}).get('schedule', {}).get('events', [])
+            # Tentar diferentes estruturas de dados
+            possible_paths = [
+                ['data', 'schedule', 'events'],
+                ['data', 'events'],
+                ['events'],
+                ['data', 'live'],
+                ['live'],
+                ['matches'],
+                ['data', 'matches'],
+                ['scheduleItems']
+            ]
+            
+            events = None
+            for path in possible_paths:
+                current = data
+                for key in path:
+                    if isinstance(current, dict) and key in current:
+                        current = current[key]
+                    else:
+                        break
+                else:
+                    events = current
+                    break
+            
+            if not events:
+                logger.debug("⚠️ Nenhuma estrutura de eventos encontrada")
+                return matches
+            
+            logger.info(f"📊 Processando {len(events)} eventos da API")
             
             for event in events:
                 try:
-                    # Verificar se está ao vivo
+                    # Verificar se é uma partida ao vivo
                     state = event.get('state', '').lower()
-                    start_time = event.get('startTime')
+                    status = event.get('status', '').lower()
                     
-                    if state in ['inprogress', 'live']:
+                    # Estados que indicam partida ao vivo
+                    live_states = ['inprogress', 'live', 'ongoing', 'started']
+                    
+                    if any(live_state in state for live_state in live_states) or \
+                       any(live_state in status for live_state in live_states):
+                        
                         match_data = {
-                            'id': event.get('id'),
-                            'league': event.get('league', {}).get('name', 'Unknown League'),
-                            'status': 'ao vivo',
-                            'teams': []
+                            'id': event.get('id', f"match_{len(matches)}"),
+                            'league': self._extract_league_name(event),
+                            'status': self._extract_status(event),
+                            'teams': self._extract_teams(event)
                         }
                         
-                        # Extrair teams
-                        teams = event.get('match', {}).get('teams', [])
-                        for team in teams[:2]:  # Apenas 2 teams
-                            match_data['teams'].append({
-                                'name': team.get('name', 'Team'),
-                                'code': team.get('code', 'TM')
-                            })
-                        
+                        # Só adicionar se tem pelo menos 2 times
                         if len(match_data['teams']) >= 2:
                             matches.append(match_data)
-                            
+                            logger.info(f"✅ Partida encontrada: {match_data['teams'][0].get('name')} vs {match_data['teams'][1].get('name')} ({match_data['league']})")
+                        
                 except Exception as e:
-                    logger.debug(f"Erro ao processar evento: {e}")
+                    logger.debug(f"⚠️ Erro ao processar evento: {e}")
                     continue
                     
         except Exception as e:
-            logger.debug(f"Erro ao extrair partidas: {e}")
+            logger.error(f"❌ Erro ao extrair partidas: {e}")
         
         return matches
+    
+    def _extract_league_name(self, event: Dict) -> str:
+        """Extrai nome da liga do evento"""
+        # Tentar diferentes caminhos para encontrar o nome da liga
+        league_paths = [
+            ['league', 'name'],
+            ['league', 'displayName'],
+            ['tournament', 'name'],
+            ['competition', 'name'],
+            ['match', 'league', 'name']
+        ]
+        
+        for path in league_paths:
+            current = event
+            for key in path:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                else:
+                    break
+            else:
+                if isinstance(current, str) and current:
+                    return current
+        
+        return 'Liga Desconhecida'
+    
+    def _extract_status(self, event: Dict) -> str:
+        """Extrai status da partida"""
+        state = event.get('state', '')
+        status = event.get('status', '')
+        
+        if 'inprogress' in state.lower() or 'live' in state.lower():
+            return 'Ao vivo'
+        elif 'ongoing' in status.lower():
+            return 'Em andamento'
+        elif 'started' in status.lower():
+            return 'Iniciada'
+        else:
+            return 'Partida ativa'
+    
+    def _extract_teams(self, event: Dict) -> List[Dict]:
+        """Extrai times do evento"""
+        teams = []
+        
+        # Tentar diferentes estruturas para encontrar os times
+        team_paths = [
+            ['match', 'teams'],
+            ['teams'],
+            ['competitors'],
+            ['participants']
+        ]
+        
+        teams_data = None
+        for path in team_paths:
+            current = event
+            for key in path:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                else:
+                    break
+            else:
+                if isinstance(current, list) and current:
+                    teams_data = current
+                    break
+        
+        if teams_data:
+            for team_data in teams_data[:2]:  # Máximo 2 times
+                if isinstance(team_data, dict):
+                    team_info = {
+                        'name': team_data.get('name', team_data.get('displayName', team_data.get('code', 'Team'))),
+                        'code': team_data.get('code', team_data.get('acronym', team_data.get('name', 'TM')[:3]))
+                    }
+                    teams.append(team_info)
+        
+        # Se não conseguiu extrair times, criar genéricos
+        while len(teams) < 2:
+            teams.append({
+                'name': f'Time {len(teams) + 1}',
+                'code': f'T{len(teams) + 1}'
+            })
+        
+        return teams
 
 class ValueBettingSystem:
     """Sistema de value betting automatizado"""
@@ -457,34 +589,68 @@ Olá {user.first_name}! 👋
         update.message.reply_text(help_text, parse_mode=ParseMode.MARKDOWN)
     
     def show_matches(self, update: Update, context: CallbackContext):
-        """Mostra partidas ao vivo"""
+        """Mostra partidas ao vivo REAIS da API"""
         self.health_manager.update_activity()
         
-        # Simular partidas (dados reais viriam da API)
-        matches_text = """🔴 **PARTIDAS AO VIVO**
+        # Buscar partidas reais de forma síncrona
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            real_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+            loop.close()
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar partidas reais: {e}")
+            real_matches = []
+        
+        if not real_matches:
+            # Se não há partidas reais, mostrar mensagem informativa
+            matches_text = """ℹ️ **NENHUMA PARTIDA AO VIVO**
 
-🇰🇷 **LCK**
-• T1 vs Gen.G (Bo3) - 1-1
-• DRX vs KT Rolster (Bo3) - 0-1
+🔍 **Não há partidas de LoL Esports acontecendo agora**
 
-🇨🇳 **LPL** 
-• JDG vs BLG (Bo3) - 2-0
-• WBG vs LNG (Bo3) - Em andamento
+🔄 **Monitoramento ativo em:**
+🏆 LCK, LPL, LEC, LCS
+🥈 CBLOL, LJL, LCO, LFL
+🌍 Ligas regionais
 
-🇪🇺 **LEC**
-• G2 vs Fnatic (Bo1) - Draft phase
-• MAD vs Rogue (Bo1) - Em andamento
+⏰ **Verifique novamente em alguns minutos**"""
 
-🇧🇷 **CBLOL**
-• LOUD vs paiN (Bo3) - 1-0
-• Red Canids vs KaBuM (Bo3) - Draft
-
-⚡ **Use /value para alertas de value betting!**"""
-
-        keyboard = [
-            [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
-             InlineKeyboardButton("📊 Analytics", callback_data="analytics")]
-        ]
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
+                 InlineKeyboardButton("💰 Value Bets", callback_data="value_bets")],
+                [InlineKeyboardButton("📊 Portfolio", callback_data="portfolio"),
+                 InlineKeyboardButton("🎯 Kelly", callback_data="kelly")]
+            ]
+        else:
+            # Mostrar partidas reais encontradas
+            matches_text = f"🔴 **PARTIDAS AO VIVO** ({len(real_matches)} encontradas)\n\n"
+            
+            for i, match in enumerate(real_matches[:6]):  # Máximo 6 partidas
+                try:
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team 1')
+                        team2 = teams[1].get('name', 'Team 2')
+                        league = match.get('league', 'Unknown')
+                        status = match.get('status', 'Ao vivo')
+                        
+                        matches_text += f"🎮 **{league}**\n"
+                        matches_text += f"• {team1} vs {team2}\n"
+                        matches_text += f"📊 {status}\n\n"
+                        
+                except Exception as e:
+                    logger.error(f"❌ Erro ao processar partida {i}: {e}")
+                    continue
+            
+            matches_text += f"⏰ Atualizado: {datetime.now().strftime('%H:%M:%S')}"
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
+                 InlineKeyboardButton("💰 Value Bets", callback_data="value_bets")],
+                [InlineKeyboardButton("📊 Portfolio", callback_data="portfolio"),
+                 InlineKeyboardButton("🎯 Kelly", callback_data="kelly")]
+            ]
         
         update.message.reply_text(
             matches_text,
@@ -630,7 +796,62 @@ Olá {user.first_name}! 👋
         self.health_manager.update_activity()
         
         if query.data == "show_matches":
-            self.show_matches(query, context)
+            # Buscar partidas reais de forma síncrona para callback
+            try:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                real_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+                loop.close()
+                
+                if not real_matches:
+                    matches_text = """ℹ️ **NENHUMA PARTIDA AO VIVO**
+
+🔍 **Não há partidas de LoL Esports acontecendo agora**
+
+🔄 **Monitoramento ativo em:**
+🏆 LCK, LPL, LEC, LCS
+🥈 CBLOL, LJL, LCO, LFL
+🌍 Ligas regionais
+
+⏰ **Verifique novamente em alguns minutos**"""
+                else:
+                    matches_text = f"🔴 **PARTIDAS AO VIVO** ({len(real_matches)} encontradas)\n\n"
+                    
+                    for i, match in enumerate(real_matches[:6]):
+                        teams = match.get('teams', [])
+                        if len(teams) >= 2:
+                            team1 = teams[0].get('name', 'Team 1')
+                            team2 = teams[1].get('name', 'Team 2')
+                            league = match.get('league', 'Unknown')
+                            status = match.get('status', 'Ao vivo')
+                            
+                            matches_text += f"🎮 **{league}**\n"
+                            matches_text += f"• {team1} vs {team2}\n"
+                            matches_text += f"📊 {status}\n\n"
+                    
+                    matches_text += f"⏰ Atualizado: {datetime.now().strftime('%H:%M:%S')}"
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
+                     InlineKeyboardButton("💰 Value Bets", callback_data="value_bets")],
+                    [InlineKeyboardButton("📊 Portfolio", callback_data="portfolio"),
+                     InlineKeyboardButton("🎯 Kelly", callback_data="kelly")]
+                ]
+                
+                query.edit_message_text(
+                    matches_text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
+            except Exception as e:
+                logger.error(f"❌ Erro no callback de partidas: {e}")
+                query.edit_message_text(
+                    "❌ Erro ao buscar partidas. Tente /partidas novamente.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
         elif query.data == "portfolio":
             self.show_portfolio(query, context)
         elif query.data == "kelly":
