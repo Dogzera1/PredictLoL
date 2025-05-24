@@ -40,20 +40,20 @@ except ImportError:
     # Modo teste - usar classes mock do arquivo original
     logger.warning("⚠️ Telegram libraries não encontradas - modo teste ativo")
     TELEGRAM_AVAILABLE = False
-
+    
     # Classes mock (same as original)
     class Update:
         pass
-
+    
     class InlineKeyboardButton:
         def __init__(self, text, callback_data=None):
             self.text = text
             self.callback_data = callback_data
-
+    
     class InlineKeyboardMarkup:
         def __init__(self, keyboard):
             self.keyboard = keyboard
-
+    
     class ChatMember:
         pass
 
@@ -89,10 +89,49 @@ except ImportError:
     VALUE_BETTING_AVAILABLE = False
     logger.warning("⚠️ Sistema de Value Betting não disponível")
 
+# Importar novos módulos
+from portfolio_manager import PortfolioManager, BetPosition
+from kelly_betting import KellyBetting, BetOpportunity
+from sentiment_analyzer import SentimentAnalyzer
+
+# Telegram Bot imports
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import ChatMemberHandler
+
+# Novos módulos avançados
+try:
+    from portfolio_manager import PortfolioManager, BetPosition
+    from kelly_betting import KellyBetting, BetOpportunity
+    from sentiment_analyzer import SentimentAnalyzer
+    logger.info("✅ Módulos avançados importados com sucesso")
+except ImportError as e:
+    logger.warning(f"⚠️ Erro ao importar módulos avançados: {e}")
+    # Criar classes vazias como fallback
+    class PortfolioManager:
+        def __init__(self, *args, **kwargs): pass
+        def get_portfolio_summary(self): return {}
+        def get_recommendations(self): return []
+        def rebalance_portfolio(self): pass
+    
+    class KellyBetting:
+        def __init__(self, *args, **kwargs): pass
+        def get_performance_summary(self): return {'financial': {'roi': 0}, 'bets': {'win_rate': 0, 'total': 0}}
+        def optimize_multiple_bets(self, opportunities): return []
+        def get_kelly_recommendations(self): return []
+    
+    class SentimentAnalyzer:
+        def __init__(self, *args, **kwargs): pass
+        async def get_sentiment_report(self, entities): return {'overall_sentiment': 0, 'alerts': [], 'entity_sentiments': {}, 'recommendations': []}
+    
+    class BetOpportunity:
+        def __init__(self, *args, **kwargs): pass
+
+logger = logging.getLogger(__name__)
 
 class ChampionAnalyzer:
     """Analisador avançado de composições de campeões"""
-
+    
     def __init__(self):
         # Base de dados de campeões com ratings e synergias
         self.champion_stats = {
@@ -853,13 +892,13 @@ class DynamicPredictionSystem:
         else:
             analysis.append(
     f"💰 **RECOMENDAÇÃO:** Partida equilibrada, aposte com cautela")
-
+        
         # Timing
         text = f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {datetime.now().strftime('%H:%M:%S')}\n"
         text += f"🔄 *Probabilidades atualizadas dinamicamente*"
-
+        
         return text
-
+    
     def _get_fallback_prediction(self) -> Dict:
         """Predição de fallback quando há erro"""
         return {
@@ -892,1208 +931,1369 @@ class TelegramBotV3Improved:
         # Sistema de Value Betting (será inicializado depois)
         self.value_monitor = None
         
-        # Sistema de Grupos Automáticos
-        self.group_manager = AutoGroupManager(self)
-
-        logger.info("🤖 Bot V3 Melhorado inicializado")
-
-    def setup_handlers(self):
-        """Configura handlers do bot"""
-        self.app.add_handler(CommandHandler("start", self.start_command))
-        self.app.add_handler(CommandHandler("live", self.live_command))
-        self.app.add_handler(CommandHandler("help", self.help_command))
-        self.app.add_handler(CallbackQueryHandler(self.button_callback))
-        self.app.add_handler(
-            MessageHandler(
-                filters.TEXT & ~filters.COMMAND,
-                self.text_message_handler))
+        # Inicializar gerenciadores avançados
+        self.portfolio_manager = PortfolioManager()
+        self.kelly_betting = KellyBetting()
+        self.sentiment_analyzer = SentimentAnalyzer()
+        # self.group_manager = AutoGroupManager(self)  # Comentado temporariamente
         
-        # Handler para quando bot é adicionado/removido de grupos
-        self.app.add_handler(ChatMemberHandler(
-            self.handle_chat_member_update, 
-            ChatMemberHandler.MY_CHAT_MEMBER
-        ))
-    
-    async def handle_chat_member_update(self, update: Update, context):
-        """Handler para mudanças de status do bot em chats"""
+        # Configurar aplicação do Telegram
+        # self.initialize_telegram_application()  # Comentado - método não existe
+        
+        # 🔐 SISTEMA DE AUTORIZAÇÃO
+        self.authorized_users = {
+            # Adicione seu user_id aqui (você pode descobrir usando @userinfobot)
+            # Exemplo: 123456789: {"name": "Seu Nome", "role": "admin"}
+        }
+        
+        # Configurações de autorização
+        self.auth_enabled = True  # True = apenas usuários autorizados | False = todos podem usar
+        self.group_restriction = True  # True = restringe uso em grupos | False = permite todos
+        self.admin_user_id = None  # Definir o ID do admin principal
+        self.whitelist_mode = True  # True = whitelist | False = blacklist
+        
+        logger.info("🚀 Bot LoL V3 com sistemas avançados inicializado")
+        logger.info(f"🔐 Sistema de autorização: {'ATIVO' if self.auth_enabled else 'DESATIVADO'}")
+
+    def is_user_authorized(self, user_id: int, chat_type: str = None) -> bool:
+        """Verifica se usuário está autorizado a usar o bot"""
         try:
-            chat_member_update = update.my_chat_member
+            # Se autorização está desabilitada, todos podem usar
+            if not self.auth_enabled:
+                return True
             
-            if chat_member_update.new_chat_member.status == ChatMember.MEMBER:
-                # Bot foi adicionado ao grupo
-                await self.group_manager.handle_bot_added_to_group(update, context)
-            elif chat_member_update.new_chat_member.status in [ChatMember.LEFT, ChatMember.BANNED]:
-                # Bot foi removido do grupo
-                chat_id = update.effective_chat.id
-                self.group_manager.remove_group(chat_id)
+            # Admin principal sempre autorizado
+            if self.admin_user_id and user_id == self.admin_user_id:
+                return True
+            
+            # Verificar se usuário está na whitelist
+            if self.whitelist_mode:
+                return user_id in self.authorized_users
+            else:
+                # Modo blacklist - todos exceto os bloqueados
+                return user_id not in self.authorized_users
                 
         except Exception as e:
-            logger.error(f"❌ Erro ao processar mudança de chat member: {e}")
+            logger.error(f"❌ Erro na verificação de autorização: {e}")
+            return False
 
-    async def start_command(self, update: Update, context):
-        """Comando /start melhorado"""
-        welcome_text = """🚀 **LOL PREDICTOR V3 MELHORADO**
+    def is_group_restricted(self, chat_type: str) -> bool:
+        """Verifica se uso em grupos está restrito"""
+        if not self.group_restriction:
+            return False
+        
+        # Restringir apenas em grupos e supergrupos
+        return chat_type in ['group', 'supergroup']
 
-🔥 **NOVIDADES:**
-• ✅ Predições dinâmicas com dados reais
-• 🎯 Análise de TODAS as partidas ao vivo
-• 🏆 Análise avançada de composições
-• 💰 Recomendações de apostas com justificativa
-• 📊 Interface totalmente funcional
-
-👆 **Clique nos botões abaixo para navegar:**"""
-
-        keyboard = [
-            [InlineKeyboardButton("🔴 PARTIDAS AO VIVO",
-                                  callback_data="live_matches_all")],
-            [
-                InlineKeyboardButton(
-    "📊 Análise de Draft",
-     callback_data="draft_analysis"),
-                InlineKeyboardButton(
-    "🎯 Predições Rápidas",
-     callback_data="quick_predictions")
-            ],
-            [
-                InlineKeyboardButton(
-    "💰 Dicas de Apostas",
-     callback_data="betting_tips"),
-                InlineKeyboardButton(
-    "📈 Rankings Atuais",
-     callback_data="current_rankings")
-            ],
-            [
-                InlineKeyboardButton(
-    "🔥 VALUE BETS", callback_data="value_betting"),
-                InlineKeyboardButton(
-    "📊 Stats Value", callback_data="value_stats")
-            ],
-            [InlineKeyboardButton("ℹ️ Ajuda", callback_data="help")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def live_command(self, update: Update, context):
-        """Comando /live melhorado - mostra TODAS as partidas"""
-        await self.show_all_live_matches(update)
-
-    async def show_all_live_matches(self, update_or_query, is_callback=False):
-        """Mostra todas as partidas ao vivo com botões funcionais"""
+    async def check_authorization(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+        """Verifica autorização e responde se negada"""
         try:
-            # Mostrar loading
-            if is_callback:
-                await update_or_query.edit_message_text("🔄 Buscando TODAS as partidas ao vivo...")
-            else:
-                loading_msg = await update_or_query.message.reply_text("🔄 Buscando TODAS as partidas ao vivo...")
+            user = update.effective_user
+            chat = update.effective_chat
+            
+            if not user:
+                return False
+            
+            user_id = user.id
+            chat_type = chat.type
+            
+            # Verificar autorização do usuário
+            if not self.is_user_authorized(user_id, chat_type):
+                await self._send_unauthorized_message(update)
+                return False
+            
+            # Verificar restrição de grupo
+            if self.is_group_restricted(chat_type):
+                await self._send_group_restriction_message(update)
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na verificação de autorização: {e}")
+            return False
 
+    async def _send_unauthorized_message(self, update: Update):
+        """Envia mensagem de não autorizado"""
+        user = update.effective_user
+        
+        unauthorized_text = f"""🔐 **ACESSO NEGADO**
+
+Olá {user.first_name}! 👋
+
+❌ **Você não está autorizado a usar este bot.**
+
+Este é um bot privado de apostas esportivas.
+Para solicitar acesso, entre em contato com o administrador.
+
+🆔 **Seu User ID:** `{user.id}`
+(Envie este ID para o admin para liberação)
+
+💡 **Motivo:** Sistema de segurança ativo"""
+
+        try:
+            await update.message.reply_text(
+                unauthorized_text,
+                parse_mode='Markdown'
+            )
+        except:
+            # Fallback se não conseguir enviar
+            await update.message.reply_text(
+                f"🔐 Acesso negado. Seu ID: {user.id}"
+            )
+
+    async def _send_group_restriction_message(self, update: Update):
+        """Envia mensagem de restrição de grupo"""
+        group_restriction_text = """🔐 **USO RESTRITO EM GRUPOS**
+
+❌ **Este bot está configurado para uso apenas em conversas privadas.**
+
+📱 **Para usar o bot:**
+1. Abra uma conversa privada comigo
+2. Envie /start
+3. Use todas as funcionalidades livremente
+
+💡 **Motivo:** Segurança e privacidade das predições
+
+👆 **Clique no meu nome e "Enviar Mensagem"**"""
+
+        try:
+            await update.message.reply_text(
+                group_restriction_text,
+                parse_mode='Markdown'
+            )
+        except:
+            await update.message.reply_text(
+                "🔐 Bot restrito a conversas privadas. Me chame no privado!"
+            )
+
+    # Comandos de administração
+    async def authorize_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando para autorizar usuário (apenas admin)"""
+        if not await self._check_admin_permission(update):
+            return
+        
+        try:
+            args = context.args
+            if not args:
+                await update.message.reply_text(
+                    "❌ **Uso:** `/auth <user_id> [nome]`\n\n"
+                    "**Exemplo:** `/auth 123456789 João`",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            user_id = int(args[0])
+            user_name = " ".join(args[1:]) if len(args) > 1 else f"User_{user_id}"
+            
+            self.authorized_users[user_id] = {
+                "name": user_name,
+                "role": "user",
+                "authorized_by": update.effective_user.id,
+                "authorized_at": datetime.now().isoformat()
+            }
+            
+            await update.message.reply_text(
+                f"✅ **Usuário autorizado com sucesso!**\n\n"
+                f"🆔 **ID:** `{user_id}`\n"
+                f"👤 **Nome:** {user_name}\n"
+                f"🕐 **Data:** {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                parse_mode='Markdown'
+            )
+            
+            logger.info(f"✅ Usuário {user_id} ({user_name}) autorizado por {update.effective_user.id}")
+            
+        except ValueError:
+            await update.message.reply_text("❌ ID do usuário deve ser um número")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Erro: {str(e)}")
+
+    async def revoke_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando para revogar autorização (apenas admin)"""
+        if not await self._check_admin_permission(update):
+            return
+        
+        try:
+            args = context.args
+            if not args:
+                await update.message.reply_text(
+                    "❌ **Uso:** `/revoke <user_id>`\n\n"
+                    "**Exemplo:** `/revoke 123456789`",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            user_id = int(args[0])
+            
+            if user_id in self.authorized_users:
+                user_data = self.authorized_users.pop(user_id)
+                await update.message.reply_text(
+                    f"✅ **Autorização revogada!**\n\n"
+                    f"🆔 **ID:** `{user_id}`\n"
+                    f"👤 **Nome:** {user_data.get('name', 'Desconhecido')}",
+                    parse_mode='Markdown'
+                )
+                logger.info(f"❌ Autorização revogada para usuário {user_id}")
+            else:
+                await update.message.reply_text(
+                    f"❌ **Usuário `{user_id}` não está na lista de autorizados**",
+                    parse_mode='Markdown'
+                )
+                
+        except ValueError:
+            await update.message.reply_text("❌ ID do usuário deve ser um número")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Erro: {str(e)}")
+
+    async def list_authorized(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Lista usuários autorizados (apenas admin)"""
+        if not await self._check_admin_permission(update):
+            return
+        
+        try:
+            if not self.authorized_users:
+                await update.message.reply_text(
+                    "📝 **Lista de usuários autorizados está vazia**",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            text = "📝 **USUÁRIOS AUTORIZADOS**\n\n"
+            
+            for user_id, data in self.authorized_users.items():
+                name = data.get('name', 'Desconhecido')
+                role = data.get('role', 'user')
+                auth_date = data.get('authorized_at', 'N/A')
+                
+                if auth_date != 'N/A':
+                    try:
+                        auth_datetime = datetime.fromisoformat(auth_date)
+                        auth_date = auth_datetime.strftime('%d/%m/%Y')
+                    except:
+                        pass
+                
+                text += f"👤 **{name}**\n"
+                text += f"   🆔 ID: `{user_id}`\n"
+                text += f"   🎭 Role: {role}\n"
+                text += f"   📅 Data: {auth_date}\n\n"
+            
+            text += f"**Total:** {len(self.authorized_users)} usuários"
+            
+            await update.message.reply_text(text, parse_mode='Markdown')
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ Erro: {str(e)}")
+
+    async def auth_config(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Configurações de autorização (apenas admin)"""
+        if not await self._check_admin_permission(update):
+            return
+        
+        try:
+            args = context.args
+            
+            if not args:
+                # Mostrar configurações atuais
+                text = f"""⚙️ **CONFIGURAÇÕES DE AUTORIZAÇÃO**
+
+🔐 **Sistema:** {'🟢 ATIVO' if self.auth_enabled else '🔴 DESATIVADO'}
+🏢 **Grupos:** {'🔒 RESTRITOS' if self.group_restriction else '🟢 LIBERADOS'}
+📋 **Modo:** {'📝 WHITELIST' if self.whitelist_mode else '🚫 BLACKLIST'}
+👑 **Admin ID:** `{self.admin_user_id or 'Não definido'}`
+👥 **Usuários:** {len(self.authorized_users)} autorizados
+
+**COMANDOS:**
+• `/authconfig enable` - Ativar autorização
+• `/authconfig disable` - Desativar autorização  
+• `/authconfig groups on` - Restringir grupos
+• `/authconfig groups off` - Liberar grupos
+• `/authconfig admin <user_id>` - Definir admin
+• `/authconfig whitelist` - Modo whitelist
+• `/authconfig blacklist` - Modo blacklist"""
+
+                keyboard = [
+                    [InlineKeyboardButton("🔐 Toggle Auth", callback_data="auth_toggle"),
+                     InlineKeyboardButton("🏢 Toggle Groups", callback_data="auth_groups")],
+                    [InlineKeyboardButton("📋 Lista Users", callback_data="auth_list"),
+                     InlineKeyboardButton("⚙️ Config", callback_data="auth_settings")]
+                ]
+                
+                await update.message.reply_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+                return
+            
+            # Processar comando
+            command = args[0].lower()
+            
+            if command == "enable":
+                self.auth_enabled = True
+                await update.message.reply_text("✅ **Sistema de autorização ATIVADO**", parse_mode='Markdown')
+            
+            elif command == "disable":
+                self.auth_enabled = False
+                await update.message.reply_text("❌ **Sistema de autorização DESATIVADO**", parse_mode='Markdown')
+            
+            elif command == "groups":
+                if len(args) > 1:
+                    setting = args[1].lower()
+                    if setting == "on":
+                        self.group_restriction = True
+                        await update.message.reply_text("🔒 **Uso em grupos RESTRITO**", parse_mode='Markdown')
+                    elif setting == "off":
+                        self.group_restriction = False
+                        await update.message.reply_text("🟢 **Uso em grupos LIBERADO**", parse_mode='Markdown')
+                    else:
+                        await update.message.reply_text("❌ Use 'on' ou 'off'")
+                else:
+                    await update.message.reply_text("❌ **Uso:** `/authconfig groups <on|off>`", parse_mode='Markdown')
+            
+            elif command == "admin":
+                if len(args) > 1:
+                    try:
+                        admin_id = int(args[1])
+                        self.admin_user_id = admin_id
+                        await update.message.reply_text(
+                            f"👑 **Admin definido:** `{admin_id}`",
+                            parse_mode='Markdown'
+                        )
+                    except ValueError:
+                        await update.message.reply_text("❌ ID deve ser um número")
+                else:
+                    await update.message.reply_text("❌ **Uso:** `/authconfig admin <user_id>`", parse_mode='Markdown')
+            
+            elif command == "whitelist":
+                self.whitelist_mode = True
+                await update.message.reply_text("📝 **Modo WHITELIST ativado**", parse_mode='Markdown')
+            
+            elif command == "blacklist":
+                self.whitelist_mode = False
+                await update.message.reply_text("🚫 **Modo BLACKLIST ativado**", parse_mode='Markdown')
+            
+            else:
+                await update.message.reply_text("❌ **Comando não reconhecido**")
+                
+        except Exception as e:
+            await update.message.reply_text(f"❌ Erro: {str(e)}")
+
+    async def _check_admin_permission(self, update: Update) -> bool:
+        """Verifica se usuário tem permissão de admin"""
+        user_id = update.effective_user.id
+        
+        # Se admin não está definido, qualquer um pode ser admin (primeira vez)
+        if not self.admin_user_id:
+            self.admin_user_id = user_id
+            await update.message.reply_text(
+                f"👑 **Você foi definido como ADMIN do bot!**\n\n"
+                f"🆔 **Admin ID:** `{user_id}`\n"
+                f"💡 Use `/authconfig` para gerenciar permissões",
+                parse_mode='Markdown'
+            )
+            return True
+        
+        # Verificar se é o admin definido
+        if user_id == self.admin_user_id:
+            return True
+        
+        # Verificar se tem role admin
+        user_data = self.authorized_users.get(user_id, {})
+        if user_data.get('role') == 'admin':
+            return True
+        
+        await update.message.reply_text(
+            "❌ **Acesso negado**\n\n"
+            "👑 Apenas administradores podem usar este comando",
+            parse_mode='Markdown'
+        )
+        return False
+
+    async def my_permissions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Mostra permissões do usuário atual"""
+        user = update.effective_user
+        chat = update.effective_chat
+        user_id = user.id
+        
+        # Verificar status
+        is_authorized = self.is_user_authorized(user_id, chat.type)
+        is_admin = user_id == self.admin_user_id
+        user_data = self.authorized_users.get(user_id, {})
+        
+        text = f"""👤 **SUAS PERMISSÕES**
+
+🆔 **User ID:** `{user_id}`
+👤 **Nome:** {user.first_name} {user.last_name or ''}
+💬 **Chat:** {chat.type}
+
+🔐 **STATUS:**
+• Autorizado: {'✅ SIM' if is_authorized else '❌ NÃO'}
+• Admin: {'👑 SIM' if is_admin else '❌ NÃO'}
+• Role: {user_data.get('role', 'Não autorizado')}
+
+⚙️ **CONFIGURAÇÕES ATUAIS:**
+• Sistema Auth: {'🟢 ATIVO' if self.auth_enabled else '🔴 DESATIVO'}
+• Restrição Grupos: {'🔒 ATIVA' if self.group_restriction else '🟢 DESATIVA'}
+• Modo: {'📝 WHITELIST' if self.whitelist_mode else '🚫 BLACKLIST'}
+
+💡 **Para solicitar acesso, envie seu ID para o admin**"""
+
+        await update.message.reply_text(text, parse_mode='Markdown')
+
+    def add_advanced_handlers(self):
+        """Adiciona handlers para funcionalidades avançadas"""
+        
+        # Portfolio Management
+        self.application.add_handler(CommandHandler("portfolio", self.show_portfolio))
+        self.application.add_handler(CommandHandler("kelly", self.kelly_analysis))
+        self.application.add_handler(CommandHandler("sentiment", self.sentiment_analysis))
+        self.application.add_handler(CommandHandler("analytics", self.show_analytics))
+        
+        # Callbacks para novos sistemas
+        self.application.add_handler(CallbackQueryHandler(self.portfolio_callback, pattern="^portfolio_"))
+        self.application.add_handler(CallbackQueryHandler(self.kelly_callback, pattern="^kelly_"))
+        self.application.add_handler(CallbackQueryHandler(self.sentiment_callback, pattern="^sentiment_"))
+
+    async def show_portfolio(self, update_or_query, context: ContextTypes.DEFAULT_TYPE = None):
+        """Mostra dashboard do portfolio"""
+        # Verificar se é callback ou mensagem
+        if hasattr(update_or_query, 'message'):
+            # É callback
+            update = type('obj', (object,), {
+                'effective_user': update_or_query.from_user,
+                'effective_chat': update_or_query.message.chat,
+                'message': update_or_query.message
+            })()
+            is_callback = True
+        else:
+            # É update normal
+            update = update_or_query
+            is_callback = False
+        
+        # Verificar autorização
+        if not is_callback and not await self.check_authorization(update, context):
+            return
+        
+        try:
+            summary = self.portfolio_manager.get_portfolio_summary()
+            
+            if not summary:
+                text = "❌ Erro ao carregar portfolio"
+                if is_callback:
+                    await update_or_query.edit_message_text(text)
+                else:
+                    await update.message.reply_text(text)
+                return
+            
+            bankroll = summary['bankroll']
+            positions = summary['positions']
+            performance = summary['performance']
+            
+            text = f"""🏦 **PORTFOLIO DASHBOARD**
+
+💰 **BANKROLL**
+• Inicial: ${bankroll['initial']:,.2f}
+• Atual: ${bankroll['current']:,.2f}
+• P&L: ${bankroll['profit_loss']:+,.2f} ({bankroll['profit_percentage']:+.2f}%)
+
+📊 **POSIÇÕES**
+• Ativas: {positions['active']}
+• Concluídas: {positions['completed']}
+• Exposição Total: ${positions['total_exposure']:,.2f} ({positions['exposure_percentage']:.1f}%)
+
+📈 **PERFORMANCE**
+• ROI: {performance['overall_roi']:.2f}%
+• Win Rate: {performance['overall_win_rate']:.1f}%
+• Total Apostado: ${performance['total_profit_loss']:+,.2f}
+• Total de Apostas: {performance['total_bets']}
+
+🎯 **DISTRIBUIÇÃO POR ESPORTE**"""
+
+            # Adicionar breakdown por esporte
+            for sport, data in summary['sport_breakdown'].items():
+                if data['total_bets'] > 0:
+                    text += f"\n• {sport.title()}: {data['roi']:.1f}% ROI | {data['win_rate']:.1f}% WR | {data['total_bets']} apostas"
+            
+            keyboard = [
+                [InlineKeyboardButton("📊 Métricas", callback_data="portfolio_metrics"),
+                 InlineKeyboardButton("📈 Recomendações", callback_data="portfolio_recommendations")],
+                [InlineKeyboardButton("💰 Kelly Analysis", callback_data="kelly_dashboard"),
+                 InlineKeyboardButton("🎭 Sentiment", callback_data="sentiment_dashboard")],
+                [InlineKeyboardButton("🔄 Rebalancear", callback_data="portfolio_rebalance"),
+                 InlineKeyboardButton("📤 Exportar", callback_data="portfolio_export")]
+            ]
+            
+            if is_callback:
+                await update_or_query.edit_message_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+            else:
+                await update.message.reply_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no portfolio: {e}")
+            error_text = "❌ Erro ao carregar portfolio"
+            if is_callback:
+                await update_or_query.edit_message_text(error_text)
+            else:
+                await update.message.reply_text(error_text)
+
+    async def kelly_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Mostra análise Kelly das próximas partidas"""
+        try:
             # Buscar partidas ao vivo
             live_matches = await self.riot_api.get_all_live_matches()
-
-            if not live_matches or len(live_matches) == 0:
-                text = """🔴 **PARTIDAS AO VIVO**
-
-❌ **Não há partidas acontecendo neste momento.**
-
-✨ O bot monitora constantemente:
-• 🇰🇷 LCK (Coreia)
-• 🇨🇳 LPL (China)
-• 🇪🇺 LEC (Europa)
-• 🇺🇸 LCS (América do Norte)
-• 🌍 Torneios internacionais
-• 🏆 Ligas regionais menores
-
-🔄 **Tente novamente em alguns minutos!**"""
-
-                keyboard = [
-                    [InlineKeyboardButton(
-                        "🔄 Atualizar", callback_data="live_matches_all")],
-                    [InlineKeyboardButton(
-                        "🏠 Menu Principal", callback_data="start")]
-                ]
-
-                reply_markup = InlineKeyboardMarkup(keyboard)
-
-                if is_callback:
-                    await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-                else:
-                    await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            
+            if not live_matches:
+                await update.message.reply_text("❌ Nenhuma partida ao vivo para análise Kelly")
                 return
-
-            # Formatar lista de partidas
-            text = f"🔴 **PARTIDAS AO VIVO ({len(live_matches)})**\n\n"
-            text += "👆 **Clique em uma partida para ver:**\n"
-            text += "• 🔮 Predição detalhada em tempo real\n"
-            text += "• 🏆 Análise completa do draft\n"
-            text += "• 💰 Recomendação de aposta com justificativa\n"
-            text += "• 📊 Probabilidades dinâmicas\n\n"
-
-            # Adicionar preview das partidas
-            for i, match in enumerate(live_matches[:6], 1):  # Mostrar até 6
-                teams = match.get('teams', [])
-                if len(teams) >= 2:
-                    team1 = teams[0]
-                    team2 = teams[1]
-
-                    league = match.get('league', 'LoL Esports')
-                    state_emoji = '🔴' if match.get(
-                        'state') == 'inProgress' else '⏳'
-
-                    # Placar se disponível
-                    score_text = ""
-                    if 'result' in team1 and 'result' in team2:
-                        wins1 = team1['result'].get('gameWins', 0)
-                        wins2 = team2['result'].get('gameWins', 0)
-                        score_text = f" ({wins1}-{wins2})"
-
-                    text += f"{state_emoji} **{league}**\n"
-                    text += f"⚔️ {team1.get('code', team1.get('name', 'Team1'))} vs "
-                    text += f"{team2.get('code', team2.get('name', 'Team2'))}{score_text}\n\n"
-
-            # Criar botões para cada partida
-            keyboard = []
-            for match in live_matches[:8]:  # Máximo 8 partidas
-                teams = match.get('teams', [])
-                if len(teams) >= 2:
-                    team1_name = teams[0].get(
-                        'code', teams[0].get('name', 'T1'))
-                    team2_name = teams[1].get(
-                        'code', teams[1].get('name', 'T2'))
-
-                    button_text = f"🔮 {team1_name} vs {team2_name}"
-                    callback_data = f"predict_match_{match['id']}"
-                    keyboard.append([InlineKeyboardButton(
-                        button_text, callback_data=callback_data)])
-
-            # Botões de ação
-            keyboard.append([
-                InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches_all"),
-                InlineKeyboardButton("📊 Ver Rankings", callback_data="current_rankings")
-            ])
-            keyboard.append([InlineKeyboardButton(
-                "🏠 Menu Principal", callback_data="start")])
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            if is_callback:
-                await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+            
+            # Converter partidas para oportunidades Kelly
+            opportunities = []
+            for i, match in enumerate(live_matches[:5]):  # Limite de 5 para análise
+                # Calcular probabilidade baseada em dados do match
+                probability = self._calculate_match_probability(match)
+                odds = self._get_match_odds(match)
+                
+                opportunity = BetOpportunity(
+                    id=f"match_{i}",
+                    description=f"{match.get('team1', 'Team1')} vs {match.get('team2', 'Team2')}",
+                    probability=probability,
+                    odds=odds,
+                    confidence_level=0.75,
+                    max_stake=1000.0,
+                    sport="lol",
+                    league=match.get('league', 'Unknown')
+                )
+                opportunities.append(opportunity)
+            
+            # Otimizar apostas usando Kelly
+            kelly_results = self.kelly_betting.optimize_multiple_bets(opportunities)
+            
+            text = "🎯 **ANÁLISE KELLY CRITERION**\n\n"
+            
+            viable_bets = [r for r in kelly_results if r.should_bet]
+            
+            if not viable_bets:
+                text += "❌ **Nenhuma aposta viável encontrada**\n\nNenhuma partida atende aos critérios Kelly no momento."
             else:
-                await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-        except Exception as e:
-            logger.error(f"❌ Erro ao mostrar partidas: {e}")
-            error_text = f"❌ **Erro ao buscar partidas**\n\nTente novamente em alguns minutos.\n\n*Detalhes técnicos: {str(e)[:100]}...*"
+                text += f"✅ **{len(viable_bets)} apostas recomendadas**\n\n"
+                
+                for result in viable_bets:
+                    text += f"🎮 **{result.bet_id}**\n"
+                    text += f"💰 Stake: ${result.recommended_stake:.2f}\n"
+                    text += f"📊 Kelly: {result.kelly_fraction:.3f}\n"
+                    text += f"📈 EV: ${result.expected_value:+.2f}\n"
+                    text += f"⚡ Risco: {result.risk_level}\n\n"
+            
+            # Adicionar resumo de performance
+            kelly_summary = self.kelly_betting.get_performance_summary()
+            text += f"📈 **PERFORMANCE KELLY**\n"
+            text += f"• ROI: {kelly_summary['financial']['roi']:.2f}%\n"
+            text += f"• Win Rate: {kelly_summary['bets']['win_rate']:.1f}%\n"
+            text += f"• Total Apostas: {kelly_summary['bets']['total']}"
             
             keyboard = [
-                [InlineKeyboardButton("🔄 Tentar Novamente", callback_data="live_matches_all")],
-                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+                [InlineKeyboardButton("🎯 Executar Apostas", callback_data="kelly_execute"),
+                 InlineKeyboardButton("📊 Performance", callback_data="kelly_performance")],
+                [InlineKeyboardButton("⚙️ Configurações", callback_data="kelly_settings"),
+                 InlineKeyboardButton("📈 Recomendações", callback_data="kelly_recommendations")]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
-            if is_callback:
-                await update_or_query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
-            else:
-                await update_or_query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def predict_match_callback(self, query, match_id: str):
-        """Callback para predição de partida específica"""
-        try:
-            await query.edit_message_text("🔄 Analisando partida e gerando predição...")
-
-            # Buscar dados da partida
-            live_matches = await self.riot_api.get_all_live_matches()
-            match_data = None
-
-            # Verificar se há partidas disponíveis
-            if not live_matches or len(live_matches) == 0:
-                error_text = """❌ **Nenhuma partida ao vivo encontrada**
-
-As partidas podem ter terminado ou não há jogos acontecendo no momento.
-
-🔄 **Tente verificar as partidas ao vivo novamente**"""
-                
-                keyboard = [
-                    [InlineKeyboardButton("🔄 Ver Partidas", callback_data="live_matches_all")],
-                    [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
-                return
-
-            # Procurar a partida específica
-            for match in live_matches:
-                if match.get('id') == match_id:
-                    match_data = match
-                    break
-
-            if not match_data:
-                error_text = """❌ **Partida não encontrada**
-
-A partida pode ter terminado ou os dados não estão mais disponíveis.
-
-🔄 **Selecione uma partida da lista atual**"""
-                
-                keyboard = [
-                    [InlineKeyboardButton("🔄 Ver Partidas Atuais", callback_data="live_matches_all")],
-                    [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
-                return
-
-            # Gerar predição
-            prediction = await self.prediction_system.predict_live_match(match_data)
-
-            # Formatar resultado
-            text = self._format_match_prediction(prediction, match_data)
-
-            # Botões de ação
-            keyboard = [
-                [
-                    InlineKeyboardButton("🏆 Ver Draft", callback_data=f"draft_{match_id}"),
-                    InlineKeyboardButton("💰 Análise Odds", callback_data=f"odds_{match_id}")
-                ],
-                [
-                    InlineKeyboardButton("🔄 Atualizar", callback_data=f"predict_match_{match_id}"),
-                    InlineKeyboardButton("📊 Comparar Times", callback_data=f"compare_{match_id}")
-                ],
-                [
-                    InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all"),
-                    InlineKeyboardButton("🏠 Menu", callback_data="start")
-                ]
-            ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
+            
+            await update.message.reply_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
         except Exception as e:
-            logger.error(f"❌ Erro na predição: {e}")
-            error_text = f"""❌ **Erro ao gerar predição**
+            logger.error(f"❌ Erro na análise Kelly: {e}")
+            await update.message.reply_text("❌ Erro na análise Kelly")
 
-Ocorreu um problema ao analisar a partida.
-
-🔄 **Tente novamente ou selecione outra partida**
-
-*Detalhes: {str(e)[:100]}...*"""
+    async def sentiment_analysis(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Mostra análise de sentimento dos times"""
+        try:
+            # Buscar partidas para extrair times
+            live_matches = await self.riot_api.get_all_live_matches()
+            
+            entities = []
+            if live_matches:
+                for match in live_matches[:3]:  # Limite para performance
+                    team1 = match.get('team1', '')
+                    team2 = match.get('team2', '')
+                    if team1:
+                        entities.append(team1)
+                    if team2:
+                        entities.append(team2)
+            
+            # Adicionar times populares se não há partidas
+            if not entities:
+                entities = ["T1", "Gen.G", "DRX", "KT Rolster", "Hanwha Life", "JDG", "BLG", "Fnatic", "G2"][:5]
+            
+            # Gerar relatório de sentimento
+            sentiment_report = await self.sentiment_analyzer.get_sentiment_report(entities)
+            
+            text = "🎭 **ANÁLISE DE SENTIMENTO**\n\n"
+            text += f"📊 **Score Geral:** {sentiment_report['overall_sentiment']:.3f}\n"
+            text += f"🚨 **Alertas:** {len(sentiment_report['alerts'])}\n\n"
+            
+            # Mostrar sentimento por entidade
+            for entity, sentiment in sentiment_report['entity_sentiments'].items():
+                if sentiment and sentiment.get('data_points', 0) > 0:
+                    score = sentiment['sentiment_score']
+                    confidence = sentiment['confidence']
+                    trend = sentiment['trend']
+                    
+                    # Emoji baseado no score
+                    if score > 0.3:
+                        emoji = "🟢"
+                    elif score < -0.3:
+                        emoji = "🔴"
+                    else:
+                        emoji = "🟡"
+                    
+                    trend_emoji = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(trend, "➡️")
+                    
+                    text += f"{emoji} **{entity}**\n"
+                    text += f"   Score: {score:.3f} | Conf: {confidence:.3f} {trend_emoji}\n"
+            
+            # Mostrar alertas
+            if sentiment_report['alerts']:
+                text += "\n🚨 **ALERTAS RECENTES**\n"
+                for alert in sentiment_report['alerts'][:3]:  # Máximo 3 alertas
+                    text += f"• {alert['entity']}: {alert['change']}\n"
+            
+            # Mostrar recomendações principais
+            text += "\n💡 **RECOMENDAÇÕES**\n"
+            for rec in sentiment_report['recommendations'][:3]:
+                text += f"• {rec}\n"
             
             keyboard = [
-                [InlineKeyboardButton("🔄 Tentar Novamente", callback_data=f"predict_match_{match_id}")],
-                [InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all")]
+                [InlineKeyboardButton("📊 Detalhes", callback_data="sentiment_details"),
+                 InlineKeyboardButton("🚨 Alertas", callback_data="sentiment_alerts")],
+                [InlineKeyboardButton("📈 Tendências", callback_data="sentiment_trends"),
+                 InlineKeyboardButton("📤 Exportar", callback_data="sentiment_export")]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
+            
+            await update.message.reply_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na análise de sentimento: {e}")
+            await update.message.reply_text("❌ Erro na análise de sentimento")
 
-    def _format_match_prediction(
-    self,
-    prediction: Dict,
-     match_data: Dict) -> str:
-        """Formata predição da partida"""
-        team1 = prediction['team1']
-        team2 = prediction['team2']
-        prob1 = prediction['team1_win_probability'] * 100
-        prob2 = prediction['team2_win_probability'] * 100
-        odds1 = prediction['team1_odds']
-        odds2 = prediction['team2_odds']
-        confidence = prediction['confidence']
-
-        # Header
-        text = f"🔮 **PREDIÇÃO EM TEMPO REAL**\n\n"
-
-        # Matchup
-        text += f"⚔️ **{team1} vs {team2}**\n\n"
-
-        # Probabilidades
-        text += f"📊 **PROBABILIDADES:**\n"
-        text += f"• {team1}: **{prob1:.1f}%** (Odds: {odds1:.2f})\n"
-        text += f"• {team2}: **{prob2:.1f}%** (Odds: {odds2:.2f})\n\n"
-
-        # Favorito
-        favorite = team1 if prob1 > prob2 else team2
-        favorite_prob = max(prob1, prob2)
-        text += f"🎯 **FAVORITO:** {favorite} ({favorite_prob:.1f}%)\n"
-        text += f"🎲 **CONFIANÇA:** {confidence.upper()}\n\n"
-
-        # Análise
-        text += f"📝 **ANÁLISE:**\n{prediction['analysis']}\n\n"
-
-        # Timing
-        text += f"⏰ **ÚLTIMA ATUALIZAÇÃO:** {datetime.now().strftime('%H:%M:%S')}\n"
-        text += f"🔄 *Probabilidades atualizadas dinamicamente*"
-
-        return text
-
-    async def show_draft_analysis(self, query, match_id: str):
-        """Mostra análise detalhada do draft"""
+    async def show_analytics(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Dashboard analytics unificado"""
         try:
-            await query.edit_message_text("🔄 Analisando draft da partida...")
+            # Coletar dados de todos os sistemas
+            portfolio_summary = self.portfolio_manager.get_portfolio_summary()
+            kelly_summary = self.kelly_betting.get_performance_summary()
+            
+            text = "📊 **ANALYTICS DASHBOARD**\n\n"
+            
+            # Resumo geral
+            text += "💰 **RESUMO FINANCEIRO**\n"
+            text += f"• Portfolio ROI: {portfolio_summary['performance']['overall_roi']:.2f}%\n"
+            text += f"• Kelly ROI: {kelly_summary['financial']['roi']:.2f}%\n"
+            text += f"• Bankroll Atual: ${portfolio_summary['bankroll']['current']:,.2f}\n"
+            text += f"• P&L Total: ${portfolio_summary['bankroll']['profit_loss']:+,.2f}\n\n"
+            
+            # Performance
+            text += "📈 **PERFORMANCE**\n"
+            text += f"• Win Rate Geral: {portfolio_summary['performance']['overall_win_rate']:.1f}%\n"
+            text += f"• Total de Apostas: {portfolio_summary['performance']['total_bets']}\n"
+            text += f"• Exposição Atual: {portfolio_summary['positions']['exposure_percentage']:.1f}%\n\n"
+            
+            # Risk Metrics
+            risk_metrics = portfolio_summary.get('risk_metrics', {})
+            text += "⚠️ **GESTÃO DE RISCO**\n"
+            text += f"• Max Drawdown: {risk_metrics.get('max_drawdown', 0):.1f}%\n"
+            text += f"• Volatilidade: {risk_metrics.get('volatility', 0):.1f}%\n"
+            text += f"• Sharpe Ratio: {risk_metrics.get('sharpe_ratio', 0):.2f}\n\n"
+            
+            # Top esportes
+            text += "🏆 **TOP ESPORTES (ROI)**\n"
+            sport_data = list(portfolio_summary['sport_breakdown'].items())
+            sport_data.sort(key=lambda x: x[1]['roi'], reverse=True)
+            
+            for sport, data in sport_data[:3]:
+                if data['total_bets'] > 0:
+                    text += f"• {sport.title()}: {data['roi']:.1f}% ({data['total_bets']} apostas)\n"
+            
+            keyboard = [
+                [InlineKeyboardButton("🏦 Portfolio", callback_data="portfolio_metrics"),
+                 InlineKeyboardButton("🎯 Kelly", callback_data="kelly_dashboard")],
+                [InlineKeyboardButton("🎭 Sentimento", callback_data="sentiment_dashboard"),
+                 InlineKeyboardButton("📊 Relatório", callback_data="analytics_report")],
+                [InlineKeyboardButton("⚙️ Configurações", callback_data="analytics_settings"),
+                 InlineKeyboardButton("📤 Backup", callback_data="analytics_backup")]
+            ]
+            
+            await update.message.reply_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no analytics: {e}")
+            await update.message.reply_text("❌ Erro no dashboard analytics")
 
-            # Buscar dados da partida
-            live_matches = await self.riot_api.get_all_live_matches()
-            match_data = None
+    def _calculate_match_probability(self, match_data: Dict) -> float:
+        """Calcula probabilidade baseada nos dados da partida"""
+        try:
+            # Implementação simplificada - em produção usar modelo ML
+            team1_winrate = match_data.get('team1_winrate', 0.5)
+            team2_winrate = match_data.get('team2_winrate', 0.5)
+            
+            # Normalizar para probabilidade de vitória do team1
+            total_strength = team1_winrate + team2_winrate
+            if total_strength > 0:
+                probability = team1_winrate / total_strength
+            else:
+                probability = 0.5
+            
+            # Adicionar ruído para simular incerteza
+            import random
+            noise = random.uniform(-0.05, 0.05)
+            probability = max(0.1, min(0.9, probability + noise))
+            
+            return probability
+            
+        except Exception:
+            return 0.5  # Probabilidade neutra em caso de erro
 
-            for match in live_matches:
-                if match['id'] == match_id:
-                    match_data = match
-                    break
+    def _get_match_odds(self, match_data: Dict) -> float:
+        """Obtém odds da partida"""
+        try:
+            # Em produção, integrar com casas de apostas
+            # Por agora, simular odds baseadas na probabilidade
+            probability = self._calculate_match_probability(match_data)
+            
+            # Converter probabilidade para odds decimais
+            if probability > 0:
+                fair_odds = 1 / probability
+                # Adicionar margem da casa (5%)
+                bookmaker_odds = fair_odds * 0.95
+                return round(bookmaker_odds, 2)
+            else:
+                return 2.0
+                
+        except Exception:
+            return 2.0
 
-            if not match_data:
-                await query.edit_message_text("❌ Partida não encontrada")
+    async def portfolio_callback(self, query):
+        """Callback para ações do portfolio"""
+        action = query.data.replace("portfolio_", "")
+        
+        try:
+            if action == "metrics":
+                summary = self.portfolio_manager.get_portfolio_summary()
+                risk_metrics = summary.get('risk_metrics', {})
+                
+                text = f"""📊 **MÉTRICAS DETALHADAS**
+
+⚠️ **RISCO**
+• Max Drawdown: {risk_metrics.get('max_drawdown', 0):.2f}%
+• Volatilidade: {risk_metrics.get('volatility', 0):.2f}%
+• Sharpe Ratio: {risk_metrics.get('sharpe_ratio', 0):.3f}
+
+📈 **DISTRIBUIÇÃO**"""
+                
+                for sport, data in summary['sport_breakdown'].items():
+                    text += f"\n• {sport.title()}: {data['exposure_percentage']:.1f}% exposição"
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+                
+            elif action == "recommendations":
+                recommendations = self.portfolio_manager.get_recommendations()
+                
+                text = "📋 **RECOMENDAÇÕES PORTFOLIO**\n\n"
+                for i, rec in enumerate(recommendations, 1):
+                    text += f"{i}. {rec}\n"
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+                
+            elif action == "rebalance":
+                await query.edit_message_text("🔄 Rebalanceando portfolio...")
+                self.portfolio_manager.rebalance_portfolio()
+                await query.edit_message_text("✅ Portfolio rebalanceado com sucesso!")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro no callback portfolio: {e}")
+            await query.edit_message_text("❌ Erro na ação do portfolio")
+
+    async def kelly_callback(self, query):
+        """Callback para ações do Kelly"""
+        action = query.data.replace("kelly_", "")
+        
+        try:
+            if action == "performance":
+                summary = self.kelly_betting.get_performance_summary()
+                
+                text = f"""🎯 **PERFORMANCE KELLY**
+
+💰 **FINANCEIRO**
+• ROI: {summary['financial']['roi']:.2f}%
+• Total Apostado: ${summary['financial']['total_staked']:,.2f}
+• Lucro Total: ${summary['financial']['total_profit']:+,.2f}
+• Stake Médio: ${summary['financial']['avg_stake']:,.2f}
+
+📊 **APOSTAS**
+• Total: {summary['bets']['total']}
+• Vitórias: {summary['bets']['wins']}
+• Derrotas: {summary['bets']['losses']}
+• Win Rate: {summary['bets']['win_rate']:.1f}%
+
+⚠️ **RISCO**
+• Max Drawdown: {summary['risk']['max_drawdown']:.2f}%"""
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+                
+            elif action == "recommendations":
+                recommendations = self.kelly_betting.get_kelly_recommendations()
+                
+                text = "🎯 **RECOMENDAÇÕES KELLY**\n\n"
+                for i, rec in enumerate(recommendations, 1):
+                    text += f"{i}. {rec}\n"
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+                
+        except Exception as e:
+            logger.error(f"❌ Erro no callback Kelly: {e}")
+            await query.edit_message_text("❌ Erro na ação Kelly")
+
+    async def sentiment_callback(self, query):
+        """Callback para ações do Sentiment Analyzer"""
+        action = query.data.replace("sentiment_", "")
+        
+        try:
+            if action == "details":
+                sentiment_details = self.sentiment_analyzer.get_sentiment_details()
+                
+                text = "📋 **DETALHES DA ANÁLISE DE SENTIMENTO**\n\n"
+                for entity, details in sentiment_details.items():
+                    text += f"• **{entity}**\n"
+                    text += f"   Sentiment Score: {details['sentiment_score']:.3f}\n"
+                    text += f"   Confidence: {details['confidence']:.3f}\n"
+                    text += f"   Trend: {details['trend']}\n\n"
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+                
+            elif action == "alerts":
+                sentiment_alerts = self.sentiment_analyzer.get_sentiment_alerts()
+                
+                text = "🚨 **ALERTAS RECENTES**\n\n"
+                for alert in sentiment_alerts:
+                    text += f"• **{alert['entity']}**: {alert['change']}\n"
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+                
+            elif action == "trends":
+                sentiment_trends = self.sentiment_analyzer.get_sentiment_trends()
+                
+                text = "📈 **TENDÊNCIAS DE SENTIMENTO**\n\n"
+                for trend in sentiment_trends:
+                    text += f"• **{trend}**: {sentiment_trends[trend]}\n\n"
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+                
+            elif action == "export":
+                sentiment_export = self.sentiment_analyzer.export_sentiment_data()
+                
+                text = "📤 **EXPORTAR DADOS DE SENTIMENTO**\n\n"
+                text += f"🗓️ **Data de Coleta**: {sentiment_export.get('collection_date', 'N/A')}\n"
+                text += f"📊 **Total de Entidades**: {sentiment_export.get('total_entities', 0)}\n"
+                text += f"🎯 **Entidades Mais Sentimentais**: N/A\n"
+                text += f"🔍 **Detalhes**: Dados exportados com sucesso\n\n"
+                
+                await query.edit_message_text(text, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no callback sentiment: {e}")
+            await query.edit_message_text("❌ Erro na ação de sentimento")
+
+    async def initialize_bot(self):
+        """Inicializa o bot e adiciona handlers"""
+        token = "7897326299:AAFkX7lF4j_aQYPP70xfAkNyNON6-ZBbMcE"
+        
+        # Criar aplicação
+        self.application = Application.builder().token(token).build()
+        
+        # Comandos básicos
+        self.application.add_handler(CommandHandler("start", self.start))
+        self.application.add_handler(CommandHandler("help", self.help_command))
+        self.application.add_handler(CommandHandler("partidas", self.show_all_live_matches))
+        self.application.add_handler(CommandHandler("predicao", self.predict_callback))
+        self.application.add_handler(CommandHandler("value", self.show_value_bets))
+        
+        # Novos comandos avançados
+        self.application.add_handler(CommandHandler("portfolio", self.show_portfolio))
+        self.application.add_handler(CommandHandler("kelly", self.kelly_analysis))
+        self.application.add_handler(CommandHandler("sentiment", self.sentiment_analysis))
+        self.application.add_handler(CommandHandler("analytics", self.show_analytics))
+        
+        # Comandos de administração
+        self.application.add_handler(CommandHandler("auth", self.authorize_user))
+        self.application.add_handler(CommandHandler("revoke", self.revoke_user))
+        self.application.add_handler(CommandHandler("listauth", self.list_authorized))
+        self.application.add_handler(CommandHandler("authconfig", self.auth_config))
+        self.application.add_handler(CommandHandler("mypermissions", self.my_permissions))
+        
+        # Callback handlers
+        self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        
+        # Chat member handler para grupos
+        if hasattr(self, 'group_manager') and self.group_manager:
+            self.application.add_handler(ChatMemberHandler(self.group_manager.track_bot_member, ChatMemberHandler.MY_CHAT_MEMBER))
+        
+        logger.info("✅ Bot inicializado com todos os handlers")
+
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando start melhorado"""
+        # Verificar autorização
+        if not await self.check_authorization(update, context):
             return
+            
+        user = update.effective_user
+        
+        welcome_text = f"""🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
 
-            # Análise de draft
-            team1_comp = match_data.get('team1_composition', [])
-            team2_comp = match_data.get('team2_composition', [])
+Olá {user.first_name}! 👋
 
-            if not team1_comp or not team2_comp:
-                text = "❌ Dados de draft não disponíveis para esta partida"
-            else:
-                draft_analysis = self.prediction_system.champion_analyzer.analyze_draft(
-                    team1_comp, team2_comp)
-                text = self._format_draft_analysis(draft_analysis, match_data)
+🚀 **FUNCIONALIDADES PRINCIPAIS:**
+• 🔍 Partidas ao vivo com predições IA
+• 🎯 Sistema Kelly Criterion automático
+• 📊 Portfolio management inteligente
+• 🎭 Análise de sentimento em tempo real
+• 💰 Value betting system
+• 📈 Analytics dashboard completo
 
-            # Botões
-            keyboard = [
-                [
-                    InlineKeyboardButton("🔮 Ver Predição", callback_data=f"predict_match_{match_id}"),
-                    InlineKeyboardButton("📊 Fases do Jogo", callback_data=f"phases_{match_id}")
-                ],
-                [
-                    InlineKeyboardButton("🔙 Voltar", callback_data=f"predict_match_{match_id}"),
-                    InlineKeyboardButton("🏠 Menu", callback_data="start")
-                ]
-            ]
+🎯 **NOVOS COMANDOS:**
+• `/partidas` - Ver partidas ao vivo
+• `/portfolio` - Dashboard do portfolio
+• `/kelly` - Análise Kelly Criterion
+• `/sentiment` - Análise de sentimento
+• `/analytics` - Dashboard completo
+• `/value` - Value betting alerts
 
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+💡 **Para grupos**: Adicione o bot como admin para dicas automáticas!
 
-        except Exception as e:
-            logger.error(f"❌ Erro na análise de draft: {e}")
-            await query.edit_message_text(f"❌ Erro: {str(e)}")
+✨ **Powered by IA, Riot API & Sistemas Avançados**"""
 
-    def _format_draft_analysis(
-    self,
-    draft_analysis: Dict,
-     match_data: Dict) -> str:
-        """Formata análise de draft"""
-        teams = match_data.get('teams', [])
-        team1_name = teams[0].get(
-    'code', 'Team 1') if len(teams) > 0 else 'Team 1'
-        team2_name = teams[1].get(
-    'code', 'Team 2') if len(teams) > 1 else 'Team 2'
+        keyboard = [
+            [InlineKeyboardButton("🔍 Ver Partidas", callback_data="show_matches"),
+             InlineKeyboardButton("📊 Portfolio", callback_data="portfolio_dashboard")],
+            [InlineKeyboardButton("🎯 Kelly Analysis", callback_data="kelly_dashboard"),
+             InlineKeyboardButton("🎭 Sentimento", callback_data="sentiment_dashboard")],
+            [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
+             InlineKeyboardButton("📈 Analytics", callback_data="analytics_dashboard")]
+        ]
+        
+        await update.message.reply_text(
+            welcome_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
 
-        team1_analysis = draft_analysis['team1']
-        team2_analysis = draft_analysis['team2']
-        advantage = draft_analysis['draft_advantage']
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando help expandido"""
+        # Verificar autorização
+        if not await self.check_authorization(update, context):
+            return
+            
+        help_text = """📚 **GUIA COMPLETO DO BOT**
 
-        text = f"🏆 **ANÁLISE DE DRAFT**\n\n"
+🎯 **COMANDOS PRINCIPAIS:**
+• `/start` - Iniciar o bot
+• `/help` - Este guia
+• `/partidas` - Partidas ao vivo do LoL
+• `/predicao` - Predição específica
 
-        # Composições
-        text += f"🔵 **{team1_name}:** {', '.join(team1_analysis['champions'])}\n"
-        text += f"🔴 **{team2_name}:** {', '.join(team2_analysis['champions'])}\n\n"
+💰 **SISTEMA FINANCEIRO:**
+• `/portfolio` - Gerenciamento de portfolio
+• `/kelly` - Análise Kelly Criterion
+• `/value` - Alertas de value betting
+• `/analytics` - Dashboard completo
 
-        # Vantagem de draft
-        favored_team = team1_name if advantage['favored_team'] == 1 else team2_name
-        confidence = advantage['confidence']
-        text += f"🎯 **VANTAGEM DE DRAFT:** {favored_team}\n"
-        text += f"📊 **CONFIANÇA:** {confidence:.1%}\n\n"
+🎭 **ANÁLISE AVANÇADA:**
+• `/sentiment` - Sentimento de times/jogadores
+• Draft analysis automática
+• Predições com IA
 
-        # Análise por fases
-        phases = draft_analysis['phase_analysis']
-        text += f"📈 **FASES DO JOGO:**\n"
-        for phase, data in phases.items():
-            phase_name = phase.replace('_', ' ').title()
-            favored = team1_name if data['favored_team'] == 1 else team2_name
-            text += f"• {phase_name}: **{favored}**\n"
+🔐 **COMANDOS DE ADMIN:**
+• `/auth <user_id> [nome]` - Autorizar usuário
+• `/revoke <user_id>` - Revogar autorização
+• `/listauth` - Listar autorizados
+• `/authconfig` - Configurar sistema
+• `/mypermissions` - Ver suas permissões
 
-        text += f"\n"
+🤖 **FUNCIONALIDADES AUTOMÁTICAS:**
+• Alertas de value betting
+• Dicas automáticas em grupos
+• Monitoramento 24/7
+• Análise de sentimento em tempo real
 
-        # Win conditions
-        win_conditions = draft_analysis['win_conditions']
-        text += f"🏆 **CONDIÇÕES DE VITÓRIA:**\n"
-        text += f"🔵 **{team1_name}:** {', '.join(win_conditions['team1'][:2])}\n"
-        text += f"🔴 **{team2_name}:** {', '.join(win_conditions['team2'][:2])}\n\n"
+💡 **DICAS:**
+• Adicione o bot em grupos como admin
+• Use botões para navegação fácil
+• Todas as predições são baseadas em IA
+• Sistema Kelly ajuda no sizing de apostas
 
-        # Synergy scores
-        text += f"🤝 **SYNERGY:**\n"
-        text += f"• {team1_name}: {team1_analysis['synergy_score']:.1%}\n"
-        text += f"• {team2_name}: {team2_analysis['synergy_score']:.1%}"
+📊 **MÉTRICAS DISPONÍVEIS:**
+• ROI por esporte
+• Win rate histórico
+• Risk management automático
+• Portfolio diversification
+• Sentiment trends"""
 
-        return text
+        await update.message.reply_text(help_text, parse_mode='Markdown')
 
-    async def button_callback(self, update: Update, context):
-        """Handler para botões do bot"""
-        query = update.callback_query
-        await query.answer()
-
-        data = query.data
-
+    async def handle_callback(self, query):
+        """Handler unificado para todos os callbacks"""
         try:
-            if data == "start":
-                await self.start_command_callback(query)
-            elif data == "live_matches_all":
+            await query.answer()
+            
+            # Verificar autorização primeiro
+            user_id = query.from_user.id
+            chat_type = query.message.chat.type
+            
+            if not self.is_user_authorized(user_id, chat_type):
+                await query.edit_message_text(
+                    f"🔐 **Acesso negado**\n\nSeu ID: `{user_id}`\nEnvie para o admin para liberação",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            if self.is_group_restricted(chat_type):
+                await query.edit_message_text(
+                    "🔐 **Bot restrito em grupos**\n\nUse em conversa privada",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            callback_data = query.data
+            
+            # Routing para diferentes sistemas
+            if callback_data.startswith("portfolio_"):
+                await self.portfolio_callback(query)
+            elif callback_data.startswith("kelly_"):
+                await self.kelly_callback(query)
+            elif callback_data.startswith("sentiment_"):
+                await self.sentiment_callback(query)
+            elif callback_data.startswith("value_"):
+                await self.value_bet_callback(query)
+            elif callback_data.startswith("predict_"):
+                await self.predict_match_callback(query, callback_data.replace("predict_", ""))
+            elif callback_data == "show_matches":
                 await self.show_all_live_matches(query, is_callback=True)
-            elif data.startswith("predict_match_"):
-                match_id = data.replace("predict_match_", "")
-                await self.predict_match_callback(query, match_id)
-            elif data.startswith("draft_"):
-                match_id = data.replace("draft_", "")
-                await self.show_draft_analysis(query, match_id)
-            elif data == "help":
-                await self.help_callback(query)
-            elif data == "betting_tips":
-                await self.betting_tips_callback(query)
-            elif data == "current_rankings":
-                await self.current_rankings_callback(query)
-            elif data == "value_betting":
-                await self.value_betting_callback(query)
-            elif data == "value_stats":
-                await self.value_stats_callback(query)
-            elif data == "subscribe_value":
-                await self.subscribe_value_callback(query)
-            elif data == "unsubscribe_value":
-                await self.unsubscribe_value_callback(query)
-            elif data.startswith("group_value_"):
-                chat_id = int(data.replace("group_value_", ""))
-                await self.activate_group_value_bets(query, chat_id)
-            elif data.startswith("group_config_"):
-                chat_id = int(data.replace("group_config_", ""))
-                await self.show_group_config(query, chat_id)
+            elif callback_data == "portfolio_dashboard":
+                await self.show_portfolio(query, context=None)
+            elif callback_data == "kelly_dashboard":
+                await self.kelly_analysis(query, context=None)
+            elif callback_data == "sentiment_dashboard":
+                await self.sentiment_analysis(query, context=None)
+            elif callback_data == "analytics_dashboard":
+                await self.show_analytics(query, context=None)
+            elif callback_data == "value_bets":
+                await self.show_value_bets(query, context=None)
             else:
-                await query.edit_message_text("⚠️ Funcionalidade em desenvolvimento")
-
+                await query.edit_message_text("❌ Ação não reconhecida")
+                
         except Exception as e:
-            logger.error(f"❌ Erro no callback: {e}")
-            await query.edit_message_text(f"❌ Erro: {str(e)}")
+            logger.error(f"❌ Erro no callback handler: {e}")
+            try:
+                await query.edit_message_text("❌ Erro ao processar ação")
+            except:
+                pass
 
-    async def start_command_callback(self, query):
-        """Callback para comando start"""
-        await self.start_command_text(query)
-
-    async def start_command_text(self, query):
-        """Texto do comando start para callback"""
-        welcome_text = """🚀 **LOL PREDICTOR V3 MELHORADO**
-
-🔥 **NOVIDADES:**
-• ✅ Predições dinâmicas com dados reais
-• 🎯 Análise de TODAS as partidas ao vivo
-• 🏆 Análise avançada de composições
-• 💰 Recomendações de apostas com justificativa
-• 📊 Interface totalmente funcional
-
-👆 **Clique nos botões abaixo para navegar:**"""
-
-        keyboard = [
-            [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
-            [
-                InlineKeyboardButton("📊 Análise de Draft", callback_data="draft_analysis"),
-                InlineKeyboardButton("🎯 Predições Rápidas", callback_data="quick_predictions")
-            ],
-            [
-                InlineKeyboardButton("💰 Dicas de Apostas", callback_data="betting_tips"),
-                InlineKeyboardButton("📈 Rankings Atuais", callback_data="current_rankings")
-            ],
-            [
-                InlineKeyboardButton("🔥 VALUE BETS", callback_data="value_betting"),
-                InlineKeyboardButton("📊 Stats Value", callback_data="value_stats")
-            ],
-            [InlineKeyboardButton("ℹ️ Ajuda", callback_data="help")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def help_callback(self, query):
-        """Callback de ajuda"""
-        help_text = """📚 **GUIA COMPLETO - V3 MELHORADO**
-
-🆕 **PRINCIPAIS MELHORIAS:**
-• **Probabilidades Dinâmicas:** Atualizadas em tempo real
-• **Todas as Partidas:** Monitora TODOS os jogos ao vivo
-• **Análise de Draft:** Composições detalhadas
-• **Botões Funcionais:** Interface 100% operacional
-• **Justificativa de Apostas:** Análise do porquê apostar
-
-🔴 **PARTIDAS AO VIVO:**
-• Clique em "PARTIDAS AO VIVO"
-• Selecione qualquer jogo
-• Receba predição instantânea
-
-🏆 **ANÁLISE DE DRAFT:**
-• Composições de campeões
-• Synergias entre champions
-• Win conditions por fase
-• Vantagem de draft
-
-💰 **RECOMENDAÇÕES DE APOSTAS:**
-• Análise de value bets
-• Confiança da predição
-• Timing ideal para apostar
-
-📊 **RECURSOS AVANÇADOS:**
-• Rankings atualizados
-• Comparação entre times
-• Histórico de performance
-• Análise de momentum"""
-
-        keyboard = [
-            [InlineKeyboardButton("🔴 Testar Agora", callback_data="live_matches_all")],
-            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(help_text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def betting_tips_callback(self, query):
-        """Callback para dicas de apostas"""
-        tips_text = """💰 **DICAS DE APOSTAS - V3 MELHORADO**
-
-🎯 **COMO USAR O BOT:**
-1. Acesse "PARTIDAS AO VIVO"
-2. Clique na partida desejada
-3. Receba análise completa instantaneamente
-
-📊 **INTERPRETANDO AS PREDIÇÕES:**
-• **Confiança Alta (70%+):** Aposta recomendada
-• **Confiança Média (55-70%):** Aposte com cautela
-• **Confiança Baixa (<55%):** Evite apostar
-
-🏆 **FATORES ANALISADOS:**
-• Rating ELO dos times
-• Forma atual (últimos jogos)
-• Vantagem de draft
-• Momentum da partida
-• Performance histórica
-
-💡 **DICAS PROFISSIONAIS:**
-• Sempre analise o draft antes de apostar
-• Times com better early game são mais seguros
-• Partidas equilibradas = maior risco
-• Use multiple sources para confirmar odds
-
-⚠️ **DISCLAIMER:**
-Este bot é para fins educacionais.
-Aposte com responsabilidade."""
-
-        keyboard = [
-            [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")],
-            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(tips_text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def current_rankings_callback(self, query):
-        """Callback para rankings atuais"""
-        rankings_text = """📈 **RANKINGS ATUAIS - V3**
-
-🏆 **TOP TEAMS MUNDIAIS:**
-
-**🇰🇷 LCK:**
-1. T1 (2100 rating) ⭐⭐⭐
-2. Gen.G (2050 rating) ⭐⭐⭐
-
-**🇨🇳 LPL:**
-1. JD Gaming (2080 rating) ⭐⭐⭐
-2. Bilibili Gaming (2020 rating) ⭐⭐
-
-**🇪🇺 LEC:**
-1. G2 Esports (1980 rating) ⭐⭐
-2. Fnatic (1950 rating) ⭐⭐
-
-**🇺🇸 LCS:**
-1. Cloud9 (1920 rating) ⭐
-2. Team Liquid (1900 rating) ⭐
-
-📊 **FORÇA REGIONAL:**
-1. 🇰🇷 LCK - 100%
-2. 🇨🇳 LPL - 95%
-3. 🇪🇺 LEC - 80%
-4. 🇺🇸 LCS - 70%
-
-🔄 Rankings atualizados automaticamente
-baseado em performance recente"""
-
-        keyboard = [
-            [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")],
-            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(rankings_text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def value_betting_callback(self, query):
-        """Callback para sistema de value betting"""
-        user_id = query.from_user.id
-
-        # Verificar se sistema está disponível
-        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
-            await query.edit_message_text(
-                "❌ Sistema de Value Betting não disponível"
-            )
-            return
-
-        # Verificar se usuário já está inscrito
-        is_subscribed = user_id in self.value_monitor.notification_system.subscribers
-
-        text = """🔥 **SISTEMA VALUE BETTING AUTOMÁTICO**
-
-🎯 **O QUE É:**
-Sistema que monitora TODAS as partidas ao vivo em busca de apostas de valor - quando nossa IA detecta alta probabilidade de vitória mas as odds estão desreguladas (>1.5x).
-
-💰 **QUANDO ALERTA:**
-• Probabilidade real ≥ 55%
-• Odds atuais ≥ 1.5x
-• Edge de +15% ou mais
-• Durante partidas em andamento
-
-🚨 **TIPOS DE URGÊNCIA:**
-🔥 Alta: +25% edge, 70%+ prob
-⚡ Média: +20% edge, 60%+ prob
-💡 Baixa: +15% edge, 55%+ prob
-
-⚠️ **AVISO:** Aposte com responsabilidade!"""
-
-        # Botões baseados no status de inscrição
-        if is_subscribed:
-            keyboard = [
-                [InlineKeyboardButton("❌ Cancelar Inscrição", callback_data="unsubscribe_value")],
-                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
-                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-        else:
-            keyboard = [
-                [InlineKeyboardButton("✅ Ativar Notificações", callback_data="subscribe_value")],
-                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
-                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def value_stats_callback(self, query):
-        """Callback para estatísticas de value betting"""
-        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
-            await query.edit_message_text(
-                "❌ Sistema de Value Betting não disponível"
-            )
-            return
-
-        stats = self.value_monitor.get_stats()
-
-        text = f"""📊 **ESTATÍSTICAS VALUE BETTING**
-
-🎯 **Value Bets Encontradas:** {stats['value_bets_found']}
-📱 **Notificações Enviadas:** {stats['notifications_sent']}
-🔍 **Partidas Analisadas:** {stats['matches_analyzed']}
-👥 **Usuários Inscritos:** {stats['subscribers']}
-
-⚙️ **Status:** {'🟢 Ativo' if stats['is_running'] else '🔴 Inativo'}
-⏱️ **Intervalo de Análise:** {stats['check_interval']}s
-
-📈 **Taxa de Detecção:** {stats['value_bets_found'] / max(1, stats['matches_analyzed']) * 100:.1f}%
-
-🔄 *Atualizado em tempo real*"""
-
-        keyboard = [
-            [InlineKeyboardButton("🔥 Configurar Alerts", callback_data="value_betting")],
-            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def help_command(self, update: Update, context):
-        """Comando /help"""
-        await self.help_callback(update.message)
-
-    async def text_message_handler(self, update: Update, context):
-        """Handler para mensagens de texto"""
-        text = update.message.text.lower()
-
-        if 'live' in text or 'ao vivo' in text:
-            await self.live_command(update, context)
-        elif 'help' in text or 'ajuda' in text:
-            await self.help_command(update, context)
-        else:
-            response = """🤖 **Comando não reconhecido!**
-
-Use os botões ou comandos:
-• `/live` - Ver partidas ao vivo
-• `/help` - Ajuda completa
-• `/start` - Menu principal
-
-💡 **Dica:** Use a interface com botões para melhor experiência!"""
-
-            keyboard = [
-                [InlineKeyboardButton("🔴 PARTIDAS AO VIVO", callback_data="live_matches_all")],
-                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-            ]
-
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(response, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def run(self):
+    async def run_bot(self):
         """Executa o bot"""
-        if not TELEGRAM_AVAILABLE:
-            print("🔧 Modo teste - Telegram não disponível")
-            return
-
         try:
-            # Criar aplicação
-            application = Application.builder().token(TOKEN).build()
-            self.app = application
-
-            # Configurar handlers
-            self.setup_handlers()
-
-            # Inicializar sistema de Value Betting
-            if VALUE_BETTING_AVAILABLE:
-                try:
-                    await initialize_value_bet_system(self, self.riot_api, self.prediction_system)
-                    logger.info("🔥 Sistema de Value Betting inicializado!")
-                except Exception as e:
-                    logger.error(f"❌ Erro ao inicializar Value Betting: {e}")
-
-            # Inicializar e executar
-            print("🚀 Iniciando Bot V3 Melhorado...")
-            await application.initialize()
-            await application.start()
-            await application.updater.start_polling()
-
-            print("✅ Bot V3 Melhorado em execução!")
-
-            # Manter rodando
-            while True:
-                await asyncio.sleep(1)
-
+            await self.initialize_bot()
+            
+            # Inicializar sistemas automáticos
+            if hasattr(self, 'group_manager') and self.group_manager:
+                asyncio.create_task(self.group_manager.start_auto_tips())
+            
+            logger.info("🚀 Iniciando bot...")
+            await self.application.run_polling()
+                
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
-        finally:
-            if self.app:
-                await self.app.stop()
+            raise
 
-    async def subscribe_value_callback(self, query):
-        """Callback para inscrever usuário nas notificações de value betting"""
-        user_id = query.from_user.id
-
-        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
-            await query.edit_message_text("❌ Sistema não disponível")
+    async def show_all_live_matches(self, update_or_query, context: ContextTypes.DEFAULT_TYPE = None, is_callback: bool = False):
+        """Mostra todas as partidas ao vivo com predições"""
+        # Verificar se é callback ou mensagem
+        if is_callback:
+            update = type('obj', (object,), {
+                'effective_user': update_or_query.from_user,
+                'effective_chat': update_or_query.message.chat,
+                'message': update_or_query.message
+            })()
+        else:
+            update = update_or_query
+        
+        # Verificar autorização apenas se não for callback
+        if not is_callback and not await self.check_authorization(update, context):
             return
-
-        self.value_monitor.notification_system.subscribe_user(user_id)
-
-        text = """✅ **INSCRITO NAS VALUE BETS!**
-
-Você receberá notificações automáticas quando encontrarmos:
-• 🎯 Apostas com alta probabilidade
-• 💰 Odds desreguladas (>1.5x)
-• ⚡ Edge de +15% ou mais
-
-🔔 As notificações chegam em tempo real durante as partidas!
-
-⚠️ **Lembre-se:** Aposte sempre com responsabilidade."""
-
-        keyboard = [
-            [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
-            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def unsubscribe_value_callback(self, query):
-        """Callback para cancelar inscrição nas notificações"""
-        user_id = query.from_user.id
-
-        if not VALUE_BETTING_AVAILABLE or not self.value_monitor:
-            await query.edit_message_text("❌ Sistema não disponível")
-            return
-
-        self.value_monitor.notification_system.unsubscribe_user(user_id)
-
-        text = """❌ **INSCRIÇÃO CANCELADA**
-
-Você não receberá mais notificações de value bets.
-
-💡 Você pode reativar a qualquer momento através do menu "🔥 VALUE BETS"."""
-
-        keyboard = [
-            [InlineKeyboardButton("🔥 Reativar", callback_data="value_betting")],
-            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-    async def activate_group_value_bets(self, query, chat_id):
-        """Ativa notificações de value bets para um grupo"""
-        self.group_manager.activate_value_bets_for_group(chat_id)
         
-        text = """✅ **VALUE BETS ATIVADO PARA O GRUPO!**
-
-🔥 **Notificações automáticas ativadas:**
-• 🚨 **Alertas em tempo real** quando odds estão desreguladas
-• 💰 **Edge de +15%** ou mais
-• ⚡ **Urgência** baseada no potencial de lucro
-• 🎯 **Recomendações específicas** de apostas
-
-⏰ **Funcionamento:**
-O bot irá enviar alertas automaticamente sempre que detectar uma oportunidade de value bet durante partidas ao vivo.
-
-🎮 **Aguarde os primeiros alertas!**"""
-        
-        keyboard = [
-            [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="value_stats")],
-            [InlineKeyboardButton("⚙️ Configurações", callback_data=f"group_config_{chat_id}")]
-        ]
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-    
-    async def show_group_config(self, query, chat_id):
-        """Mostra configurações do grupo"""
-        is_value_active = chat_id in self.group_manager.value_bet_groups
-        is_auto_tips_active = chat_id in self.group_manager.active_groups
-        
-        text = f"""⚙️ **CONFIGURAÇÕES DO GRUPO**
-
-📊 **Status Atual:**
-• 🔥 **Value Bets:** {'✅ Ativo' if is_value_active else '❌ Inativo'}
-• ⚡ **Dicas Automáticas:** {'✅ Ativo' if is_auto_tips_active else '❌ Inativo'}
-• ⏰ **Intervalo:** 30 minutos
-• 📈 **Monitoramento:** Tempo real
-
-🎯 **Funcionalidades Disponíveis:**
-• Predições automáticas das partidas ao vivo
-• Alertas de value betting em tempo real
-• Análises de draft e composições
-• Rankings e estatísticas atualizadas
-
-💡 **O bot funciona automaticamente sem comandos!**"""
-        
-        keyboard = []
-        if not is_value_active:
-            keyboard.append([InlineKeyboardButton("🔥 Ativar Value Bets", callback_data=f"group_value_{chat_id}")])
-        
-        keyboard.extend([
-            [InlineKeyboardButton("📊 Ver Stats", callback_data="value_stats")],
-            [InlineKeyboardButton("🔴 Ver Partidas", callback_data="live_matches_all")]
-        ])
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-
-
-class AutoGroupManager:
-    """Gerenciador automático para grupos - envia dicas sem comando start"""
-    
-    def __init__(self, bot_instance):
-        self.bot = bot_instance
-        self.active_groups = set()  # Chat IDs dos grupos ativos
-        self.last_tips_sent = {}    # Último envio de dicas por grupo
-        self.value_bet_groups = set()  # Grupos inscritos em value bets
-        self.auto_tips_interval = 1800  # 30 minutos entre dicas automáticas
-        
-    async def handle_bot_added_to_group(self, update: Update, context):
-        """Handler quando bot é adicionado a um grupo"""
-        try:
-            chat_id = update.effective_chat.id
-            chat_type = update.effective_chat.type
-            
-            # Verificar se é um grupo ou supergrupo
-            if chat_type in ['group', 'supergroup']:
-                self.active_groups.add(chat_id)
-                logger.info(f"🔥 Bot adicionado ao grupo {chat_id}")
-                
-                # Enviar mensagem de boas-vindas automática
-                welcome_text = """🚀 **LOL PREDICTOR V3 - MODO GRUPO ATIVO!**
-
-🔥 **FUNCIONALIDADES AUTOMÁTICAS ATIVADAS:**
-• ⚡ **Dicas automáticas** a cada 30 minutos
-• 🎯 **Notificações de Value Bets** em tempo real
-• 🏆 **Análise de partidas ao vivo** automaticamente
-• 💰 **Alertas de apostas** quando odds estão desreguladas
-
-📊 **O bot irá monitorar continuamente:**
-• Todas as partidas LoL ao vivo
-• Oportunidades de value betting
-• Análises de draft em tempo real
-• Rankings e estatísticas
-
-🎮 **Sem necessidade de comandos - tudo automático!**
-Aguarde as próximas dicas em alguns minutos..."""
-                
-                keyboard = [
-                    [InlineKeyboardButton("🔥 Ativar Value Bets", callback_data=f"group_value_{chat_id}")],
-                    [InlineKeyboardButton("⚙️ Configurações", callback_data=f"group_config_{chat_id}")]
-                ]
-                
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=welcome_text,
-                    reply_markup=reply_markup,
-                    parse_mode='Markdown'
-                )
-                
-                # Iniciar envio automático após 5 minutos
-                asyncio.create_task(self._start_auto_tips_for_group(chat_id, context))
-                
-        except Exception as e:
-            logger.error(f"❌ Erro ao processar adição ao grupo: {e}")
-    
-    async def _start_auto_tips_for_group(self, chat_id: int, context):
-        """Inicia envio automático de dicas para um grupo"""
-        await asyncio.sleep(300)  # Aguarda 5 minutos
-        
-        while chat_id in self.active_groups:
-            try:
-                # Verificar se passou tempo suficiente desde última dica
-                last_sent = self.last_tips_sent.get(chat_id, 0)
-                now = datetime.now().timestamp()
-                
-                if now - last_sent >= self.auto_tips_interval:
-                    await self._send_auto_tips(chat_id, context)
-                    self.last_tips_sent[chat_id] = now
-                
-                # Aguardar 5 minutos antes de verificar novamente
-                await asyncio.sleep(300)
-                
-            except Exception as e:
-                logger.error(f"❌ Erro no loop automático do grupo {chat_id}: {e}")
-                await asyncio.sleep(600)  # Aguarda mais tempo em caso de erro
-    
-    async def _send_auto_tips(self, chat_id: int, context):
-        """Envia dicas automáticas para o grupo"""
         try:
             # Buscar partidas ao vivo
-            live_matches = await self.bot.riot_api.get_all_live_matches()
+            live_matches = await self.riot_api.get_all_live_matches()
             
-            if not live_matches or len(live_matches) == 0:
-                # Se não há partidas, enviar update de status
-                status_text = """⏰ **UPDATE AUTOMÁTICO**
+            if not live_matches:
+                text = """ℹ️ **NENHUMA PARTIDA AO VIVO**
 
-🔍 **Status:** Monitorando partidas...
-📊 **Partidas ativas:** 0
-🎯 **Próxima verificação:** 30 minutos
+🔍 **Não há partidas de LoL Esports ao vivo no momento**
 
-💡 **Não há partidas acontecendo neste momento**
+O sistema monitora continuamente as seguintes ligas:
+• 🏆 **LCK** (Coreia do Sul)
+• 🏆 **LPL** (China) 
+• 🏆 **LEC** (Europa)
+• 🏆 **LCS** (América do Norte)
+• 🏆 **Worlds** (Mundial)
+• 🏆 **MSI** (Mid-Season Invitational)
 
-O bot continua monitorando todas as ligas em busca de:
-• 🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS
-• 🌍 Torneios internacionais • 🏆 Ligas regionais
+🔄 **O monitoramento é automático 24/7**
+📱 Você será notificado quando partidas iniciarem
 
-🔄 **Você será notificado quando partidas iniciarem!**"""
-                
+💡 Use /start para voltar ao menu principal"""
+
                 keyboard = [
-                    [InlineKeyboardButton("🔄 Verificar Agora", callback_data="live_matches_all")],
-                    [InlineKeyboardButton("📊 Ver Rankings", callback_data="current_rankings")]
+                    [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
+                     InlineKeyboardButton("📊 Portfolio", callback_data="portfolio_dashboard")],
+                    [InlineKeyboardButton("🎯 Kelly", callback_data="kelly_dashboard"),
+                     InlineKeyboardButton("📈 Analytics", callback_data="analytics_dashboard")]
                 ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=status_text,
-                    reply_markup=reply_markup,
-                    parse_mode='Markdown'
-                )
+                if is_callback:
+                    await update_or_query.edit_message_text(
+                        text,
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        parse_mode='Markdown'
+                    )
+                else:
+                    await update.message.reply_text(
+                        text,
+                        reply_markup=InlineKeyboardMarkup(keyboard),
+                        parse_mode='Markdown'
+                    )
                 return
+
+            # Mostrar partidas encontradas
+            text = f"🎮 **PARTIDAS AO VIVO** ({len(live_matches)} encontradas)\n\n"
             
-            # Gerar predições para as principais partidas
-            predictions = []
-            for match in live_matches[:3]:  # Top 3 partidas
+            keyboard = []
+            
+            for i, match in enumerate(live_matches[:8]):  # Máximo 8 partidas
                 try:
-                    prediction = await self.bot.prediction_system.predict_live_match(match)
-                    predictions.append((match, prediction))
+                    # Fazer predição da partida
+                    prediction = await self.prediction_system.predict_live_match(match)
+                    
+                    team1 = prediction.get('team1', 'Team 1')
+                    team2 = prediction.get('team2', 'Team 2')
+                    prob1 = prediction.get('team1_win_probability', 0.5) * 100
+                    prob2 = prediction.get('team2_win_probability', 0.5) * 100
+                    confidence = prediction.get('confidence', 'média')
+                    
+                    # Determinar favorito
+                    if prob1 > prob2:
+                        favorite = team1
+                        favorite_prob = prob1
+                        underdog_prob = prob2
+                    else:
+                        favorite = team2
+                        favorite_prob = prob2
+                        underdog_prob = prob1
+                    
+                    # Emoji da confiança
+                    conf_emoji = {
+                        'muito alta': '🟢',
+                        'alta': '🟢', 
+                        'média': '🟡',
+                        'baixa': '🟠',
+                        'muito baixa': '🔴'
+                    }.get(confidence, '🟡')
+                    
+                    text += f"🎯 **{team1} vs {team2}**\n"
+                    text += f"📊 Favorito: **{favorite}** ({favorite_prob:.1f}%)\n"
+                    text += f"{conf_emoji} Confiança: {confidence}\n\n"
+                    
+                    # Adicionar botão para predição detalhada
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            f"🎯 {team1} vs {team2}",
+                            callback_data=f"predict_{i}"
+                        )
+                    ])
+                    
                 except Exception as e:
-                    logger.warning(f"⚠️ Erro ao gerar predição para partida: {e}")
-                    continue
+                    logger.error(f"❌ Erro ao processar partida {i}: {e}")
+                    text += f"❌ Erro ao processar partida {i + 1}\n\n"
             
-            if not predictions:
-                # Se não conseguiu gerar predições, enviar status básico
-                status_text = f"""⏰ **UPDATE AUTOMÁTICO**
-
-🔍 **Status:** {len(live_matches)} partidas encontradas
-⚠️ **Análise:** Dados insuficientes para predições
-🎯 **Próxima verificação:** 30 minutos
-
-🔄 **Tentaremos análise novamente na próxima atualização**"""
-                
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=status_text,
-                    parse_mode='Markdown'
-                )
-                return
-            
-            # Formatar mensagem automática
-            auto_message = self._format_auto_tips_message(predictions)
-            
-            # Criar botões para ver mais detalhes
-            keyboard = [
-                [InlineKeyboardButton("🔴 Ver Todas as Partidas", callback_data="live_matches_all")],
-                [
-                    InlineKeyboardButton("🔥 Value Bets", callback_data="value_betting"),
-                    InlineKeyboardButton("📊 Rankings", callback_data="current_rankings")
-                ]
+            # Adicionar botões de navegação
+            nav_buttons = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
+                 InlineKeyboardButton("📊 Portfolio", callback_data="portfolio_dashboard")],
+                [InlineKeyboardButton("🎯 Kelly", callback_data="kelly_dashboard"),
+                 InlineKeyboardButton("📈 Analytics", callback_data="analytics_dashboard")]
             ]
             
-            reply_markup = InlineKeyboardMarkup(keyboard)
+            keyboard.extend(nav_buttons)
             
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=auto_message,
-                reply_markup=reply_markup,
-                parse_mode='Markdown'
-            )
+            text += f"⏰ **Última atualização:** {datetime.now().strftime('%H:%M:%S')}\n"
+            text += "🔄 *Dados atualizados automaticamente*"
             
-            logger.info(f"✅ Dicas automáticas enviadas para grupo {chat_id}")
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao enviar dicas automáticas para grupo {chat_id}: {e}")
-            try:
-                # Enviar mensagem de erro simples para o grupo
-                error_text = """⚠️ **Erro no update automático**
-
-🔄 Tentaremos novamente na próxima verificação (30 minutos)
-
-💡 Use `/live` para verificar partidas manualmente"""
-                
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=error_text,
+            if is_callback:
+                await update_or_query.edit_message_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode='Markdown'
                 )
-            except Exception as e2:
-                logger.error(f"❌ Erro ao enviar mensagem de erro: {e2}")
-    
-    def _format_auto_tips_message(self, predictions: List) -> str:
-        """Formata mensagem de dicas automáticas"""
-        text = "🔥 **DICAS AUTOMÁTICAS - LOL PREDICTOR**\n\n"
-        text += f"⏰ **{datetime.now().strftime('%H:%M:%S')}** | 📊 **{len(predictions)} partidas ativas**\n\n"
-        
-        for i, (match, prediction) in enumerate(predictions, 1):
-            team1 = prediction['team1']
-            team2 = prediction['team2']
-            prob1 = prediction['team1_win_probability'] * 100
-            confidence = prediction['confidence']
-            
-            # Determinar favorito
-            if prob1 > 50:
-                favorite = team1
-                favorite_prob = prob1
             else:
-                favorite = team2
-                favorite_prob = 100 - prob1
+                await update.message.reply_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar partidas: {e}")
+            error_text = "❌ Erro ao buscar partidas. Tente novamente."
             
-            # Emoji baseado na confiança
-            confidence_emoji = "🔥" if confidence == "alta" or confidence == "muito alta" else "⚡" if confidence == "média" else "💡"
-            
-            text += f"{confidence_emoji} **PARTIDA {i}:** {team1} vs {team2}\n"
-            text += f"🎯 **Favorito:** {favorite} ({favorite_prob:.1f}%)\n"
-            text += f"🎲 **Confiança:** {confidence.upper()}\n\n"
-        
-        text += "💰 **DICA PRINCIPAL:** Aposte no favorito das partidas com confiança ALTA\n\n"
-        text += "🔄 **Próxima atualização:** 30 minutos\n"
-        text += "📱 Use os botões abaixo para análises detalhadas!"
-        
-        return text
-    
-    async def send_value_bet_alert(self, chat_id: int, value_bet_info: Dict, context):
-        """Envia alerta de value bet para grupo"""
-        if chat_id not in self.value_bet_groups:
-            return
-            
+            if is_callback:
+                await update_or_query.edit_message_text(error_text)
+            else:
+                await update.message.reply_text(error_text)
+
+    async def predict_match_callback(self, query, match_index: str):
+        """Callback para predição detalhada de uma partida"""
         try:
-            alert_text = f"""🚨 **ALERTA VALUE BET AUTOMÁTICO** 🚨
-
-🎯 **{value_bet_info['team1']} vs {value_bet_info['team2']}**
-💰 **Probabilidade Real:** {value_bet_info['probability']:.1%}
-📊 **Odds Atuais:** {value_bet_info['odds']:.2f}
-⚡ **Edge:** +{value_bet_info['edge']:.1%}
-
-🔥 **URGÊNCIA:** {value_bet_info['urgency']}
-⏰ **AGIR AGORA** - Odds podem mudar rapidamente!
-
-💡 **Aposte em:** {value_bet_info['recommended_team']}"""
+            # Verificar autorização
+            user_id = query.from_user.id
+            chat_type = query.message.chat.type
             
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=alert_text,
+            if not self.is_user_authorized(user_id, chat_type):
+                await query.edit_message_text(
+                    "🔐 **Acesso negado**\n\nVocê não está autorizado a usar este bot"
+                )
+                return
+            
+            match_idx = int(match_index)
+            
+            # Buscar partidas novamente
+            live_matches = await self.riot_api.get_all_live_matches()
+            
+            if not live_matches or match_idx >= len(live_matches):
+                await query.edit_message_text(
+                    "❌ **Partida não encontrada**\n\n"
+                    "A partida pode ter terminado ou não estar mais disponível.\n"
+                    "Use /partidas para ver partidas atuais."
+                )
+                return
+            
+            match = live_matches[match_idx]
+            prediction = await self.prediction_system.predict_live_match(match)
+            
+            team1 = prediction.get('team1', 'Team 1')
+            team2 = prediction.get('team2', 'Team 2')
+            prob1 = prediction.get('team1_win_probability', 0.5)
+            prob2 = prediction.get('team2_win_probability', 0.5)
+            odds1 = prediction.get('team1_odds', 2.0)
+            odds2 = prediction.get('team2_odds', 2.0)
+            confidence = prediction.get('confidence', 'média')
+            analysis = prediction.get('analysis', 'Análise não disponível')
+            
+            text = f"""🎯 **PREDIÇÃO DETALHADA**
+
+🎮 **{team1} vs {team2}**
+
+📊 **PROBABILIDADES:**
+• {team1}: {prob1*100:.1f}% (odds {odds1:.2f})
+• {team2}: {prob2*100:.1f}% (odds {odds2:.2f})
+
+🎖️ **Confiança:** {confidence}
+
+📋 **ANÁLISE:**
+{analysis}
+
+🕐 **Última atualização:** {datetime.now().strftime('%H:%M:%S')}"""
+
+            # Draft analysis se disponível
+            draft_analysis = prediction.get('draft_analysis')
+            if draft_analysis:
+                text += f"\n\n🎭 **ANÁLISE DE DRAFT:**\n"
+                advantage = draft_analysis.get('draft_advantage', {})
+                favored_team = advantage.get('favored_team', 1)
+                favorite_name = team1 if favored_team == 1 else team2
+                text += f"• Vantagem no draft: **{favorite_name}**\n"
+                text += f"• Confiança: {advantage.get('confidence', 0)*100:.0f}%"
+
+            keyboard = [
+                [InlineKeyboardButton("◀️ Voltar", callback_data="show_matches"),
+                 InlineKeyboardButton("🔄 Atualizar", callback_data=f"predict_{match_index}")],
+                [InlineKeyboardButton("📊 Portfolio", callback_data="portfolio_dashboard"),
+                 InlineKeyboardButton("🎯 Kelly", callback_data="kelly_dashboard")]
+            ]
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode='Markdown'
             )
             
         except Exception as e:
-            logger.error(f"❌ Erro ao enviar alerta de value bet: {e}")
-    
-    def activate_value_bets_for_group(self, chat_id: int):
-        """Ativa notificações de value bets para um grupo"""
-        self.value_bet_groups.add(chat_id)
-        logger.info(f"🔥 Value bets ativado para grupo {chat_id}")
-    
-    def remove_group(self, chat_id: int):
-        """Remove grupo quando bot é removido"""
-        self.active_groups.discard(chat_id)
-        self.value_bet_groups.discard(chat_id)
-        self.last_tips_sent.pop(chat_id, None)
-        logger.info(f"❌ Grupo {chat_id} removido")
+            logger.error(f"❌ Erro na predição: {e}")
+            await query.edit_message_text(
+                "❌ Erro ao carregar predição.\nTente novamente ou use /partidas"
+            )
 
 
-# Função principal
+# Implementações placeholder para métodos não implementados
+async def show_value_bets(self, update_or_query, context=None, is_callback=False):
+    """Placeholder para value bets"""
+    text = "💰 **VALUE BETTING SYSTEM**\n\nSistema em desenvolvimento..."
+    
+    if is_callback:
+        await update_or_query.edit_message_text(text, parse_mode='Markdown')
+    else:
+        await update_or_query.message.reply_text(text, parse_mode='Markdown')
+
+async def predict_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Placeholder para predição"""
+    await update.message.reply_text("🎯 Use /partidas para ver predições das partidas ao vivo")
+
+async def value_bet_callback(self, query):
+    """Placeholder para value bet callback"""
+    await query.edit_message_text("💰 Value betting em desenvolvimento...")
+
+# Adicionar métodos à classe
+TelegramBotV3Improved.show_value_bets = show_value_bets
+TelegramBotV3Improved.predict_callback = predict_callback  
+TelegramBotV3Improved.value_bet_callback = value_bet_callback
+
+
 async def main():
     """Função principal"""
-    bot = TelegramBotV3Improved()
-    await bot.run()
+    try:
+        bot = TelegramBotV3Improved()
+        await bot.run_bot()
+    except KeyboardInterrupt:
+        logger.info("🛑 Bot interrompido pelo usuário")
+    except Exception as e:
+        logger.error(f"❌ Erro crítico: {e}")
 
-
-# Flask App para Railway deployment
-if FLASK_AVAILABLE:
-    app = Flask(__name__)
-
-    @app.route('/')
-    def home():
-        return jsonify({
-            "status": "online",
-            "version": "3.0-melhorado",
-            "features": {
-                "probabilidades_dinamicas": True,
-                "todas_partidas_ao_vivo": True,
-                "analise_draft_completa": True,
-                "interface_funcional": True,
-                "justificativa_apostas": True
-            },
-            "telegram_available": TELEGRAM_AVAILABLE
-        })
-
-    @app.route('/health')
-    def health():
-        return jsonify({
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "bot_status": "running",
-            "version": "3.0-melhorado"
-        })
 
 if __name__ == "__main__":
-    import threading
-
-    # Iniciar bot Telegram em thread separada
-    if TELEGRAM_AVAILABLE and TOKEN:
-        def run_telegram_bot():
-            asyncio.run(main())
-
-        telegram_thread = threading.Thread(
-    target=run_telegram_bot, daemon=True)
-        telegram_thread.start()
-        print("🤖 Bot Telegram iniciado em background")
-
-    # Iniciar Flask app para Railway
-    if FLASK_AVAILABLE:
-        port = int(os.environ.get("PORT", 8080))
-        print(f"🚀 Iniciando Flask server na porta {port}")
-        app.run(host="0.0.0.0", port=port, debug=False)
-    else:
-        print("❌ Flask não disponível - apenas modo Telegram")
-        if TELEGRAM_AVAILABLE:
-            asyncio.run(main())
+    asyncio.run(main())

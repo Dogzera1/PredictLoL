@@ -1,25 +1,58 @@
+# 🐳 DOCKERFILE PARA BOT LOL V3 ULTRA AVANÇADO
 FROM python:3.11-slim
 
-# Variáveis de ambiente
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PORT=8080
+# Metadata
+LABEL maintainer="Bot LoL V3 Team"
+LABEL description="Bot LoL Predictor V3 Ultra Avançado com IA"
+LABEL version="3.1.0"
 
-# Definir diretório de trabalho
+# Configurar timezone
+ENV TZ=America/Sao_Paulo
+RUN apt-get update && apt-get install -y tzdata && rm -rf /var/lib/apt/lists/*
+
+# Criar usuário não-root para segurança
+RUN groupadd -r botuser && useradd -r -g botuser -d /app -s /bin/bash botuser
+
+# Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar requirements primeiro (cache layer)
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    wget \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements primeiro (para cache do Docker)
 COPY requirements.txt .
 
 # Instalar dependências Python
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copiar código da aplicação
 COPY . .
 
-# Expor porta
-EXPOSE $PORT
+# Criar diretórios necessários
+RUN mkdir -p /app/logs /app/data /app/backups
 
-# Comando de inicialização para Railway
-CMD ["python", "-u", "main_v3_riot_integrated.py"] 
+# Configurar permissões
+RUN chown -R botuser:botuser /app
+USER botuser
+
+# Variáveis de ambiente
+ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+
+# Expor porta para webhook (opcional)
+EXPOSE 8080
+
+# Comando padrão
+CMD ["python", "main_v3_riot_integrated.py"] 

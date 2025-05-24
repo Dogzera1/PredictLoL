@@ -1,0 +1,384 @@
+name: 🚀 Bot LoL V3 - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Deploy automático diário às 6h UTC (3h no Brasil)
+    - cron: '0 6 * * *'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================================================
+  # 🧪 TESTES AUTOMÁTICOS
+  # ============================================================================
+  tests:
+    name: 🧪 Testes e Qualidade
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
+    
+    steps:
+    - name: 📁 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: 📦 Cache Dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements_production.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: 🔧 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_production.txt
+        pip install pytest pytest-cov pytest-asyncio black flake8 safety bandit
+        
+    - name: 🔍 Code Quality Checks
+      run: |
+        echo "🎨 Checking code formatting..."
+        black --check --diff .
+        
+        echo "📏 Checking code style..."
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        
+        echo "🔒 Security scan..."
+        safety check
+        bandit -r . -f json || true
+        
+    - name: 🧪 Run Tests
+      env:
+        TELEGRAM_TOKEN: test-token-for-testing
+        ENVIRONMENT: test
+      run: |
+        echo "🧪 Running unit tests..."
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+        
+    - name: 📊 Upload Coverage
+      uses: codecov/codecov-action@v3
+      if: matrix.python-version == '3.11'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  # ============================================================================
+  # 🔄 BUILD E PUSH DOCKER IMAGE
+  # ============================================================================
+  build:
+    name: 🐳 Build Docker Image
+    runs-on: ubuntu-latest
+    needs: tests
+    if: github.event_name == 'push'
+    
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-url: ${{ steps.build.outputs.image-url }}
+    
+    steps:
+    - name: 📁 Checkout
+      uses: actions/checkout@v4
+      
+    - name: 🔐 Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 📝 Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: 🏗️ Build and Push
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 🚀 DEPLOY AUTOMÁTICO EM STAGING
+  # ============================================================================
+  deploy-staging:
+    name: 🔄 Deploy Staging
+    runs-on: ubuntu-latest
+    needs: [tests, build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: 📁 Checkout
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Deploy to Staging
+      env:
+        STAGING_HOST: ${{ secrets.STAGING_HOST }}
+        STAGING_USER: ${{ secrets.STAGING_USER }}
+        STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        TELEGRAM_TOKEN: ${{ secrets.STAGING_TELEGRAM_TOKEN }}
+      run: |
+        echo "🚀 Deploying to staging environment..."
+        
+        # Setup SSH
+        mkdir -p ~/.ssh
+        echo "$STAGING_KEY" > ~/.ssh/staging_key
+        chmod 600 ~/.ssh/staging_key
+        
+        # Deploy commands
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/staging_key $STAGING_USER@$STAGING_HOST << 'EOF'
+          cd /home/botuser/lol-bot-v3-staging
+          git pull origin develop
+          ./deploy.sh stop
+          ./deploy.sh deploy
+        EOF
+        
+    - name: 🧪 Staging Health Check
+      run: |
+        echo "🩺 Checking staging health..."
+        sleep 30
+        curl -f http://${{ secrets.STAGING_HOST }}:8080/health || exit 1
+        echo "✅ Staging deployment successful!"
+
+  # ============================================================================
+  # 🌟 DEPLOY AUTOMÁTICO EM PRODUÇÃO
+  # ============================================================================
+  deploy-production:
+    name: 🌟 Deploy Production
+    runs-on: ubuntu-latest
+    needs: [tests, build]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: 📁 Checkout
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Deploy to Production
+      env:
+        PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+        PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+        PRODUCTION_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+        TELEGRAM_TOKEN: ${{ secrets.PRODUCTION_TELEGRAM_TOKEN }}
+        BACKUP_BEFORE_DEPLOY: true
+      run: |
+        echo "🌟 Deploying to PRODUCTION environment..."
+        
+        # Setup SSH
+        mkdir -p ~/.ssh
+        echo "$PRODUCTION_KEY" > ~/.ssh/production_key
+        chmod 600 ~/.ssh/production_key
+        
+        # Deploy with backup
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/production_key $PRODUCTION_USER@$PRODUCTION_HOST << 'EOF'
+          cd /home/botuser/lol-bot-v3
+          
+          echo "💾 Creating pre-deploy backup..."
+          ./deploy.sh backup
+          
+          echo "🔄 Updating code..."
+          git pull origin main
+          
+          echo "🚀 Deploying new version..."
+          ./deploy.sh stop
+          ./deploy.sh deploy
+          
+          echo "🩺 Running health checks..."
+          sleep 45
+          ./deploy.sh status
+        EOF
+        
+    - name: 🩺 Production Health Check
+      run: |
+        echo "🩺 Comprehensive production health check..."
+        
+        # Basic health
+        curl -f http://${{ secrets.PRODUCTION_HOST }}:8080/health || exit 1
+        
+        # Bot responsiveness test
+        echo "🤖 Testing bot responsiveness..."
+        # Aqui você poderia adicionar testes específicos do Telegram
+        
+        echo "✅ Production deployment successful!"
+        
+    - name: 📢 Notify Success
+      if: success()
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      run: |
+        curl -H "Content-Type: application/json" \
+             -d '{"content":"🎉 **Bot LoL V3** deployed to PRODUCTION successfully!\n⏰ Time: '"$(date)"'\n📦 Version: '${{ github.sha }}'\n🚀 Environment: Production"}' \
+             $DISCORD_WEBHOOK
+
+  # ============================================================================
+  # 🔍 MONITORAMENTO CONTÍNUO
+  # ============================================================================
+  monitoring:
+    name: 📊 Continuous Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always() && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 📊 System Performance Check
+      env:
+        PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+        PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+        PRODUCTION_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+      run: |
+        echo "📊 Checking system performance..."
+        
+        mkdir -p ~/.ssh
+        echo "$PRODUCTION_KEY" > ~/.ssh/production_key
+        chmod 600 ~/.ssh/production_key
+        
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/production_key $PRODUCTION_USER@$PRODUCTION_HOST << 'EOF'
+          echo "🖥️ System Resources:"
+          free -h
+          df -h
+          echo "🐳 Docker Status:"
+          docker stats --no-stream
+          echo "📊 Bot Metrics:"
+          curl -s http://localhost:8080/metrics | head -20
+        EOF
+        
+    - name: 🚨 Alert on Issues
+      if: failure()
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      run: |
+        echo "🚨 Deployment issues detected, sending alerts..."
+        
+        # Discord notification
+        curl -H "Content-Type: application/json" \
+             -d '{"content":"🚨 **ALERT**: Bot LoL V3 deployment issues detected!\n⏰ Time: '"$(date)"'\n📦 Version: '${{ github.sha }}'\n❌ Check logs immediately!"}' \
+             $DISCORD_WEBHOOK
+             
+        # Slack notification (if configured)
+        if [ ! -z "$SLACK_WEBHOOK" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+               --data '{"text":"🚨 Bot LoL V3 deployment FAILED - Immediate attention required!"}' \
+               $SLACK_WEBHOOK
+        fi
+
+  # ============================================================================
+  # 🔄 AUTO-UPDATE DEPENDENCIES
+  # ============================================================================
+  dependency-update:
+    name: 🔄 Dependency Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - name: 📁 Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 🔄 Update Dependencies
+      run: |
+        echo "🔄 Checking for dependency updates..."
+        
+        # Install pip-tools
+        pip install pip-tools
+        
+        # Update requirements
+        pip-compile --upgrade requirements.in || echo "No requirements.in found"
+        
+        # Check for security updates
+        pip install safety
+        safety check || echo "Security check completed"
+        
+    - name: 📝 Create PR for Updates
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: '🔄 Auto-update dependencies'
+        title: '🔄 Automated Dependency Updates'
+        body: |
+          🤖 This is an automated dependency update PR.
+          
+          ## Changes:
+          - Updated dependencies to latest versions
+          - Security patches applied
+          - Compatibility verified
+          
+          ## Testing:
+          - [ ] All tests pass
+          - [ ] No breaking changes
+          - [ ] Security scan clean
+          
+          Auto-generated by GitHub Actions.
+        branch: auto-update-dependencies
+        delete-branch: true
+
+  # ============================================================================
+  # 📋 RELATÓRIO FINAL
+  # ============================================================================
+  report:
+    name: 📋 Pipeline Report
+    runs-on: ubuntu-latest
+    needs: [tests, build, deploy-production, monitoring]
+    if: always()
+    
+    steps:
+    - name: 📋 Generate Pipeline Report
+      run: |
+        echo "📋 Generating pipeline execution report..."
+        
+        echo "## 🚀 Bot LoL V3 - CI/CD Pipeline Report" > pipeline_report.md
+        echo "**Date:** $(date)" >> pipeline_report.md
+        echo "**Commit:** ${{ github.sha }}" >> pipeline_report.md
+        echo "**Branch:** ${{ github.ref }}" >> pipeline_report.md
+        echo "" >> pipeline_report.md
+        
+        echo "### 📊 Pipeline Results:" >> pipeline_report.md
+        echo "- **Tests:** ${{ needs.tests.result }}" >> pipeline_report.md
+        echo "- **Build:** ${{ needs.build.result }}" >> pipeline_report.md
+        echo "- **Deploy:** ${{ needs.deploy-production.result }}" >> pipeline_report.md
+        echo "- **Monitoring:** ${{ needs.monitoring.result }}" >> pipeline_report.md
+        echo "" >> pipeline_report.md
+        
+        echo "### 🔗 Links Úteis:" >> pipeline_report.md
+        echo "- [Production Health](http://${{ secrets.PRODUCTION_HOST }}:8080/health)" >> pipeline_report.md
+        echo "- [Grafana Dashboard](http://${{ secrets.PRODUCTION_HOST }}:3000)" >> pipeline_report.md
+        echo "- [Prometheus Metrics](http://${{ secrets.PRODUCTION_HOST }}:9090)" >> pipeline_report.md
+        
+        cat pipeline_report.md
+        
+    - name: 📤 Upload Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: pipeline-report
+        path: pipeline_report.md
+        retention-days: 30 

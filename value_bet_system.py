@@ -11,6 +11,7 @@ from typing import Dict, List, Set
 import json
 import random
 from dataclasses import dataclass
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -245,185 +246,259 @@ class ValueBetNotificationSystem:
             logger.info("🧹 Cache de notificações limpo")
 
 class LiveValueBetMonitor:
-    """Monitor principal que executa em background"""
+    """Monitor de value bets em tempo real"""
     
     def __init__(self, bot_instance, riot_api, prediction_system):
         self.bot = bot_instance
         self.riot_api = riot_api
         self.prediction_system = prediction_system
+        
+        # Inicializar componentes
         self.odds_simulator = OddsSimulator()
-        self.detector = ValueBetDetector(prediction_system, self.odds_simulator)
+        self.value_detector = ValueBetDetector(prediction_system, self.odds_simulator)
         self.notification_system = ValueBetNotificationSystem(bot_instance)
         
+        # Estado do monitor
         self.is_running = False
-        self.check_interval = 120  # Verifica a cada 2 minutos
+        self.monitor_task = None
         self.stats = {
-            'value_bets_found': 0,
-            'notifications_sent': 0,
-            'matches_analyzed': 0
+            'total_bets_detected': 0,
+            'total_notifications_sent': 0,
+            'uptime_start': None
         }
-    
+        
     async def start_monitoring(self):
-        """Inicia monitoramento em background"""
+        """Inicia monitoramento de value bets"""
         if self.is_running:
+            logger.warning("⚠️ Monitor já está rodando")
             return
             
         self.is_running = True
-        logger.info("🎯 Value Bet Monitor iniciado")
+        self.stats['uptime_start'] = datetime.now()
+        
+        logger.info("🔍 Iniciando monitoramento de value bets...")
+        
+        # Inicializar sistema automaticamente
+        try:
+            await initialize_value_bet_system(self.bot, self.riot_api, self.prediction_system)
+            logger.info("✅ Sistema de Value Betting inicializado")
+        except Exception as e:
+            logger.error(f"❌ Erro ao inicializar sistema: {e}")
+        
+        # Criar task do monitor
+        self.monitor_task = asyncio.create_task(self._monitor_cycle())
+        
+    async def stop_monitoring(self):
+        """Para monitoramento"""
+        self.is_running = False
+        if self.monitor_task:
+            self.monitor_task.cancel()
+            
+    async def _monitor_cycle(self):
+        """Ciclo principal de monitoramento"""
+        logger.info("🔄 Ciclo de monitoramento iniciado")
         
         while self.is_running:
             try:
-                await self._monitor_cycle()
-                await asyncio.sleep(self.check_interval)
-            except Exception as e:
-                logger.error(f"❌ Erro no monitor: {e}")
-                await asyncio.sleep(60)  # Espera menor em caso de erro
-    
-    async def stop_monitoring(self):
-        """Para o monitoramento"""
-        self.is_running = False
-        logger.info("⏹️ Value Bet Monitor parado")
-    
-    async def _monitor_cycle(self):
-        """Um ciclo de monitoramento"""
-        try:
-            # Buscar partidas ao vivo
-            live_matches = await self.riot_api.get_all_live_matches()
-            
-            if not live_matches:
-                return
+                # Buscar partidas ao vivo
+                live_matches = await self.riot_api.get_all_live_matches()
                 
-            logger.info(f"🔍 Analisando {len(live_matches)} partidas para value bets...")
-            
-            for match in live_matches:
-                try:
-                    value_bets = await self.detector.analyze_match_for_value(match)
-                    self.stats['matches_analyzed'] += 1
-                    
-                    for value_bet in value_bets:
-                        self.stats['value_bets_found'] += 1
-                        logger.info(f"💰 Value bet encontrada: {value_bet.team} ({value_bet.value_percentage:.1%} edge)")
+                if not live_matches:
+                    logger.info("📭 Nenhuma partida ao vivo encontrada")
+                    await asyncio.sleep(30)
+                    continue
+                
+                logger.info(f"🎮 Analisando {len(live_matches)} partidas ao vivo...")
+                
+                # Analisar cada partida para value bets
+                for match in live_matches:
+                    try:
+                        value_bets = await self.value_detector.analyze_match_for_value(match)
                         
-                        # Enviar notificação
-                        await self.notification_system.send_value_bet_alert(value_bet)
-                        self.stats['notifications_sent'] += 1
-                        
-                        # Log da oportunidade
-                        await self._log_value_bet(value_bet)
-                        
-                except Exception as e:
-                    logger.error(f"❌ Erro ao analisar partida {match.get('id', 'unknown')}: {e}")
-            
-            # Limpeza periódica
-            self.notification_system.cleanup_old_notifications()
-            
+                        for value_bet in value_bets:
+                            await self._process_value_bet(value_bet)
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Erro ao analisar partida {match.get('id', 'unknown')}: {e}")
+                
+                # Aguardar antes do próximo ciclo
+                await asyncio.sleep(120)  # 2 minutos entre verificações
+                
+            except asyncio.CancelledError:
+                logger.info("🛑 Monitor cancelado")
+                break
+            except Exception as e:
+                logger.error(f"❌ Erro no ciclo de monitoramento: {e}")
+                await asyncio.sleep(60)  # Aguardar 1 minuto em caso de erro
+    
+    async def _process_value_bet(self, value_bet: ValueBet):
+        """Processa uma value bet detectada"""
+        self.stats['total_bets_detected'] += 1
+        
+        # Log da detecção
+        await self._log_value_bet(value_bet)
+        
+        # Enviar notificação automática
+        try:
+            await self.notification_system.send_value_bet_alert(value_bet)
+            self.stats['total_notifications_sent'] += 1
+            logger.info(f"📱 Notificação enviada para value bet: {value_bet.team}")
         except Exception as e:
-            logger.error(f"❌ Erro no ciclo de monitoramento: {e}")
+            logger.error(f"❌ Erro ao enviar notificação: {e}")
     
     async def _log_value_bet(self, value_bet: ValueBet):
-        """Log da aposta de valor para análise"""
-        log_data = {
+        """Registra value bet nos logs"""
+        log_entry = {
             'timestamp': value_bet.timestamp.isoformat(),
             'match_id': value_bet.match_id,
             'team': value_bet.team,
+            'opponent': value_bet.opponent,
             'league': value_bet.league,
-            'probability': value_bet.predicted_probability,
-            'odds': value_bet.current_odds,
-            'edge': value_bet.value_percentage,
+            'predicted_probability': value_bet.predicted_probability,
+            'current_odds': value_bet.current_odds,
+            'value_percentage': value_bet.value_percentage,
+            'confidence': value_bet.confidence,
+            'reasoning': value_bet.reasoning,
+            'match_time': value_bet.match_time,
             'urgency': value_bet.urgency
         }
         
-        # Salvar em arquivo para análise posterior
-        try:
-            with open('value_bets_log.json', 'a') as f:
-                f.write(json.dumps(log_data) + '\n')
-        except Exception as e:
-            logger.error(f"❌ Erro ao salvar log: {e}")
+        # Salvar em arquivo de log
+        log_file = Path('logs/value_bets.jsonl')
+        log_file.parent.mkdir(exist_ok=True)
+        
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry) + '\n')
     
     def get_stats(self) -> Dict:
         """Retorna estatísticas do monitor"""
+        uptime = None
+        if self.stats['uptime_start']:
+            uptime = (datetime.now() - self.stats['uptime_start']).total_seconds()
+            
         return {
-            **self.stats,
             'is_running': self.is_running,
-            'subscribers': len(self.notification_system.subscribers),
-            'check_interval': self.check_interval
+            'uptime_seconds': uptime,
+            'total_bets_detected': self.stats['total_bets_detected'],
+            'total_notifications_sent': self.stats['total_notifications_sent'],
+            'subscribers_count': len(self.notification_system.subscribers)
         }
 
-# Funcções de integração com o bot principal
 def add_value_bet_commands(bot_instance):
     """Adiciona comandos de value betting ao bot"""
-    
-    # Adicionar handler para inscrições
-    from telegram.ext import CommandHandler
     
     async def subscribe_command(update, context):
         """Comando para se inscrever nas notificações"""
         user_id = update.effective_user.id
-        bot_instance.value_monitor.notification_system.subscribe_user(user_id)
+        
+        # Verificar autorização
+        if not bot_instance.is_user_authorized(user_id):
+            await update.message.reply_text("🔐 Você não está autorizado a usar este bot.")
+            return
+            
+        # Inscrever usuário
+        bot_instance.value_bet_monitor.notification_system.subscribe_user(user_id)
         
         await update.message.reply_text(
-            "✅ **INSCRITO NAS VALUE BETS!**\n\n"
-            "Você receberá notificações automáticas quando encontrarmos:\n"
-            "• 🎯 Apostas com alta probabilidade\n"
-            "• 💰 Odds desreguladas (>1.5x)\n"
-            "• ⚡ Edge de +15% ou mais\n\n"
-            "Use /unsubscribe para cancelar.",
+            "✅ **Inscrito em Value Betting!**\n\n"
+            "Você receberá notificações automáticas quando apostas de valor forem detectadas.\n\n"
+            "📊 **Critérios:**\n"
+            "• Probabilidade mínima: 55%\n"
+            "• Edge mínimo: 15%\n"
+            "• Odds mínimas: 1.50\n\n"
+            "Use /unsubscribe_vb para cancelar.",
             parse_mode='Markdown'
         )
     
     async def unsubscribe_command(update, context):
         """Comando para cancelar inscrição"""
         user_id = update.effective_user.id
-        bot_instance.value_monitor.notification_system.unsubscribe_user(user_id)
+        
+        bot_instance.value_bet_monitor.notification_system.unsubscribe_user(user_id)
         
         await update.message.reply_text(
-            "❌ **INSCRIÇÃO CANCELADA**\n\n"
-            "Você não receberá mais notificações de value bets.\n"
-            "Use /subscribe para reativar.",
+            "❌ **Inscrição cancelada**\n\n"
+            "Você não receberá mais notificações de value betting.\n"
+            "Use /subscribe_vb para se inscrever novamente.",
             parse_mode='Markdown'
         )
     
     async def value_stats_command(update, context):
-        """Comando para ver estatísticas"""
-        stats = bot_instance.value_monitor.get_stats()
+        """Comando para ver estatísticas do value betting"""
+        user_id = update.effective_user.id
         
-        text = f"""📊 **ESTATÍSTICAS VALUE BETTING**
-
-🎯 **Value Bets Encontradas:** {stats['value_bets_found']}
-📱 **Notificações Enviadas:** {stats['notifications_sent']}
-🔍 **Partidas Analisadas:** {stats['matches_analyzed']}
-👥 **Usuários Inscritos:** {stats['subscribers']}
-
-⚙️ **Status:** {'🟢 Ativo' if stats['is_running'] else '🔴 Inativo'}
-⏱️ **Intervalo:** {stats['check_interval']}s
-
-💡 Use /subscribe para receber notificações automáticas!"""
+        if not bot_instance.is_user_authorized(user_id):
+            await update.message.reply_text("🔐 Você não está autorizado a usar este bot.")
+            return
+            
+        stats = bot_instance.value_bet_monitor.get_stats()
         
+        uptime_str = "N/A"
+        if stats['uptime_seconds']:
+            hours = int(stats['uptime_seconds'] // 3600)
+            minutes = int((stats['uptime_seconds'] % 3600) // 60)
+            uptime_str = f"{hours}h {minutes}m"
+        
+        text = f"""💰 **Estatísticas Value Betting**
+
+🔄 **Status:** {'🟢 Ativo' if stats['is_running'] else '🔴 Inativo'}
+⏰ **Uptime:** {uptime_str}
+📊 **Bets detectados:** {stats['total_bets_detected']}
+📱 **Notificações enviadas:** {stats['total_notifications_sent']}
+👥 **Inscritos:** {stats['subscribers_count']}
+
+⚙️ **Configurações atuais:**
+• Verificação a cada 2 minutos
+• Probabilidade mínima: 55%
+• Edge mínimo: 15%
+• Odds mínimas: 1.50"""
+
         await update.message.reply_text(text, parse_mode='Markdown')
     
-    # Adicionar handlers ao bot
-    if hasattr(bot_instance, 'app') and bot_instance.app:
-        bot_instance.app.add_handler(CommandHandler("subscribe", subscribe_command))
-        bot_instance.app.add_handler(CommandHandler("unsubscribe", unsubscribe_command))
-        bot_instance.app.add_handler(CommandHandler("valuestats", value_stats_command))
+    # Registrar comandos no bot
+    from telegram.ext import CommandHandler
+    
+    bot_instance.application.add_handler(CommandHandler("subscribe_vb", subscribe_command))
+    bot_instance.application.add_handler(CommandHandler("unsubscribe_vb", unsubscribe_command))
+    bot_instance.application.add_handler(CommandHandler("value_stats", value_stats_command))
+    
+    logger.info("✅ Comandos de value betting adicionados")
 
-# Função para inicializar o sistema
 async def initialize_value_bet_system(bot_instance, riot_api, prediction_system):
-    """Inicializa o sistema de value betting"""
+    """Inicializa sistema completo de value betting"""
     try:
-        # Criar monitor
-        monitor = LiveValueBetMonitor(bot_instance, riot_api, prediction_system)
-        bot_instance.value_monitor = monitor
+        logger.info("🚀 Inicializando sistema de Value Betting...")
+        
+        # Criar monitor se não existir
+        if not hasattr(bot_instance, 'value_bet_monitor'):
+            bot_instance.value_bet_monitor = LiveValueBetMonitor(
+                bot_instance, riot_api, prediction_system
+            )
         
         # Adicionar comandos
         add_value_bet_commands(bot_instance)
         
-        # Iniciar monitoramento em background
-        asyncio.create_task(monitor.start_monitoring())
+        # Iniciar monitoramento automático
+        await bot_instance.value_bet_monitor.start_monitoring()
         
-        logger.info("🚀 Sistema de Value Betting inicializado com sucesso!")
+        logger.info("✅ Sistema de Value Betting inicializado com sucesso!")
+        
+        # Enviar notificação de inicialização (se houver inscritos)
+        if hasattr(bot_instance, 'value_bet_monitor'):
+            notification_system = bot_instance.value_bet_monitor.notification_system
+            if notification_system.subscribers:
+                for user_id in notification_system.subscribers:
+                    try:
+                        await bot_instance.application.bot.send_message(
+                            chat_id=user_id,
+                            text="🟢 **Sistema de Value Betting ativado!**\n\nMonitoramento automático iniciado. Você receberá alertas quando apostas de valor forem detectadas.",
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.error(f"❌ Erro ao notificar usuário {user_id}: {e}")
+        
         return True
         
     except Exception as e:
-        logger.error(f"❌ Erro ao inicializar sistema de value betting: {e}")
+        logger.error(f"❌ Erro ao inicializar sistema de Value Betting: {e}")
         return False 
