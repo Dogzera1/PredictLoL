@@ -2,13 +2,23 @@
 """
 Bot LoL V3 - Versão Compatível com python-telegram-bot 13.15
 Resolve todos os problemas de event loop e compatibilidade
+Inclui sistema de healthcheck para containers
 """
 
 import os
 import logging
+import threading
 from typing import Dict, List
 import asyncio
 from datetime import datetime
+
+# Flask para healthcheck
+try:
+    from flask import Flask, jsonify
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    Flask = None
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -58,14 +68,114 @@ class BotLoLV13:
     def __init__(self):
         if not TOKEN:
             raise ValueError("TELEGRAM_TOKEN não configurado")
+        
+        # Estado do bot para healthcheck
+        self.bot_healthy = False
+        self.last_activity = datetime.now()
+        self.startup_time = datetime.now()
             
         self.updater = Updater(TOKEN, use_context=True)
         self.dispatcher = self.updater.dispatcher
         self.authorized_users = set()  # Autorização simplificada
         
+        # Inicializar Flask healthcheck
+        self.setup_flask_healthcheck()
+        
         # Configurar handlers
         self._setup_handlers()
         
+        logger.info("🚀 Bot LoL V3 - Versão Compatível (python-telegram-bot 13.15)")
+        
+    def setup_flask_healthcheck(self):
+        """Configura Flask app para endpoints de healthcheck"""
+        if FLASK_AVAILABLE:
+            try:
+                self.flask_app = Flask(__name__)
+                
+                @self.flask_app.route('/health')
+                def health_check():
+                    """Endpoint de healthcheck para container"""
+                    try:
+                        current_time = datetime.now()
+                        uptime = (current_time - self.startup_time).total_seconds()
+                        time_since_activity = (current_time - self.last_activity).total_seconds()
+                        
+                        status = {
+                            'status': 'healthy' if self.bot_healthy else 'unhealthy',
+                            'uptime_seconds': uptime,
+                            'last_activity_seconds_ago': time_since_activity,
+                            'timestamp': current_time.isoformat(),
+                            'bot_systems': {
+                                'telegram_bot': self.updater is not None,
+                                'dispatcher': self.dispatcher is not None,
+                                'polling': hasattr(self.updater, '_running') and self.updater._running
+                            }
+                        }
+                        
+                        # Considerar saudável se:
+                        # 1. Bot foi marcado como saudável
+                        # 2. Teve atividade nos últimos 5 minutos
+                        # 3. Sistemas principais estão carregados
+                        is_healthy = (
+                            self.bot_healthy and 
+                            time_since_activity < 300 and  # 5 minutos
+                            status['bot_systems']['telegram_bot']
+                        )
+                        
+                        if is_healthy:
+                            return jsonify(status), 200
+                        else:
+                            return jsonify(status), 503
+                            
+                    except Exception as e:
+                        return jsonify({
+                            'status': 'error',
+                            'error': str(e),
+                            'timestamp': datetime.now().isoformat()
+                        }), 500
+                
+                @self.flask_app.route('/status')
+                def status_check():
+                    """Endpoint de status detalhado"""
+                    return jsonify({
+                        'bot_name': 'Bot LoL V3 Ultra Avançado - Compatível',
+                        'version': '3.0-compat',
+                        'healthy': self.bot_healthy,
+                        'uptime': (datetime.now() - self.startup_time).total_seconds(),
+                        'last_activity': self.last_activity.isoformat(),
+                        'telegram_version': '13.15',
+                        'total_matches': len(MOCK_MATCHES),
+                        'systems_loaded': {
+                            'telegram': self.updater is not None,
+                            'dispatcher': self.dispatcher is not None,
+                            'flask_healthcheck': True
+                        }
+                    })
+                
+                # Iniciar Flask em thread separada
+                def run_flask():
+                    self.flask_app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+                
+                flask_thread = threading.Thread(target=run_flask, daemon=True)
+                flask_thread.start()
+                
+                logger.info("✅ Flask healthcheck server iniciado na porta 5000")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao configurar Flask healthcheck: {e}")
+        else:
+            logger.warning("⚠️ Flask não disponível - healthcheck desabilitado")
+
+    def update_activity(self):
+        """Atualiza timestamp da última atividade"""
+        self.last_activity = datetime.now()
+
+    def mark_bot_healthy(self):
+        """Marca bot como saudável"""
+        self.bot_healthy = True
+        self.update_activity()
+        logger.info("✅ Bot marcado como saudável")
+
     def _setup_handlers(self):
         """Configura os handlers do bot"""
         # Comandos básicos
@@ -80,6 +190,9 @@ class BotLoLV13:
     
     def start_command(self, update: Update, context: CallbackContext):
         """Comando /start"""
+        # Atualizar atividade para healthcheck
+        self.update_activity()
+        
         user = update.effective_user
         
         text = f"""🎮 **BOT LOL V3 COMPATÍVEL** 🎮
@@ -116,6 +229,9 @@ Olá {user.first_name}! 👋
     
     def help_command(self, update: Update, context: CallbackContext):
         """Comando /help"""
+        # Atualizar atividade para healthcheck
+        self.update_activity()
+        
         text = """📚 **GUIA COMPLETO DO BOT**
 
 🎯 **COMANDOS PRINCIPAIS:**
@@ -145,6 +261,9 @@ Olá {user.first_name}! 👋
     
     def partidas_command(self, update: Update, context: CallbackContext):
         """Comando /partidas"""
+        # Atualizar atividade para healthcheck
+        self.update_activity()
+        
         text = "🎮 **PARTIDAS AO VIVO**\n\n"
         
         keyboard = []
@@ -199,6 +318,9 @@ Olá {user.first_name}! 👋
     
     def button_callback(self, update: Update, context: CallbackContext):
         """Processa callbacks dos botões"""
+        # Atualizar atividade para healthcheck
+        self.update_activity()
+        
         query = update.callback_query
         query.answer()
         
@@ -421,6 +543,10 @@ Olá {user.first_name}! 👋
         try:
             # Iniciar polling
             self.updater.start_polling()
+            
+            # Marcar bot como saudável após inicialização bem-sucedida
+            self.mark_bot_healthy()
+            
             logger.info("✅ Bot iniciado com sucesso!")
             logger.info("🔄 Pressione Ctrl+C para parar")
             
@@ -429,8 +555,12 @@ Olá {user.first_name}! 👋
             
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
+            # Marcar bot como não saudável em caso de erro
+            self.bot_healthy = False
             raise
         finally:
+            # Marcar bot como não saudável ao finalizar
+            self.bot_healthy = False
             logger.info("✅ Bot finalizado")
 
 def main():

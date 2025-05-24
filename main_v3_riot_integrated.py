@@ -1190,6 +1190,11 @@ class TelegramBotV3Improved:
         self.prediction_system = DynamicPredictionSystem()
         self.app = None
         self.last_update = None
+        
+        # Estado do bot para healthcheck
+        self.bot_healthy = False
+        self.last_activity = datetime.now()
+        self.startup_time = datetime.now()
 
         # Cache de partidas para evitar spam na API
         self.live_matches_cache = []
@@ -1219,8 +1224,102 @@ class TelegramBotV3Improved:
         self.admin_user_id = None  # Definir o ID do admin principal
         self.whitelist_mode = True  # True = whitelist | False = blacklist
         
+        # Inicializar Flask app para healthcheck
+        self.setup_flask_healthcheck()
+        
         logger.info("🚀 Bot LoL V3 com sistemas avançados inicializado")
         logger.info(f"🔐 Sistema de autorização: {'ATIVO' if self.auth_enabled else 'DESATIVADO'}")
+
+    def setup_flask_healthcheck(self):
+        """Configura Flask app para endpoints de healthcheck"""
+        if FLASK_AVAILABLE:
+            try:
+                self.flask_app = Flask(__name__)
+                
+                @self.flask_app.route('/health')
+                def health_check():
+                    """Endpoint de healthcheck para container"""
+                    try:
+                        current_time = datetime.now()
+                        uptime = (current_time - self.startup_time).total_seconds()
+                        time_since_activity = (current_time - self.last_activity).total_seconds()
+                        
+                        status = {
+                            'status': 'healthy' if self.bot_healthy else 'unhealthy',
+                            'uptime_seconds': uptime,
+                            'last_activity_seconds_ago': time_since_activity,
+                            'timestamp': current_time.isoformat(),
+                            'bot_systems': {
+                                'telegram_bot': hasattr(self, 'application') and self.application is not None,
+                                'value_betting': self.value_monitor is not None,
+                                'portfolio_manager': self.portfolio_manager is not None,
+                                'riot_api': self.riot_api is not None
+                            }
+                        }
+                        
+                        # Considerar saudável se:
+                        # 1. Bot foi marcado como saudável
+                        # 2. Teve atividade nos últimos 5 minutos
+                        # 3. Sistemas principais estão carregados
+                        is_healthy = (
+                            self.bot_healthy and 
+                            time_since_activity < 300 and  # 5 minutos
+                            status['bot_systems']['telegram_bot']
+                        )
+                        
+                        if is_healthy:
+                            return jsonify(status), 200
+                        else:
+                            return jsonify(status), 503
+                            
+                    except Exception as e:
+                        return jsonify({
+                            'status': 'error',
+                            'error': str(e),
+                            'timestamp': datetime.now().isoformat()
+                        }), 500
+                
+                @self.flask_app.route('/status')
+                def status_check():
+                    """Endpoint de status detalhado"""
+                    return jsonify({
+                        'bot_name': 'Bot LoL V3 Ultra Avançado',
+                        'version': '3.0',
+                        'healthy': self.bot_healthy,
+                        'uptime': (datetime.now() - self.startup_time).total_seconds(),
+                        'last_activity': self.last_activity.isoformat(),
+                        'systems_loaded': {
+                            'telegram': hasattr(self, 'application'),
+                            'value_betting': self.value_monitor is not None,
+                            'portfolio': self.portfolio_manager is not None,
+                            'riot_api': self.riot_api is not None
+                        }
+                    })
+                
+                # Iniciar Flask em thread separada
+                import threading
+                def run_flask():
+                    self.flask_app.run(host='0.0.0.0', port=5000, debug=False)
+                
+                flask_thread = threading.Thread(target=run_flask, daemon=True)
+                flask_thread.start()
+                
+                logger.info("✅ Flask healthcheck server iniciado na porta 5000")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao configurar Flask healthcheck: {e}")
+        else:
+            logger.warning("⚠️ Flask não disponível - healthcheck desabilitado")
+
+    def update_activity(self):
+        """Atualiza timestamp da última atividade"""
+        self.last_activity = datetime.now()
+
+    def mark_bot_healthy(self):
+        """Marca bot como saudável"""
+        self.bot_healthy = True
+        self.update_activity()
+        logger.info("✅ Bot marcado como saudável")
 
     def is_user_authorized(self, user_id: int, chat_type: str = None) -> bool:
         """Verifica se usuário está autorizado a usar o bot"""
@@ -2320,6 +2419,8 @@ Olá {user.first_name}! 👋
                 except Exception as e:
                     logger.warning(f"⚠️ Erro ao inicializar Value Betting: {e}")
             
+            # Marcar bot como saudável após inicialização completa
+            self.mark_bot_healthy()
             logger.info("✅ Bot iniciado com sucesso! Pressione Ctrl+C para parar.")
             
             # Abordagem simples e robusta - usar polling manual
@@ -2334,6 +2435,10 @@ Olá {user.first_name}! 👋
                         allowed_updates=["message", "callback_query", "chat_member"]
                     )
                     
+                    # Atualizar atividade se houver updates
+                    if updates:
+                        self.update_activity()
+                    
                     # Processar cada update
                     for update in updates:
                         last_update_id = update.update_id
@@ -2347,6 +2452,11 @@ Olá {user.first_name}! 👋
                     # Pequena pausa para não sobrecarregar
                     if not updates:
                         await asyncio.sleep(1)
+                    
+                    # Atualizar atividade periodicamente (a cada 30 segundos mesmo sem updates)
+                    current_time = datetime.now()
+                    if (current_time - self.last_activity).total_seconds() > 30:
+                        self.update_activity()
                         
                 except asyncio.CancelledError:
                     logger.info("🛑 Operação cancelada")
@@ -2362,9 +2472,12 @@ Olá {user.first_name}! 👋
             logger.info("🛑 Interrupção detectada, parando bot...")
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
+            # Marcar bot como não saudável em caso de erro crítico
+            self.bot_healthy = False
             raise
         finally:
             # Shutdown simples
+            self.bot_healthy = False
             logger.info("✅ Bot finalizado corretamente")
 
     async def show_all_live_matches(self, update_or_query, context: ContextTypes.DEFAULT_TYPE = None, is_callback: bool = False):
