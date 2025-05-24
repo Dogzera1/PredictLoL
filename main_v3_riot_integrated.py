@@ -2091,7 +2091,11 @@ Para solicitar acesso, entre em contato com o administrador.
 
     async def initialize_bot(self):
         """Inicializa o bot e adiciona handlers"""
-        token = "7897326299:AAFkX7lF4j_aQYPP70xfAkNyNON6-ZBbMcE"
+        # Usar token da variável de ambiente
+        token = TOKEN
+        if not token:
+            logger.error("❌ TELEGRAM_TOKEN não configurado")
+            raise ValueError("Token do Telegram não encontrado")
         
         # Criar aplicação
         self.application = Application.builder().token(token).build()
