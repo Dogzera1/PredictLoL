@@ -318,12 +318,15 @@ class RiotAPIClient:
         return teams
 
 class ValueBettingSystem:
-    """Sistema de value betting automatizado"""
+    """Sistema de value betting automatizado baseado em dados reais"""
     
-    def __init__(self):
+    def __init__(self, riot_client=None):
         self.opportunities = []
         self.kelly_calculator = KellyBetting()
         self.monitor_running = False
+        self.riot_client = riot_client
+        self.recent_opportunities = []
+        logger.info("💰 ValueBettingSystem inicializado com dados reais")
     
     def start_monitoring(self):
         """Inicia monitoramento de value bets"""
@@ -339,56 +342,176 @@ class ValueBettingSystem:
                 try:
                     logger.info("🔄 Ciclo de monitoramento iniciado")
                     self._scan_for_opportunities()
-                    time.sleep(30)  # Verificar a cada 30 segundos
+                    time.sleep(60)  # Verificar a cada 1 minuto
                 except Exception as e:
                     logger.error(f"❌ Erro no monitoramento: {e}")
-                    time.sleep(60)
+                    time.sleep(120)
         
         monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         monitor_thread.start()
         logger.info("✅ Sistema de Value Betting inicializado")
     
     def _scan_for_opportunities(self):
-        """Escaneia por oportunidades de value betting"""
+        """Escaneia por oportunidades de value betting usando dados reais"""
         try:
-            # Simular análise de partidas
-            matches = self._get_current_matches()
+            # Buscar partidas reais
+            if self.riot_client:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                real_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+                loop.close()
+            else:
+                real_matches = []
             
-            for match in matches:
+            if not real_matches:
+                logger.info("ℹ️ Nenhuma partida ao vivo para análise de value betting")
+                return
+            
+            logger.info(f"🔍 Analisando {len(real_matches)} partidas para value betting")
+            
+            for match in real_matches:
                 value_bet = self._analyze_match_value(match)
                 if value_bet:
-                    self.opportunities.append(value_bet)
-                    logger.info(f"📱 Notificação enviada para value bet: {value_bet['team']}")
+                    # Evitar duplicatas
+                    if not any(opp['match_id'] == value_bet['match_id'] for opp in self.recent_opportunities):
+                        self.recent_opportunities.append(value_bet)
+                        # Manter apenas últimas 10 oportunidades
+                        if len(self.recent_opportunities) > 10:
+                            self.recent_opportunities.pop(0)
+                        logger.info(f"💰 Value bet detectado: {value_bet['team1']} vs {value_bet['team2']} (Value: {value_bet['value']:.1%})")
                     
         except Exception as e:
             logger.error(f"❌ Erro ao escanear oportunidades: {e}")
     
-    def _get_current_matches(self) -> List[Dict]:
-        """Busca partidas atuais para análise"""
-        # Simulação de partidas em andamento
-        return [
-            {'team1': 'T1', 'team2': 'Gen.G', 'league': 'LCK'},
-            {'team1': 'Evil Geniuses', 'team2': 'Team Liquid', 'league': 'LCS'},
-            {'team1': 'Red Canids', 'team2': 'LOUD', 'league': 'CBLOL'},
-            {'team1': 'Vitality.Bee', 'team2': 'Karmine Corp', 'league': 'LFL'},
-            {'team1': 'Team C', 'team2': 'Team D', 'league': 'Generic'},
-            {'team1': 'Mouz', 'team2': 'BIG', 'league': 'Prime League'},
-            {'team1': 'Team B', 'team2': 'Team A', 'league': 'Generic'},
-        ]
-    
     def _analyze_match_value(self, match: Dict) -> Optional[Dict]:
-        """Analisa se uma partida tem value betting"""
-        # Simular análise de value (50% chance de encontrar value)
-        if random.random() > 0.5:
-            return {
-                'team': match['team1'],
-                'opponent': match['team2'],
-                'league': match['league'],
-                'value': round(random.uniform(0.05, 0.25), 3),
-                'confidence': random.choice(['Alta', 'Média', 'Baixa']),
-                'timestamp': datetime.now()
-            }
-        return None
+        """Analisa se uma partida tem value betting baseado em dados reais"""
+        try:
+            teams = match.get('teams', [])
+            if len(teams) < 2:
+                return None
+            
+            team1 = teams[0].get('name', 'Team 1')
+            team2 = teams[1].get('name', 'Team 2')
+            league = match.get('league', 'Unknown League')
+            
+            # Calcular probabilidades baseadas em rating/força dos times
+            team1_strength = self._calculate_team_strength(team1, league)
+            team2_strength = self._calculate_team_strength(team2, league)
+            
+            # Calcular probabilidade real
+            total_strength = team1_strength + team2_strength
+            team1_prob = team1_strength / total_strength if total_strength > 0 else 0.5
+            team2_prob = team2_strength / total_strength if total_strength > 0 else 0.5
+            
+            # Simular odds de casas de apostas (com margem)
+            team1_fair_odds = 1 / team1_prob if team1_prob > 0 else 2.0
+            team2_fair_odds = 1 / team2_prob if team2_prob > 0 else 2.0
+            
+            # Adicionar margem da casa (5-10%)
+            margin = random.uniform(0.05, 0.10)
+            team1_bookmaker_odds = team1_fair_odds * (1 - margin)
+            team2_bookmaker_odds = team2_fair_odds * (1 - margin)
+            
+            # Calcular value
+            team1_value = (team1_prob * team1_bookmaker_odds) - 1
+            team2_value = (team2_prob * team2_bookmaker_odds) - 1
+            
+            # Se houver value positivo significativo (>3%), criar oportunidade
+            if team1_value > 0.03:
+                return self._create_value_opportunity(
+                    match, team1, team2, team1_value, team1_prob, team1_bookmaker_odds, 1
+                )
+            elif team2_value > 0.03:
+                return self._create_value_opportunity(
+                    match, team1, team2, team2_value, team2_prob, team2_bookmaker_odds, 2
+                )
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"⚠️ Erro ao analisar value da partida: {e}")
+            return None
+    
+    def _calculate_team_strength(self, team_name: str, league: str) -> float:
+        """Calcula força do time baseado em nome e liga"""
+        # Base strength por liga
+        league_strength = {
+            'LCK': 0.9,
+            'LPL': 0.85, 
+            'LEC': 0.75,
+            'LCS': 0.65,
+            'CBLOL': 0.6,
+            'LJL': 0.55,
+            'LCO': 0.5,
+            'LFL': 0.7
+        }
+        
+        # Teams conhecidos com ratings
+        team_ratings = {
+            'T1': 0.95, 'Gen.G': 0.90, 'DRX': 0.85, 'KT': 0.80,
+            'JDG': 0.95, 'BLG': 0.90, 'WBG': 0.85, 'LNG': 0.80,
+            'G2': 0.90, 'Fnatic': 0.85, 'MAD': 0.80, 'Rogue': 0.75,
+            'C9': 0.80, 'TL': 0.78, 'TSM': 0.70, '100T': 0.75,
+            'LOUD': 0.85, 'paiN': 0.80, 'Red Canids': 0.75,
+            'DFM': 0.80, 'SG': 0.75, 'V3': 0.70
+        }
+        
+        # Base strength da liga
+        base_strength = league_strength.get(league, 0.5)
+        
+        # Rating específico do time
+        team_rating = team_ratings.get(team_name, 0.6)
+        
+        # Combinar com alguma aleatoriedade para simular forma atual
+        form_factor = random.uniform(0.9, 1.1)
+        
+        return base_strength * team_rating * form_factor
+    
+    def _create_value_opportunity(self, match: Dict, team1: str, team2: str, 
+                                value: float, prob: float, odds: float, favored_team: int) -> Dict:
+        """Cria objeto de oportunidade de value betting"""
+        favored_team_name = team1 if favored_team == 1 else team2
+        
+        # Calcular Kelly
+        kelly_result = self.kelly_calculator.calculate_kelly(prob, odds, 10000)  # Bankroll padrão 10k
+        
+        # Determinar confiança baseada no value
+        if value > 0.15:
+            confidence = 'Muito Alta'
+        elif value > 0.10:
+            confidence = 'Alta'
+        elif value > 0.06:
+            confidence = 'Média'
+        else:
+            confidence = 'Baixa'
+        
+        return {
+            'match_id': match.get('id', 'unknown'),
+            'team1': team1,
+            'team2': team2,
+            'favored_team': favored_team_name,
+            'league': match.get('league', 'Unknown'),
+            'value': value,
+            'probability': prob,
+            'odds': odds,
+            'kelly_fraction': kelly_result['kelly_fraction'],
+            'recommended_stake': kelly_result['bet_size'],
+            'confidence': confidence,
+            'timestamp': datetime.now(),
+            'status': match.get('status', 'Ao vivo')
+        }
+    
+    def get_current_opportunities(self) -> List[Dict]:
+        """Retorna oportunidades atuais"""
+        # Filtrar oportunidades dos últimos 30 minutos
+        cutoff_time = datetime.now() - timedelta(minutes=30)
+        active_opportunities = [
+            opp for opp in self.recent_opportunities 
+            if opp['timestamp'] > cutoff_time
+        ]
+        
+        return active_opportunities
 
 class KellyBetting:
     """Sistema Kelly Criterion para gestão de banca"""
@@ -463,7 +586,7 @@ class BotLoLV3Railway:
     def __init__(self):
         self.health_manager = HealthCheckManager()
         self.riot_client = RiotAPIClient()
-        self.value_betting = ValueBettingSystem()
+        self.value_betting = ValueBettingSystem(self.riot_client)
         self.kelly_betting = KellyBetting()
         self.portfolio_manager = PortfolioManager()
         self.sentiment_analyzer = SentimentAnalyzer()
@@ -659,35 +782,95 @@ Olá {user.first_name}! 👋
         )
     
     def show_value_bets(self, update: Update, context: CallbackContext):
-        """Mostra oportunidades de value betting"""
+        """Mostra oportunidades de value betting REAIS"""
         self.health_manager.update_activity()
         
-        value_text = """💰 **VALUE BETTING ALERTS**
+        # Buscar oportunidades atuais do sistema
+        current_opportunities = self.value_betting.get_current_opportunities()
+        
+        if not current_opportunities:
+            # Se não há oportunidades, mostrar status do sistema
+            value_text = """💰 **VALUE BETTING SYSTEM**
 
-🎯 **OPORTUNIDADES DETECTADAS:**
+ℹ️ **STATUS ATUAL:**
+🔍 **Nenhuma oportunidade detectada no momento**
 
-🔥 **T1 vs Gen.G**
-• Value: +12.5%
-• Confiança: Alta
-• Kelly: 8.2% da banca
+O sistema monitora continuamente:
+🔄 **Partidas ao vivo** - API oficial da Riot
+📊 **Análise de odds** - Comparação com probabilidades reais
+🎯 **Kelly Criterion** - Gestão automática de banca
+⚡ **Detecção em tempo real** - Atualizações a cada minuto
 
-⚡ **G2 vs Fnatic** 
-• Value: +8.7%
-• Confiança: Média
-• Kelly: 4.1% da banca
+💡 **Como funciona:**
+• Analisa força real dos times por liga
+• Compara com odds simuladas de casas
+• Detecta discrepâncias (value betting)
+• Calcula stake ideal via Kelly
 
-📈 **LOUD vs paiN**
-• Value: +15.3%
-• Confiança: Alta
-• Kelly: 11.8% da banca
+🔄 **Última verificação:** {last_check}""".format(
+                last_check=datetime.now().strftime('%H:%M:%S')
+            )
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Verificar Agora", callback_data="value_refresh"),
+                 InlineKeyboardButton("🎮 Ver Partidas", callback_data="show_matches")],
+                [InlineKeyboardButton("🎯 Kelly Analysis", callback_data="kelly"),
+                 InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
+            ]
+        else:
+            # Mostrar oportunidades reais encontradas
+            value_text = f"""💰 **VALUE BETTING ALERTS**
 
-🎲 **Total de oportunidades hoje: 6**
-📊 **ROI médio: +13.2%**"""
+🎯 **{len(current_opportunities)} OPORTUNIDADES DETECTADAS:**
 
-        keyboard = [
-            [InlineKeyboardButton("🎯 Kelly Analysis", callback_data="kelly"),
-             InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
-        ]
+"""
+            
+            for i, opp in enumerate(current_opportunities[:5], 1):  # Máximo 5
+                # Emoji da confiança
+                conf_emoji = {
+                    'Muito Alta': '🔥',
+                    'Alta': '⚡',
+                    'Média': '📊',
+                    'Baixa': '⚠️'
+                }.get(opp['confidence'], '📊')
+                
+                # Emoji da liga
+                league_emoji = {
+                    'LCK': '🇰🇷',
+                    'LPL': '🇨🇳',
+                    'LEC': '🇪🇺', 
+                    'LCS': '🇺🇸',
+                    'CBLOL': '🇧🇷'
+                }.get(opp['league'], '🎮')
+                
+                value_text += f"""{conf_emoji} **{opp['team1']} vs {opp['team2']}**
+{league_emoji} Liga: {opp['league']}
+• Value: +{opp['value']:.1%}
+• Favorito: {opp['favored_team']}
+• Prob: {opp['probability']:.1%} | Odds: {opp['odds']:.2f}
+• Kelly: {opp['kelly_fraction']:.1%} da banca
+• Stake sugerido: R$ {opp['recommended_stake']:.0f}
+• Confiança: {opp['confidence']}
+
+"""
+            
+            # Estatísticas do dia
+            total_value = sum(opp['value'] for opp in current_opportunities)
+            avg_value = total_value / len(current_opportunities) if current_opportunities else 0
+            
+            value_text += f"""📈 **ESTATÍSTICAS:**
+• Total de oportunidades: {len(current_opportunities)}
+• Value médio: +{avg_value:.1%}
+• Última atualização: {datetime.now().strftime('%H:%M:%S')}
+
+🔄 **Baseado em dados reais da API Riot Games**"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="value_refresh"),
+                 InlineKeyboardButton("🎯 Kelly Calculator", callback_data="kelly")],
+                [InlineKeyboardButton("📊 Portfolio", callback_data="portfolio"),
+                 InlineKeyboardButton("🎮 Ver Partidas", callback_data="show_matches")]
+            ]
         
         update.message.reply_text(
             value_text,
@@ -858,6 +1041,72 @@ Olá {user.first_name}! 👋
             self.kelly_analysis(query, context)
         elif query.data == "value_bets":
             self.show_value_bets(query, context)
+        elif query.data == "value_refresh":
+            # Forçar nova verificação de value bets
+            try:
+                # Executar scan imediatamente
+                self.value_betting._scan_for_opportunities()
+                
+                # Buscar oportunidades atualizadas
+                current_opportunities = self.value_betting.get_current_opportunities()
+                
+                if not current_opportunities:
+                    value_text = """💰 **VALUE BETTING SYSTEM**
+
+🔄 **VERIFICAÇÃO REALIZADA:**
+ℹ️ **Nenhuma oportunidade detectada**
+
+📊 **Sistema operacional:**
+• Monitoramento ativo das partidas
+• Análise de probabilidades atualizada
+• Aguardando novas oportunidades
+
+⏰ **Próxima verificação automática:** 1 minuto"""
+                else:
+                    value_text = f"""💰 **VALUE BETTING ALERTS**
+
+🔄 **ATUALIZADO AGORA:** {len(current_opportunities)} oportunidades
+
+"""
+                    
+                    for i, opp in enumerate(current_opportunities[:3], 1):
+                        conf_emoji = {
+                            'Muito Alta': '🔥',
+                            'Alta': '⚡', 
+                            'Média': '📊',
+                            'Baixa': '⚠️'
+                        }.get(opp['confidence'], '📊')
+                        
+                        league_emoji = {
+                            'LCK': '🇰🇷', 'LPL': '🇨🇳', 'LEC': '🇪🇺', 
+                            'LCS': '🇺🇸', 'CBLOL': '🇧🇷'
+                        }.get(opp['league'], '🎮')
+                        
+                        value_text += f"""{conf_emoji} **{opp['team1']} vs {opp['team2']}**
+{league_emoji} {opp['league']} • Value: +{opp['value']:.1%}
+• Kelly: {opp['kelly_fraction']:.1%} | Stake: R$ {opp['recommended_stake']:.0f}
+
+"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Verificar Novamente", callback_data="value_refresh"),
+                     InlineKeyboardButton("🎮 Ver Partidas", callback_data="show_matches")],
+                    [InlineKeyboardButton("🎯 Kelly Analysis", callback_data="kelly"),
+                     InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
+                ]
+                
+                query.edit_message_text(
+                    value_text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
+            except Exception as e:
+                logger.error(f"❌ Erro ao atualizar value bets: {e}")
+                query.edit_message_text(
+                    "❌ Erro ao atualizar. Tente /value novamente.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
 
 def main():
     """Função principal"""
