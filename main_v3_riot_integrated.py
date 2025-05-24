@@ -2097,7 +2097,7 @@ Para solicitar acesso, entre em contato com o administrador.
             logger.error("❌ TELEGRAM_TOKEN não configurado")
             raise ValueError("Token do Telegram não encontrado")
         
-        # Criar aplicação
+        # Criar aplicação de forma simples (sem configurações de timezone complexas)
         self.application = Application.builder().token(token).build()
         
         # Comandos básicos
@@ -2330,22 +2330,17 @@ Olá {user.first_name}! 👋
                 except Exception as e:
                     logger.warning(f"⚠️ Erro ao inicializar Value Betting: {e}")
             
-            # Inicializar aplicação
-            await self.application.initialize()
-            await self.application.start()
-            
-            # Iniciar polling
-            await self.application.updater.start_polling()
-            
             logger.info("✅ Bot iniciado com sucesso! Pressione Ctrl+C para parar.")
             
-            # Manter bot rodando
-            try:
-                # Usar idle() para manter o bot ativo
-                await self.application.updater.idle()
-            except KeyboardInterrupt:
-                logger.info("🛑 Interrupção detectada, parando bot...")
+            # Executar o bot usando run_polling (método correto para versões recentes)
+            await self.application.run_polling(
+                poll_interval=2.0,  # Verificar updates a cada 2 segundos
+                timeout=10,         # Timeout de 10 segundos
+                drop_pending_updates=True  # Ignorar updates pendentes
+            )
             
+        except KeyboardInterrupt:
+            logger.info("🛑 Interrupção detectada, parando bot...")
         except Exception as e:
             logger.error(f"❌ Erro ao executar bot: {e}")
             raise
