@@ -473,17 +473,18 @@ class ImprovedRiotAPI:
             # Tentar buscar da API oficial
             live_matches = await self._get_live_from_api()
 
-            if live_matches:
+            if live_matches and len(live_matches) > 0:
                 logger.info(f"✅ {len(live_matches)} partidas ao vivo da API oficial")
                 return live_matches
 
-            # Se API falhar, usar dados de fallback
-            logger.warning("⚠️ API não disponível, usando dados simulados")
-            return self.fallback_live_matches
+            # Se não há partidas na API, retornar lista vazia
+            logger.info("ℹ️ Nenhuma partida ao vivo encontrada na API oficial")
+            return []
 
         except Exception as e:
             logger.error(f"❌ Erro ao buscar partidas: {e}")
-            return self.fallback_live_matches
+            # Em caso de erro, retornar lista vazia ao invés de fallback
+            return []
 
     async def _get_live_from_api(self) -> List[Dict]:
         """Busca da API oficial"""
@@ -497,14 +498,25 @@ class ImprovedRiotAPI:
 
                         if data and 'data' in data and 'schedule' in data['data']:
                             events = data['data']['schedule'].get('events', [])
+                            
+                            # Filtrar apenas eventos que estão realmente ao vivo
+                            live_events = [event for event in events if event.get('state') == 'inProgress']
+
+                            if not live_events:
+                                logger.info("ℹ️ Nenhuma partida ao vivo encontrada")
+                                return []
 
                             # Enriquecer com dados de composições
                             enriched_matches = []
-                            for event in events:
-                                enriched_match = await self._enrich_match_with_compositions(event)
-                                enriched_matches.append(enriched_match)
+                            for event in live_events:
+                                try:
+                                    enriched_match = await self._enrich_match_with_compositions(event)
+                                    enriched_matches.append(enriched_match)
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Erro ao enriquecer partida: {e}")
+                                    continue
 
-                        return enriched_matches
+                            return enriched_matches
 
                 return []
         except Exception as e:
@@ -978,10 +990,10 @@ class TelegramBotV3Improved:
             # Buscar partidas ao vivo
             live_matches = await self.riot_api.get_all_live_matches()
 
-            if not live_matches:
+            if not live_matches or len(live_matches) == 0:
                 text = """🔴 **PARTIDAS AO VIVO**
 
-Não há partidas acontecendo neste momento.
+❌ **Não há partidas acontecendo neste momento.**
 
 ✨ O bot monitora constantemente:
 • 🇰🇷 LCK (Coreia)
@@ -991,22 +1003,22 @@ Não há partidas acontecendo neste momento.
 • 🌍 Torneios internacionais
 • 🏆 Ligas regionais menores
 
-🔄 Atualize em alguns minutos!"""
+🔄 **Tente novamente em alguns minutos!**"""
 
-            keyboard = [
-                [InlineKeyboardButton(
-                    "🔄 Atualizar", callback_data="live_matches_all")],
-                [InlineKeyboardButton(
-                    "🏠 Menu Principal", callback_data="start")]
-            ]
+                keyboard = [
+                    [InlineKeyboardButton(
+                        "🔄 Atualizar", callback_data="live_matches_all")],
+                    [InlineKeyboardButton(
+                        "🏠 Menu Principal", callback_data="start")]
+                ]
 
-            reply_markup = InlineKeyboardMarkup(keyboard)
+                reply_markup = InlineKeyboardMarkup(keyboard)
 
-            if is_callback:
-                await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-            else:
-                await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-            return
+                if is_callback:
+                    await update_or_query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+                else:
+                    await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+                return
 
             # Formatar lista de partidas
             text = f"🔴 **PARTIDAS AO VIVO ({len(live_matches)})**\n\n"
@@ -1070,12 +1082,18 @@ Não há partidas acontecendo neste momento.
 
         except Exception as e:
             logger.error(f"❌ Erro ao mostrar partidas: {e}")
-            error_text = f"❌ Erro ao buscar partidas: {str(e)}"
+            error_text = f"❌ **Erro ao buscar partidas**\n\nTente novamente em alguns minutos.\n\n*Detalhes técnicos: {str(e)[:100]}...*"
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Tentar Novamente", callback_data="live_matches_all")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
             if is_callback:
-                await update_or_query.edit_message_text(error_text)
+                await update_or_query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
             else:
-                await update_or_query.message.reply_text(error_text)
+                await update_or_query.message.reply_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
 
     async def predict_match_callback(self, query, match_id: str):
         """Callback para predição de partida específica"""
@@ -1086,14 +1104,42 @@ Não há partidas acontecendo neste momento.
             live_matches = await self.riot_api.get_all_live_matches()
             match_data = None
 
+            # Verificar se há partidas disponíveis
+            if not live_matches or len(live_matches) == 0:
+                error_text = """❌ **Nenhuma partida ao vivo encontrada**
+
+As partidas podem ter terminado ou não há jogos acontecendo no momento.
+
+🔄 **Tente verificar as partidas ao vivo novamente**"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Ver Partidas", callback_data="live_matches_all")],
+                    [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
+                return
+
+            # Procurar a partida específica
             for match in live_matches:
-                if match['id'] == match_id:
+                if match.get('id') == match_id:
                     match_data = match
                     break
 
             if not match_data:
-                await query.edit_message_text("❌ Partida não encontrada")
-            return
+                error_text = """❌ **Partida não encontrada**
+
+A partida pode ter terminado ou os dados não estão mais disponíveis.
+
+🔄 **Selecione uma partida da lista atual**"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Ver Partidas Atuais", callback_data="live_matches_all")],
+                    [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
+                return
 
             # Gerar predição
             prediction = await self.prediction_system.predict_live_match(match_data)
@@ -1122,7 +1168,20 @@ Não há partidas acontecendo neste momento.
 
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
-            await query.edit_message_text(f"❌ Erro na predição: {str(e)}")
+            error_text = f"""❌ **Erro ao gerar predição**
+
+Ocorreu um problema ao analisar a partida.
+
+🔄 **Tente novamente ou selecione outra partida**
+
+*Detalhes: {str(e)[:100]}...*"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Tentar Novamente", callback_data=f"predict_match_{match_id}")],
+                [InlineKeyboardButton("🔙 Voltar", callback_data="live_matches_all")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(error_text, reply_markup=reply_markup, parse_mode='Markdown')
 
     def _format_match_prediction(
     self,
@@ -1811,7 +1870,7 @@ Aguarde as próximas dicas em alguns minutos..."""
             # Buscar partidas ao vivo
             live_matches = await self.bot.riot_api.get_all_live_matches()
             
-            if not live_matches:
+            if not live_matches or len(live_matches) == 0:
                 # Se não há partidas, enviar update de status
                 status_text = """⏰ **UPDATE AUTOMÁTICO**
 
@@ -1819,13 +1878,24 @@ Aguarde as próximas dicas em alguns minutos..."""
 📊 **Partidas ativas:** 0
 🎯 **Próxima verificação:** 30 minutos
 
+💡 **Não há partidas acontecendo neste momento**
+
 O bot continua monitorando todas as ligas em busca de:
 • 🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS
-• 🌍 Torneios internacionais • 🏆 Ligas regionais"""
+• 🌍 Torneios internacionais • 🏆 Ligas regionais
+
+🔄 **Você será notificado quando partidas iniciarem!**"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Verificar Agora", callback_data="live_matches_all")],
+                    [InlineKeyboardButton("📊 Ver Rankings", callback_data="current_rankings")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await context.bot.send_message(
                     chat_id=chat_id,
                     text=status_text,
+                    reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
                 return
@@ -1833,8 +1903,29 @@ O bot continua monitorando todas as ligas em busca de:
             # Gerar predições para as principais partidas
             predictions = []
             for match in live_matches[:3]:  # Top 3 partidas
-                prediction = await self.bot.prediction_system.predict_live_match(match)
-                predictions.append((match, prediction))
+                try:
+                    prediction = await self.bot.prediction_system.predict_live_match(match)
+                    predictions.append((match, prediction))
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao gerar predição para partida: {e}")
+                    continue
+            
+            if not predictions:
+                # Se não conseguiu gerar predições, enviar status básico
+                status_text = f"""⏰ **UPDATE AUTOMÁTICO**
+
+🔍 **Status:** {len(live_matches)} partidas encontradas
+⚠️ **Análise:** Dados insuficientes para predições
+🎯 **Próxima verificação:** 30 minutos
+
+🔄 **Tentaremos análise novamente na próxima atualização**"""
+                
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=status_text,
+                    parse_mode='Markdown'
+                )
+                return
             
             # Formatar mensagem automática
             auto_message = self._format_auto_tips_message(predictions)
@@ -1860,7 +1951,22 @@ O bot continua monitorando todas as ligas em busca de:
             logger.info(f"✅ Dicas automáticas enviadas para grupo {chat_id}")
             
         except Exception as e:
-            logger.error(f"❌ Erro ao enviar dicas automáticas: {e}")
+            logger.error(f"❌ Erro ao enviar dicas automáticas para grupo {chat_id}: {e}")
+            try:
+                # Enviar mensagem de erro simples para o grupo
+                error_text = """⚠️ **Erro no update automático**
+
+🔄 Tentaremos novamente na próxima verificação (30 minutos)
+
+💡 Use `/live` para verificar partidas manualmente"""
+                
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=error_text,
+                    parse_mode='Markdown'
+                )
+            except Exception as e2:
+                logger.error(f"❌ Erro ao enviar mensagem de erro: {e2}")
     
     def _format_auto_tips_message(self, predictions: List) -> str:
         """Formata mensagem de dicas automáticas"""
