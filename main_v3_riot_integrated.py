@@ -418,7 +418,7 @@ class ChampionAnalyzer:
 
 class ImprovedRiotAPI:
     """Cliente melhorado para API da Riot com análise de composições"""
-
+    
     def __init__(self):
         self.base_url = "https://esports-api.lolesports.com/persisted/gw"
         self.api_key = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
@@ -581,7 +581,7 @@ class ImprovedRiotAPI:
                     except asyncio.TimeoutError:
                         logger.debug(f"⏱️ Timeout no endpoint")
                         continue
-                    except Exception as e:
+            except Exception as e:
                         logger.debug(f"❌ Erro no endpoint: {e}")
                         continue
                 
@@ -637,7 +637,7 @@ class ImprovedRiotAPI:
                 for key in path:
                     if isinstance(current, dict) and key in current:
                         current = current[key]
-                    else:
+                else:
                         break
                 else:
                     events = current
@@ -680,8 +680,8 @@ class ImprovedRiotAPI:
                             })
                         
                         matches.append(match_data)
-                        
-                except Exception as e:
+            
+        except Exception as e:
                     logger.debug(f"⚠️ Erro ao processar evento: {e}")
                     continue
             
@@ -855,7 +855,7 @@ class ImprovedRiotAPI:
 
             return match_data
 
-        except Exception as e:
+            except Exception as e:
             logger.error(f"❌ Erro ao enriquecer partida: {e}")
             return match_data
 
@@ -876,7 +876,7 @@ class ImprovedRiotAPI:
                         team1_comp = comp
                     elif side == 'red':
                         team2_comp = comp
-        except Exception as e:
+            except Exception as e:
             logger.error(f"❌ Erro ao extrair composições: {e}")
 
         return team1_comp, team2_comp
@@ -971,8 +971,8 @@ class DynamicPredictionSystem:
                 'draft_analysis': draft_analysis,
                 'last_updated': datetime.now().isoformat()
             }
-
-        except Exception as e:
+                    
+            except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             return self._get_fallback_prediction()
 
@@ -1269,7 +1269,7 @@ class TelegramBotV3Improved:
                         
                         if is_healthy:
                             return jsonify(status), 200
-                        else:
+            else:
                             return jsonify(status), 503
                             
                     except Exception as e:
@@ -1308,7 +1308,7 @@ class TelegramBotV3Improved:
                 
             except Exception as e:
                 logger.warning(f"⚠️ Erro ao configurar Flask healthcheck: {e}")
-        else:
+            else:
             logger.warning("⚠️ Flask não disponível - healthcheck desabilitado")
 
     def update_activity(self):
@@ -1338,7 +1338,7 @@ class TelegramBotV3Improved:
             else:
                 # Modo blacklist - todos exceto os bloqueados
                 return user_id not in self.authorized_users
-                
+        
         except Exception as e:
             logger.error(f"❌ Erro na verificação de autorização: {e}")
             return False
@@ -1437,8 +1437,8 @@ Para solicitar acesso, entre em contato com o administrador.
     async def authorize_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Comando para autorizar usuário (apenas admin)"""
         if not await self._check_admin_permission(update):
-            return
-        
+                return
+            
         try:
             args = context.args
             if not args:
@@ -1553,8 +1553,8 @@ Para solicitar acesso, entre em contato com o administrador.
     async def auth_config(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Configurações de autorização (apenas admin)"""
         if not await self._check_admin_permission(update):
-            return
-        
+                return
+            
         try:
             args = context.args
             
@@ -1577,7 +1577,7 @@ Para solicitar acesso, entre em contato com o administrador.
 • `/authconfig whitelist` - Modo whitelist
 • `/authconfig blacklist` - Modo blacklist"""
 
-                keyboard = [
+            keyboard = [
                     [InlineKeyboardButton("🔐 Toggle Auth", callback_data="auth_toggle"),
                      InlineKeyboardButton("🏢 Toggle Groups", callback_data="auth_groups")],
                     [InlineKeyboardButton("📋 Lista Users", callback_data="auth_list"),
@@ -1640,7 +1640,7 @@ Para solicitar acesso, entre em contato com o administrador.
             
             else:
                 await update.message.reply_text("❌ **Comando não reconhecido**")
-                
+            
         except Exception as e:
             await update.message.reply_text(f"❌ Erro: {str(e)}")
 
@@ -1738,8 +1738,8 @@ Para solicitar acesso, entre em contato com o administrador.
         
         # Verificar autorização
         if not is_callback and not await self.check_authorization(update, context):
-            return
-        
+                return
+            
         try:
             summary = self.portfolio_manager.get_portfolio_summary()
             
@@ -2196,8 +2196,11 @@ Para solicitar acesso, entre em contato com o administrador.
             logger.error("❌ TELEGRAM_TOKEN não configurado")
             raise ValueError("Token do Telegram não encontrado")
         
-        # Criar aplicação de forma simples (sem configurações de timezone complexas)
+        # Criar aplicação de forma correta com inicialização
         self.application = Application.builder().token(token).build()
+        
+        # IMPORTANTE: Inicializar a aplicação explicitamente
+        await self.application.initialize()
         
         # Comandos básicos
         self.application.add_handler(CommandHandler("start", self.start))
@@ -2232,7 +2235,7 @@ Para solicitar acesso, entre em contato com o administrador.
         """Comando start melhorado"""
         # Verificar autorização
         if not await self.check_authorization(update, context):
-            return
+                return
             
         user = update.effective_user
         
@@ -2279,7 +2282,7 @@ Olá {user.first_name}! 👋
         """Comando help expandido"""
         # Verificar autorização
         if not await self.check_authorization(update, context):
-            return
+                return
             
         help_text = """📚 **GUIA COMPLETO DO BOT**
 
@@ -2446,7 +2449,7 @@ Olá {user.first_name}! 👋
                         # Processar update usando o sistema de handlers
                         try:
                             await self.application.process_update(update)
-                        except Exception as e:
+        except Exception as e:
                             logger.error(f"❌ Erro ao processar update: {e}")
                     
                     # Pequena pausa para não sobrecarregar
@@ -2514,7 +2517,7 @@ O sistema monitora continuamente as seguintes competições:
 📱 Você será notificado quando partidas iniciarem
 
 💡 Use /start para voltar ao menu principal"""
-
+                
                 keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
                      InlineKeyboardButton("📊 Portfolio", callback_data="portfolio_dashboard")],
@@ -2535,7 +2538,7 @@ O sistema monitora continuamente as seguintes competições:
                         parse_mode='Markdown'
                     )
                 return
-
+            
             # Mostrar partidas encontradas com informação de região
             regions = set([match.get('region', 'Unknown') for match in live_matches])
             text = f"🎮 **PARTIDAS AO VIVO** ({len(live_matches)} encontradas)\n"
@@ -2581,14 +2584,14 @@ O sistema monitora continuamente as seguintes competições:
                     text += f"{conf_emoji} Confiança: {confidence}\n\n"
                     
                     # Adicionar botão para predição detalhada
-                    keyboard.append([
+            keyboard.append([
                         InlineKeyboardButton(
                             f"🎯 {team1} vs {team2}",
                             callback_data=f"predict_{i}"
                         )
                     ])
                     
-                except Exception as e:
+        except Exception as e:
                     logger.error(f"❌ Erro ao processar partida {i}: {e}")
                     text += f"❌ Erro ao processar partida {i + 1}\n\n"
             
@@ -2611,7 +2614,7 @@ O sistema monitora continuamente as seguintes competições:
                     reply_markup=InlineKeyboardMarkup(keyboard),
                     parse_mode='Markdown'
                 )
-            else:
+        else:
                 await update.message.reply_text(
                     text,
                     reply_markup=InlineKeyboardMarkup(keyboard),
@@ -2624,7 +2627,7 @@ O sistema monitora continuamente as seguintes competições:
             
             if is_callback:
                 await update_or_query.edit_message_text(error_text)
-            else:
+        else:
                 await update.message.reply_text(error_text)
 
     async def predict_match_callback(self, query, match_index: str):
@@ -2710,7 +2713,7 @@ O sistema monitora continuamente as seguintes competições:
                 parse_mode='Markdown'
             )
             
-        except Exception as e:
+                except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             await query.edit_message_text(
                 "❌ Erro ao carregar predição.\nTente novamente ou use /partidas"
