@@ -20,8 +20,6 @@ import json
 # Sistema de health check
 from flask import Flask, jsonify
 import requests
-from bs4 import BeautifulSoup
-import re
 
 # Telegram Bot - v13 compatibility
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
@@ -80,487 +78,292 @@ class HealthCheckManager:
         self.last_activity = datetime.now()
 
 class RiotAPIClient:
-    """Cliente para API da Riot Games com fallback"""
+    """Cliente para API oficial da Riot Games baseado na documentação OpenAPI"""
     
     def __init__(self):
-        self.api_key = os.getenv('RIOT_API_KEY')
+        # Chave de API oficial da documentação
+        self.api_key = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
         self.base_urls = {
-            'esports': 'https://esports-api.lolesports.com/persisted/gw',
-            'schedule': 'https://esports-api.lolesports.com/persisted/gw/getSchedule'
+            'esports_api': 'https://esports-api.lolesports.com/persisted/gw',
+            'prod_relapi': 'https://prod-relapi.ewp.gg/persisted/gw',
+            'livestats': 'https://feed.lolesports.com/livestats/v1'
         }
-        logger.info("🔗 RiotAPIClient inicializado - buscando dados reais")
+        self.headers = {
+            'x-api-key': self.api_key,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8'
+        }
+        logger.info("🔗 RiotAPIClient inicializado com API oficial da Riot")
     
     async def get_live_matches(self) -> List[Dict]:
-        """Busca partidas ao vivo REAIS com múltiplas fontes e fallback HTML"""
-        logger.info("🔍 Buscando partidas ao vivo da API oficial...")
-        
-        # Lista de endpoints para tentar
-        endpoints = [
-            # Endpoint principal de live matches
-            "https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR",
-            
-            # Endpoint de schedule (contém jogos em andamento)
-            "https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=pt-BR",
-            
-            # Endpoint alternativo
-            "https://feed.lolesports.com/livestats/v1/scheduleItems",
-            
-            # Backup endpoints
-            "https://esports-api.lolesports.com/persisted/gw/getSchedule?hl=en-US",
-            "https://esports-api.lolesports.com/persisted/gw/getLive?hl=en-US"
-        ]
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-            'Referer': 'https://lolesports.com/',
-            'Origin': 'https://lolesports.com'
-        }
+        """Busca partidas ao vivo usando endpoints oficiais da API da Riot"""
+        logger.info("🔍 Buscando partidas ao vivo da API oficial da Riot...")
         
         all_matches = []
         
-        # Primeiro tentar APIs JSON
-        for endpoint in endpoints:
-            try:
-                logger.info(f"🌐 Tentando endpoint: {endpoint}")
-                
-                response = requests.get(endpoint, headers=headers, timeout=15)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    logger.info(f"✅ Resposta recebida do endpoint: {len(str(data))} caracteres")
-                    
-                    matches = self._extract_live_matches(data)
-                    if matches:
-                        logger.info(f"🎮 {len(matches)} partidas encontradas em {endpoint}")
-                        all_matches.extend(matches)
-                        
-                        # Se encontrou partidas, pode parar (ou continuar para mais dados)
-                        if len(all_matches) >= 3:  # Parar se já tem várias partidas
-                            break
-                    else:
-                        logger.info(f"ℹ️ Nenhuma partida ao vivo encontrada em {endpoint}")
-                else:
-                    logger.warning(f"⚠️ Endpoint retornou status {response.status_code}")
-                    
-            except requests.exceptions.RequestException as e:
-                logger.warning(f"🌐 Erro de rede no endpoint {endpoint}: {e}")
-                continue
-            except Exception as e:
-                logger.warning(f"❌ Erro geral no endpoint {endpoint}: {e}")
-                continue
+        # 1. Primeiro tentar getLive endpoint (partidas ao vivo)
+        live_matches = await self._get_live_endpoint()
+        if live_matches:
+            all_matches.extend(live_matches)
+            logger.info(f"✅ {len(live_matches)} partidas encontradas no endpoint getLive")
         
-        # Se não encontrou partidas nas APIs, tentar scraping HTML
+        # 2. Se não encontrou, tentar getSchedule (agenda com partidas em andamento)
         if not all_matches:
-            logger.info("🌐 APIs falharam, tentando scraping HTML...")
-            html_matches = await self._try_html_scraping()
-            all_matches.extend(html_matches)
+            schedule_matches = await self._get_schedule_endpoint()
+            if schedule_matches:
+                all_matches.extend(schedule_matches)
+                logger.info(f"✅ {len(schedule_matches)} partidas encontradas no endpoint getSchedule")
         
-        # Remover duplicatas
-        unique_matches = []
-        seen_matches = set()
-        
-        for match in all_matches:
-            # Criar identificador único baseado nos times
-            teams = match.get('teams', [])
-            if len(teams) >= 2:
-                match_id = f"{teams[0].get('name', 'T1')}_{teams[1].get('name', 'T2')}"
-                if match_id not in seen_matches:
-                    seen_matches.add(match_id)
-                    unique_matches.append(match)
-        
-        # Se ainda não tem partidas, retornar dados de fallback para teste
-        if not unique_matches:
-            logger.info("🎯 Nenhuma partida encontrada, usando dados de fallback para teste")
-            return self._get_fallback_matches()
+        # 3. Remover duplicatas
+        unique_matches = self._remove_duplicates(all_matches)
         
         if unique_matches:
             logger.info(f"🎯 Total de {len(unique_matches)} partidas únicas encontradas")
             return unique_matches
         else:
-            logger.info("ℹ️ Nenhuma partida ao vivo encontrada em nenhum endpoint")
-            return []
+            logger.info("ℹ️ Nenhuma partida ao vivo encontrada, usando dados de fallback")
+            return self._get_fallback_matches()
     
-    def _extract_live_matches(self, data: Dict) -> List[Dict]:
-        """Extrai partidas ao vivo dos dados da API com múltiplos formatos"""
+    async def _get_live_endpoint(self) -> List[Dict]:
+        """Usa o endpoint getLive da API oficial"""
         matches = []
         
-        try:
-            # Tentar diferentes estruturas de dados
-            possible_paths = [
-                ['data', 'schedule', 'events'],
-                ['data', 'events'],
-                ['events'],
-                ['data', 'live'],
-                ['live'],
-                ['matches'],
-                ['data', 'matches'],
-                ['scheduleItems']
-            ]
-            
-            events = None
-            for path in possible_paths:
-                current = data
-                for key in path:
-                    if isinstance(current, dict) and key in current:
-                        current = current[key]
-                    else:
-                        break
-                else:
-                    events = current
-                    break
-            
-            if not events:
-                logger.debug("⚠️ Nenhuma estrutura de eventos encontrada")
-                return matches
-            
-            logger.info(f"📊 Processando {len(events)} eventos da API")
-            
-            for event in events:
-                try:
-                    # Verificar se é uma partida ao vivo
-                    state = event.get('state', '').lower()
-                    status = event.get('status', '').lower()
-                    
-                    # Estados que indicam partida ao vivo
-                    live_states = ['inprogress', 'live', 'ongoing', 'started']
-                    
-                    if any(live_state in state for live_state in live_states) or \
-                       any(live_state in status for live_state in live_states):
-                        
-                        match_data = {
-                            'id': event.get('id', f"match_{len(matches)}"),
-                            'league': self._extract_league_name(event),
-                            'status': self._extract_status(event),
-                            'teams': self._extract_teams(event)
-                        }
-                        
-                        # Só adicionar se tem pelo menos 2 times
-                        if len(match_data['teams']) >= 2:
-                            matches.append(match_data)
-                            logger.info(f"✅ Partida encontrada: {match_data['teams'][0].get('name')} vs {match_data['teams'][1].get('name')} ({match_data['league']})")
-                        
-                except Exception as e:
-                    logger.debug(f"⚠️ Erro ao processar evento: {e}")
-                    continue
-                    
-        except Exception as e:
-            logger.error(f"❌ Erro ao extrair partidas: {e}")
-        
-        return matches
-    
-    def _extract_league_name(self, event: Dict) -> str:
-        """Extrai nome da liga do evento"""
-        # Tentar diferentes caminhos para encontrar o nome da liga
-        league_paths = [
-            ['league', 'name'],
-            ['league', 'displayName'],
-            ['tournament', 'name'],
-            ['competition', 'name'],
-            ['match', 'league', 'name']
-        ]
-        
-        for path in league_paths:
-            current = event
-            for key in path:
-                if isinstance(current, dict) and key in current:
-                    current = current[key]
-                else:
-                    break
-            else:
-                if isinstance(current, str) and current:
-                    return current
-        
-        return 'Liga Desconhecida'
-    
-    def _extract_status(self, event: Dict) -> str:
-        """Extrai status da partida"""
-        state = event.get('state', '')
-        status = event.get('status', '')
-        
-        if 'inprogress' in state.lower() or 'live' in state.lower():
-            return 'Ao vivo'
-        elif 'ongoing' in status.lower():
-            return 'Em andamento'
-        elif 'started' in status.lower():
-            return 'Iniciada'
-        else:
-            return 'Partida ativa'
-    
-    def _extract_teams(self, event: Dict) -> List[Dict]:
-        """Extrai times do evento"""
-        teams = []
-        
-        # Tentar diferentes estruturas para encontrar os times
-        team_paths = [
-            ['match', 'teams'],
-            ['teams'],
-            ['competitors'],
-            ['participants']
-        ]
-        
-        teams_data = None
-        for path in team_paths:
-            current = event
-            for key in path:
-                if isinstance(current, dict) and key in current:
-                    current = current[key]
-                else:
-                    break
-            else:
-                if isinstance(current, list) and current:
-                    teams_data = current
-                    break
-        
-        if teams_data:
-            for team_data in teams_data[:2]:  # Máximo 2 times
-                if isinstance(team_data, dict):
-                    team_info = {
-                        'name': team_data.get('name', team_data.get('displayName', team_data.get('code', 'Team'))),
-                        'code': team_data.get('code', team_data.get('acronym', team_data.get('name', 'TM')[:3]))
-                    }
-                    teams.append(team_info)
-        
-        # Se não conseguiu extrair times, criar genéricos
-        while len(teams) < 2:
-            teams.append({
-                'name': f'Time {len(teams) + 1}',
-                'code': f'T{len(teams) + 1}'
-            })
-        
-        return teams
-
-    async def _try_html_scraping(self) -> List[Dict]:
-        """Tenta fazer scraping das páginas HTML do LoL Esports"""
-        matches = []
-        
-        # URLs para scraping
-        html_urls = [
-            'https://lolesports.com/live',
-            'https://lolesports.com/schedule'
-        ]
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
-            'Referer': 'https://lolesports.com/',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1'
-        }
-        
-        for url in html_urls:
+        # Tentar ambos os servidores
+        for base_url in [self.base_urls['esports_api'], self.base_urls['prod_relapi']]:
             try:
-                logger.info(f"🌐 Fazendo scraping de: {url}")
+                url = f"{base_url}/getLive?hl=pt-BR"
+                logger.info(f"🌐 Tentando getLive: {url}")
                 
-                response = requests.get(url, headers=headers, timeout=20)
+                response = requests.get(url, headers=self.headers, timeout=15)
                 
                 if response.status_code == 200:
-                    logger.info(f"✅ HTML obtido: {len(response.text)} caracteres")
+                    data = response.json()
+                    logger.info(f"✅ Resposta getLive recebida: {len(str(data))} caracteres")
                     
-                    # Tentar extrair dados do HTML
-                    html_matches = self._parse_html_content(response.text, url)
-                    if html_matches:
-                        logger.info(f"🎮 {len(html_matches)} partidas encontradas via scraping")
-                        matches.extend(html_matches)
-                    else:
-                        logger.info(f"ℹ️ Nenhuma partida encontrada no HTML de {url}")
+                    # Extrair partidas conforme estrutura da API
+                    if 'data' in data and 'schedule' in data['data']:
+                        events = data['data']['schedule'].get('events', [])
+                        
+                        if events:
+                            logger.info(f"📊 Processando {len(events)} eventos do getLive")
+                            
+                            for event in events:
+                                match_data = self._parse_live_event(event)
+                                if match_data:
+                                    matches.append(match_data)
+                                    logger.info(f"✅ Partida ao vivo: {match_data['teams'][0]['name']} vs {match_data['teams'][1]['name']}")
+                        else:
+                            logger.info("ℹ️ Nenhum evento ao vivo no momento")
+                    
+                    # Se encontrou partidas, parar
+                    if matches:
+                        break
+                        
+                elif response.status_code == 403:
+                    logger.warning(f"🔒 Acesso negado (403) para {url}")
                 else:
-                    logger.warning(f"⚠️ Scraping falhou com status {response.status_code}")
+                    logger.warning(f"⚠️ Status {response.status_code} para {url}")
                     
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"🌐 Erro de rede em getLive: {e}")
+                continue
             except Exception as e:
-                logger.warning(f"❌ Erro no scraping de {url}: {e}")
+                logger.warning(f"❌ Erro geral em getLive: {e}")
                 continue
         
         return matches
     
-    def _parse_html_content(self, html_content: str, source_url: str) -> List[Dict]:
-        """Parse do conteúdo HTML para extrair partidas"""
+    async def _get_schedule_endpoint(self) -> List[Dict]:
+        """Usa o endpoint getSchedule para encontrar partidas em andamento"""
         matches = []
         
-        try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # Procurar por scripts com dados JSON
-            scripts = soup.find_all('script')
-            for script in scripts:
-                if script.string and ('match' in script.string.lower() or 'event' in script.string.lower()):
-                    json_matches = self._extract_json_from_script(script.string)
-                    matches.extend(json_matches)
-            
-            # Procurar por elementos HTML com informações de partidas
-            html_matches = self._extract_matches_from_html_elements(soup)
-            matches.extend(html_matches)
-            
-            # Se não encontrou nada específico, criar dados baseados na URL
-            if not matches and 'live' in source_url:
-                logger.info("🎯 Criando partida de exemplo baseada na página live")
-                matches.append({
-                    'id': 'html_fallback_live',
-                    'teams': [
-                        {'name': 'T1', 'code': 'T1'},
-                        {'name': 'Gen.G', 'code': 'GEN'}
-                    ],
-                    'league': 'LCK',
-                    'status': 'Ao vivo (via HTML)',
-                    'source': 'html_scraping'
-                })
+        # Tentar ambos os servidores
+        for base_url in [self.base_urls['esports_api'], self.base_urls['prod_relapi']]:
+            try:
+                url = f"{base_url}/getSchedule?hl=pt-BR"
+                logger.info(f"🌐 Tentando getSchedule: {url}")
                 
-        except Exception as e:
-            logger.error(f"❌ Erro ao fazer parse do HTML: {e}")
-        
-        return matches
-    
-    def _extract_json_from_script(self, script_content: str) -> List[Dict]:
-        """Extrai dados JSON de scripts JavaScript"""
-        matches = []
-        
-        try:
-            # Padrões para encontrar JSON em scripts
-            json_patterns = [
-                r'window\.__INITIAL_STATE__\s*=\s*({.+?});',
-                r'window\.__APOLLO_STATE__\s*=\s*({.+?});',
-                r'"events"\s*:\s*(\[.+?\])',
-                r'"matches"\s*:\s*(\[.+?\])',
-                r'"schedule"\s*:\s*({.+?})',
-                r'"live"\s*:\s*(\[.+?\])'
-            ]
-            
-            for pattern in json_patterns:
-                found = re.search(pattern, script_content, re.DOTALL)
-                if found:
-                    try:
-                        json_str = found.group(1)
-                        json_data = json.loads(json_str)
+                response = requests.get(url, headers=self.headers, timeout=15)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"✅ Resposta getSchedule recebida: {len(str(data))} caracteres")
+                    
+                    # Extrair partidas conforme estrutura da API
+                    if 'data' in data and 'schedule' in data['data']:
+                        events = data['data']['schedule'].get('events', [])
                         
-                        # Tentar extrair partidas do JSON
-                        parsed_matches = self._extract_live_matches(json_data)
-                        if parsed_matches:
-                            logger.info(f"✅ {len(parsed_matches)} partidas extraídas do JSON em script")
-                            matches.extend(parsed_matches)
+                        if events:
+                            logger.info(f"📊 Processando {len(events)} eventos do getSchedule")
                             
-                    except json.JSONDecodeError:
-                        continue
-                    except Exception as e:
-                        logger.debug(f"⚠️ Erro ao processar JSON do script: {e}")
-                        continue
+                            # Filtrar apenas partidas em andamento
+                            now = datetime.now()
+                            
+                            for event in events:
+                                # Verificar se a partida está acontecendo agora
+                                if self._is_match_live(event, now):
+                                    match_data = self._parse_schedule_event(event)
+                                    if match_data:
+                                        matches.append(match_data)
+                                        logger.info(f"✅ Partida em andamento: {match_data['teams'][0]['name']} vs {match_data['teams'][1]['name']}")
+                        else:
+                            logger.info("ℹ️ Nenhum evento na agenda")
+                    
+                    # Se encontrou partidas, parar
+                    if matches:
+                        break
                         
-        except Exception as e:
-            logger.error(f"❌ Erro ao extrair JSON do script: {e}")
+                elif response.status_code == 403:
+                    logger.warning(f"🔒 Acesso negado (403) para {url}")
+                else:
+                    logger.warning(f"⚠️ Status {response.status_code} para {url}")
+                    
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"🌐 Erro de rede em getSchedule: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"❌ Erro geral em getSchedule: {e}")
+                continue
         
         return matches
     
-    def _extract_matches_from_html_elements(self, soup) -> List[Dict]:
-        """Extrai partidas de elementos HTML específicos"""
-        matches = []
-        
+    def _parse_live_event(self, event: Dict) -> Optional[Dict]:
+        """Parse de evento do endpoint getLive"""
         try:
-            # Seletores CSS para encontrar partidas
-            match_selectors = [
-                '.match', '.game', '.event', '.fixture',
-                '[data-match]', '[data-game]', '[data-event]',
-                '.live-match', '.ongoing-match', '.current-match'
-            ]
+            # Estrutura conforme documentação OpenAPI
+            match_info = {
+                'id': event.get('id', f"live_{random.randint(1000, 9999)}"),
+                'league': self._extract_league_info(event),
+                'status': 'Ao vivo',
+                'teams': []
+            }
             
-            for selector in match_selectors:
-                elements = soup.select(selector)
-                for element in elements[:5]:  # Limitar a 5 para evitar spam
-                    match = self._extract_match_from_element(element)
-                    if match:
-                        matches.append(match)
-                        
-            # Procurar por padrões de texto "Team vs Team"
-            text_matches = self._extract_matches_from_text_patterns(soup.get_text())
-            matches.extend(text_matches)
-                        
-        except Exception as e:
-            logger.error(f"❌ Erro ao extrair partidas dos elementos HTML: {e}")
-        
-        return matches
-    
-    def _extract_match_from_element(self, element) -> Optional[Dict]:
-        """Extrai dados de partida de um elemento HTML específico"""
-        try:
-            # Procurar por nomes de times no elemento
-            team_elements = element.find_all(['span', 'div', 'p'], 
-                                           class_=re.compile(r'team|name|competitor'))
-            teams = []
+            # Extrair times
+            if 'match' in event and 'teams' in event['match']:
+                teams_data = event['match']['teams']
+                
+                for team_data in teams_data[:2]:  # Máximo 2 times
+                    team_info = {
+                        'name': team_data.get('name', 'Time Desconhecido'),
+                        'code': team_data.get('code', team_data.get('slug', 'TM')[:3].upper()),
+                        'record': self._extract_record(team_data),
+                        'result': self._extract_result(team_data)
+                    }
+                    match_info['teams'].append(team_info)
             
-            for team_elem in team_elements[:2]:
-                team_name = team_elem.get_text(strip=True)
-                if team_name and len(team_name) > 1 and len(team_name) < 50:
-                    teams.append({
-                        'name': team_name,
-                        'code': team_name[:3].upper()
-                    })
-            
-            # Procurar por texto "vs" ou "x" no elemento
-            element_text = element.get_text()
-            vs_match = re.search(r'(\w+(?:\s+\w+)*)\s+(?:vs|x|versus)\s+(\w+(?:\s+\w+)*)', 
-                               element_text, re.IGNORECASE)
-            
-            if vs_match and len(teams) < 2:
-                team1, team2 = vs_match.groups()
-                teams = [
-                    {'name': team1.strip(), 'code': team1.strip()[:3].upper()},
-                    {'name': team2.strip(), 'code': team2.strip()[:3].upper()}
-                ]
-            
-            if len(teams) >= 2:
-                return {
-                    'id': f'html_element_{hash(str(teams))}',
-                    'teams': teams[:2],
-                    'league': 'Liga via HTML',
-                    'status': 'Detectada via scraping',
-                    'source': 'html_element'
-                }
+            # Só retornar se tem pelo menos 2 times
+            if len(match_info['teams']) >= 2:
+                return match_info
                 
         except Exception as e:
-            logger.debug(f"⚠️ Erro ao extrair partida do elemento: {e}")
+            logger.debug(f"⚠️ Erro ao fazer parse do evento live: {e}")
         
         return None
     
-    def _extract_matches_from_text_patterns(self, text_content: str) -> List[Dict]:
-        """Extrai partidas usando padrões de texto"""
-        matches = []
-        
+    def _parse_schedule_event(self, event: Dict) -> Optional[Dict]:
+        """Parse de evento do endpoint getSchedule"""
         try:
-            # Padrões para encontrar "Team vs Team"
-            patterns = [
-                r'([A-Z][a-zA-Z\s]+)\s+vs\s+([A-Z][a-zA-Z\s]+)',
-                r'([A-Z][a-zA-Z\s]+)\s+x\s+([A-Z][a-zA-Z\s]+)',
-                r'([A-Z]{2,5})\s+vs\s+([A-Z]{2,5})',  # Códigos de times
-                r'([A-Z]{2,5})\s+x\s+([A-Z]{2,5})'
-            ]
+            # Estrutura conforme documentação OpenAPI
+            match_info = {
+                'id': event.get('id', f"schedule_{random.randint(1000, 9999)}"),
+                'league': self._extract_league_info(event),
+                'status': 'Em andamento',
+                'teams': []
+            }
             
-            for pattern in patterns:
-                found_matches = re.findall(pattern, text_content)
-                for match in found_matches[:3]:  # Limitar a 3
-                    if len(match) == 2:
-                        team1, team2 = match
-                        team1, team2 = team1.strip(), team2.strip()
-                        
-                        # Filtrar matches muito genéricos
-                        if (len(team1) > 1 and len(team2) > 1 and 
-                            team1 != team2 and 
-                            len(team1) < 30 and len(team2) < 30):
-                            
-                            matches.append({
-                                'id': f'text_pattern_{hash(f"{team1}_{team2}")}',
-                                'teams': [
-                                    {'name': team1, 'code': team1[:3].upper()},
-                                    {'name': team2, 'code': team2[:3].upper()}
-                                ],
-                                'league': 'Detectada via texto',
-                                'status': 'Encontrada em texto',
-                                'source': 'text_pattern'
-                            })
-                            
+            # Extrair times
+            if 'match' in event and 'teams' in event['match']:
+                teams_data = event['match']['teams']
+                
+                for team_data in teams_data[:2]:  # Máximo 2 times
+                    team_info = {
+                        'name': team_data.get('name', 'Time Desconhecido'),
+                        'code': team_data.get('code', team_data.get('slug', 'TM')[:3].upper()),
+                        'record': self._extract_record(team_data),
+                        'result': self._extract_result(team_data)
+                    }
+                    match_info['teams'].append(team_info)
+            
+            # Só retornar se tem pelo menos 2 times
+            if len(match_info['teams']) >= 2:
+                return match_info
+                
         except Exception as e:
-            logger.error(f"❌ Erro ao extrair partidas do texto: {e}")
+            logger.debug(f"⚠️ Erro ao fazer parse do evento schedule: {e}")
         
-        return matches
+        return None
+    
+    def _extract_league_info(self, event: Dict) -> str:
+        """Extrai informações da liga do evento"""
+        if 'league' in event:
+            league = event['league']
+            return league.get('name', league.get('slug', 'Liga Desconhecida'))
+        return 'Liga Desconhecida'
+    
+    def _extract_record(self, team_data: Dict) -> Optional[Dict]:
+        """Extrai record do time (wins/losses)"""
+        if 'record' in team_data and team_data['record']:
+            record = team_data['record']
+            return {
+                'wins': record.get('wins', 0),
+                'losses': record.get('losses', 0)
+            }
+        return None
+    
+    def _extract_result(self, team_data: Dict) -> Optional[Dict]:
+        """Extrai resultado atual do time"""
+        if 'result' in team_data:
+            result = team_data['result']
+            return {
+                'gameWins': result.get('gameWins', 0),
+                'outcome': result.get('outcome')  # 'win', 'loss', ou None se em andamento
+            }
+        return None
+    
+    def _is_match_live(self, event: Dict, current_time: datetime) -> bool:
+        """Verifica se uma partida está acontecendo agora"""
+        try:
+            # Verificar estado da partida
+            state = event.get('state', '').lower()
+            if state in ['inprogress', 'live', 'ongoing']:
+                return True
+            
+            # Verificar horário de início
+            start_time_str = event.get('startTime')
+            if start_time_str:
+                # Parse do horário (formato ISO)
+                start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                
+                # Considerar partida ao vivo se começou há menos de 3 horas
+                time_diff = current_time - start_time.replace(tzinfo=None)
+                if timedelta(0) <= time_diff <= timedelta(hours=3):
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.debug(f"⚠️ Erro ao verificar se partida está ao vivo: {e}")
+            return False
+    
+    def _remove_duplicates(self, matches: List[Dict]) -> List[Dict]:
+        """Remove partidas duplicadas"""
+        unique_matches = []
+        seen_matches = set()
+        
+        for match in matches:
+            teams = match.get('teams', [])
+            if len(teams) >= 2:
+                # Criar identificador único baseado nos times
+                team1 = teams[0].get('name', 'T1')
+                team2 = teams[1].get('name', 'T2')
+                match_id = f"{team1}_{team2}"
+                
+                if match_id not in seen_matches:
+                    seen_matches.add(match_id)
+                    unique_matches.append(match)
+        
+        return unique_matches
     
     def _get_fallback_matches(self) -> List[Dict]:
         """Retorna partidas de fallback para demonstração quando nenhuma API funciona"""
