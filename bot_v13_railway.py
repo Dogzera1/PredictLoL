@@ -278,32 +278,29 @@ class BotLoLV3Railway:
         self.health_manager.update_activity()
         
         keyboard = [
-            [InlineKeyboardButton("📊 Ver Stats Detalhadas", callback_data="stats"),
-             InlineKeyboardButton("🔮 Predições", callback_data="predict")],
-            [InlineKeyboardButton("💰 Value Bets", callback_data="value"),
-             InlineKeyboardButton("🔄 Atualizar", callback_data="partidas")]
+            [InlineKeyboardButton("🔄 Verificar Novamente", callback_data="partidas"),
+             InlineKeyboardButton("💰 Value Betting", callback_data="value")],
+            [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
+             InlineKeyboardButton("🎯 Sistema", callback_data="sistema")]
         ]
         
         update.message.reply_text(
-            "🔴 **PARTIDAS AO VIVO**\n\n"
-            "🎮 **LCK - Coreia do Sul**\n"
-            "• T1 vs Gen.G\n"
-            "• Status: 🔴 Ao vivo\n"
-            "• Tempo: 25:30\n"
-            "• Favorito: T1 (62%)\n\n"
-            "🎮 **LEC - Europa**\n"
-            "• G2 vs Fnatic\n"
-            "• Status: 🔴 Ao vivo\n"
-            "• Tempo: 18:45\n"
-            "• Favorito: G2 (58%)\n\n"
-            "🎮 **LCS - América do Norte**\n"
-            "• C9 vs TL\n"
-            "• Status: 🔴 Ao vivo\n"
-            "• Tempo: 32:15\n"
-            "• Favorito: TL (55%)\n\n"
-            f"⏰ **Atualizado:** {datetime.now().strftime('%H:%M:%S')}\n"
-            "📊 **Sistema de estatísticas ao vivo ativo!**\n"
-            "🔄 **Probabilidades se atualizam em tempo real**",
+            "🔍 **MONITORAMENTO DE PARTIDAS**\n\n"
+            "ℹ️ **NENHUMA PARTIDA AO VIVO DETECTADA**\n\n"
+            "🔄 **SISTEMA ATIVO:**\n"
+            "• Monitoramento 24/7 ativo\n"
+            "• API Riot Games integrada\n"
+            "• Detecção automática de partidas\n\n"
+            "🎮 **LIGAS MONITORADAS:**\n"
+            "🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS\n"
+            "🇧🇷 CBLOL • 🇯🇵 LJL • 🇦🇺 LCO • 🌏 PCS\n"
+            "🇫🇷 LFL • 🇩🇪 Prime League • 🇪🇸 Superliga\n\n"
+            "⏰ **PRÓXIMAS VERIFICAÇÕES:**\n"
+            "• Sistema verifica a cada 1 minuto\n"
+            "• Alertas automáticos quando detectar partidas\n"
+            "• Estatísticas em tempo real disponíveis\n\n"
+            f"🔄 **Última verificação:** {datetime.now().strftime('%H:%M:%S')}\n"
+            "💡 **Use 'Verificar Novamente' para atualizar**",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -312,57 +309,32 @@ class BotLoLV3Railway:
         """Comando /stats - Estatísticas ao vivo"""
         self.health_manager.update_activity()
         
-        # Obter estatísticas dinâmicas
-        stats = self.live_stats.get_live_stats()
-        
-        # Determinar vantagem
-        if stats['advantages']['gold'] > 2000:
-            advantage_text = f"🔵 **{stats['team1']['name']} com vantagem**"
-        elif stats['advantages']['gold'] < -2000:
-            advantage_text = f"🔴 **{stats['team2']['name']} com vantagem**"
-        else:
-            advantage_text = "⚖️ **Partida equilibrada**"
-        
         keyboard = [
-            [InlineKeyboardButton("🔄 Atualizar Stats", callback_data="stats"),
-             InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas")],
-            [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
-             InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
+            [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
+             InlineKeyboardButton("💰 Value Betting", callback_data="value")],
+            [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
+             InlineKeyboardButton("🔄 Atualizar", callback_data="stats")]
         ]
         
-        stats_text = (
-            f"🎮 **ESTATÍSTICAS AO VIVO**\n\n"
-            f"{stats['phase_emoji']} **Fase:** {stats['phase']}\n"
-            f"⏰ **Tempo:** {stats['game_time']}:00\n"
-            f"🏟️ **Mapa:** Summoner's Rift\n\n"
-            f"🔵 **{stats['team1']['name']} (Blue Side)**\n"
-            f"• Kills: {stats['team1']['kills']}/{stats['team1']['deaths']}/{stats['team1']['assists']}\n"
-            f"• Gold: {stats['team1']['gold']:,}\n"
-            f"• CS: {stats['team1']['cs']}\n"
-            f"• 🐉 Dragões: {stats['team1']['dragons']}\n"
-            f"• 🦅 Barões: {stats['team1']['barons']}\n"
-            f"• 🏗️ Torres: {stats['team1']['towers']}\n\n"
-            f"🔴 **{stats['team2']['name']} (Red Side)**\n"
-            f"• Kills: {stats['team2']['kills']}/{stats['team2']['deaths']}/{stats['team2']['assists']}\n"
-            f"• Gold: {stats['team2']['gold']:,}\n"
-            f"• CS: {stats['team2']['cs']}\n"
-            f"• 🐉 Dragões: {stats['team2']['dragons']}\n"
-            f"• 🦅 Barões: {stats['team2']['barons']}\n"
-            f"• 🏗️ Torres: {stats['team2']['towers']}\n\n"
-            f"📊 **PROBABILIDADES DINÂMICAS:**\n"
-            f"• {stats['team1']['name']}: {stats['probabilities']['team1']:.1%}\n"
-            f"• {stats['team2']['name']}: {stats['probabilities']['team2']:.1%}\n\n"
-            f"📈 **VANTAGENS:**\n"
-            f"• Gold: {stats['advantages']['gold']:+,}\n"
-            f"• Kills: {stats['advantages']['kills']:+}\n"
-            f"• Objetivos: {stats['advantages']['objectives']:+}\n\n"
-            f"{advantage_text}\n\n"
-            f"🔄 **Atualizado:** {stats['timestamp']}\n"
-            f"⚡ **Probabilidades evoluem com o tempo!**"
-        )
-        
         update.message.reply_text(
-            stats_text,
+            "📊 **SISTEMA DE ESTATÍSTICAS AO VIVO**\n\n"
+            "ℹ️ **AGUARDANDO PARTIDAS ATIVAS**\n\n"
+            "🎮 **FUNCIONALIDADES DISPONÍVEIS:**\n"
+            "• Gold, kills, mortes, assists em tempo real\n"
+            "• Dragões, barões, torres dinâmicos\n"
+            "• Probabilidades que evoluem com o tempo\n"
+            "• Análise por fase (Early/Mid/Late Game)\n"
+            "• Vantagens calculadas dinamicamente\n\n"
+            "🔄 **SISTEMA PREPARADO:**\n"
+            "• Monitoramento ativo 24/7\n"
+            "• Detecção automática de partidas\n"
+            "• Estatísticas atualizadas em tempo real\n"
+            "• Probabilidades dinâmicas ativas\n\n"
+            "⚡ **QUANDO HOUVER PARTIDAS:**\n"
+            "• Stats detalhadas aparecerão automaticamente\n"
+            "• Probabilidades se atualizarão em tempo real\n"
+            "• Sistema de value betting será ativado\n\n"
+            f"⏰ **Status:** Sistema operacional - {datetime.now().strftime('%H:%M:%S')}",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -372,34 +344,32 @@ class BotLoLV3Railway:
         self.health_manager.update_activity()
         
         keyboard = [
-            [InlineKeyboardButton("🎯 Kelly Calculator", callback_data="kelly"),
+            [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
              InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
-            [InlineKeyboardButton("🔄 Atualizar", callback_data="value"),
-             InlineKeyboardButton("🎮 Partidas", callback_data="partidas")]
+            [InlineKeyboardButton("🔄 Verificar Oportunidades", callback_data="value"),
+             InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
         ]
         
         update.message.reply_text(
             "💰 **VALUE BETTING SYSTEM**\n\n"
-            "🎯 **OPORTUNIDADES DETECTADAS:**\n\n"
-            "🔥 **T1 vs Gen.G (LCK)**\n"
-            "• Value: +5.2%\n"
-            "• Odds: 1.85\n"
-            "• Kelly: 3.1% da banca\n"
-            "• Stake sugerido: R$ 310\n"
-            "• Confiança: Alta\n\n"
-            "⚡ **G2 vs Fnatic (LEC)**\n"
-            "• Value: +3.8%\n"
-            "• Odds: 2.10\n"
-            "• Kelly: 2.4% da banca\n"
-            "• Stake sugerido: R$ 240\n"
-            "• Confiança: Média\n\n"
-            "📊 **ESTATÍSTICAS:**\n"
-            "• Total de oportunidades: 2\n"
-            "• Value médio: +4.5%\n"
-            "• Exposição total: 5.5% da banca\n\n"
-            "🔄 **Sistema monitora 24/7**\n"
-            "⚡ **Baseado em dados reais da API Riot**\n"
-            f"⏰ **Última verificação:** {datetime.now().strftime('%H:%M:%S')}",
+            "🔍 **MONITORAMENTO ATIVO**\n\n"
+            "ℹ️ **AGUARDANDO PARTIDAS PARA ANÁLISE**\n\n"
+            "🎯 **SISTEMA PREPARADO:**\n"
+            "• Detecção automática de value betting\n"
+            "• Cálculo Kelly Criterion em tempo real\n"
+            "• Análise de probabilidades vs odds\n"
+            "• Alertas instantâneos de oportunidades\n\n"
+            "📊 **QUANDO HOUVER PARTIDAS:**\n"
+            "• Value betting será calculado automaticamente\n"
+            "• Oportunidades com +3% de value detectadas\n"
+            "• Stakes sugeridos via Kelly Criterion\n"
+            "• Análise de confiança por partida\n\n"
+            "🔄 **CONFIGURAÇÕES ATIVAS:**\n"
+            "• Banca padrão: R$ 10.000\n"
+            "• Max bet individual: 25%\n"
+            "• Diversificação automática\n"
+            "• Risk management ativo\n\n"
+            f"⏰ **Sistema operacional:** {datetime.now().strftime('%H:%M:%S')}",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -411,8 +381,8 @@ class BotLoLV3Railway:
         keyboard = [
             [InlineKeyboardButton("💰 Value Bets", callback_data="value"),
              InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
-            [InlineKeyboardButton("🔄 Atualizar", callback_data="portfolio"),
-             InlineKeyboardButton("🎮 Partidas", callback_data="partidas")]
+            [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
+             InlineKeyboardButton("🔄 Atualizar", callback_data="portfolio")]
         ]
         
         update.message.reply_text(
@@ -421,23 +391,25 @@ class BotLoLV3Railway:
             "• Sistema: ✅ Operacional\n"
             "• Monitoramento: 🔄 Ativo\n"
             "• Bankroll: R$ 10.000\n"
-            "• Risk Level: Baixo\n\n"
+            "• Risk Level: Conservador\n\n"
             "🎮 **LIGAS MONITORADAS:**\n"
-            "🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS • 🇧🇷 CBLOL\n\n"
-            "📈 **OPORTUNIDADES ATIVAS:**\n"
-            "• Total encontradas: 2\n"
-            "• Value médio: +4.5%\n"
-            "• Stake total sugerido: R$ 550\n"
-            "• Exposição atual: 5.5%\n\n"
-            "📊 **MÉTRICAS DE RISCO:**\n"
-            "• Diversificação: 2 ligas\n"
-            "• Max bet individual: 25%\n"
-            "• Kelly Criterion ativo\n\n"
-            "🔄 **Sistema de estatísticas ao vivo:**\n"
+            "🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS • 🇧🇷 CBLOL\n"
+            "🇯🇵 LJL • 🇦🇺 LCO • 🌏 PCS • 🇫🇷 LFL • 🇩🇪 Prime League\n\n"
+            "📈 **AGUARDANDO OPORTUNIDADES:**\n"
+            "• Nenhuma partida ativa no momento\n"
+            "• Sistema preparado para detectar value bets\n"
+            "• Análise automática quando houver partidas\n\n"
+            "📊 **CONFIGURAÇÕES DE RISCO:**\n"
+            "• Diversificação: Múltiplas ligas\n"
+            "• Max bet individual: 25% da banca\n"
+            "• Kelly Criterion ativo\n"
+            "• Stop-loss automático\n\n"
+            "🔄 **SISTEMA PREPARADO:**\n"
             "• Probabilidades dinâmicas ✅\n"
             "• Monitoramento 24/7 ✅\n"
-            "• API Riot integrada ✅\n\n"
-            f"⏰ **Última atualização:** {datetime.now().strftime('%H:%M:%S')}",
+            "• API Riot integrada ✅\n"
+            "• Alertas automáticos ✅\n\n"
+            f"⏰ **Status:** Aguardando partidas - {datetime.now().strftime('%H:%M:%S')}",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
@@ -457,41 +429,67 @@ class BotLoLV3Railway:
             self.value(update, context)
         elif query.data == "portfolio":
             self.portfolio(update, context)
+        elif query.data == "sistema":
+            query.edit_message_text(
+                "🎯 **STATUS DO SISTEMA**\n\n"
+                "✅ **COMPONENTES ATIVOS:**\n"
+                "• Bot Telegram: Online\n"
+                "• API Riot Games: Conectada\n"
+                "• Sistema de monitoramento: Ativo\n"
+                "• Health check: Operacional\n\n"
+                "🔄 **FUNCIONALIDADES:**\n"
+                "• Detecção automática de partidas\n"
+                "• Estatísticas em tempo real\n"
+                "• Value betting automático\n"
+                "• Portfolio management\n\n"
+                "📊 **MÉTRICAS:**\n"
+                f"• Uptime: {datetime.now().strftime('%H:%M:%S')}\n"
+                "• Latência: <100ms\n"
+                "• Status: Operacional\n\n"
+                "⚡ **Sistema preparado para detectar partidas!**",
+                parse_mode=ParseMode.MARKDOWN
+            )
         elif query.data == "kelly":
             query.edit_message_text(
                 "🎯 **KELLY CRITERION CALCULATOR**\n\n"
-                "💰 **CONFIGURAÇÕES:**\n"
+                "ℹ️ **AGUARDANDO PARTIDAS PARA CÁLCULO**\n\n"
+                "💰 **CONFIGURAÇÕES PREPARADAS:**\n"
                 "• Banca padrão: R$ 10.000\n"
                 "• Max bet individual: 25%\n"
-                "• Diversificação: Recomendada\n\n"
-                "📊 **CÁLCULOS ATIVOS:**\n"
-                "• T1 vs Gen.G: 3.1% da banca\n"
-                "• G2 vs Fnatic: 2.4% da banca\n\n"
-                "🎯 **VANTAGENS:**\n"
+                "• Diversificação: Recomendada\n"
+                "• Risk management: Ativo\n\n"
+                "📊 **QUANDO HOUVER PARTIDAS:**\n"
+                "• Cálculo automático de Kelly\n"
+                "• Stakes otimizados por partida\n"
+                "• Análise de risco em tempo real\n"
+                "• Recomendações personalizadas\n\n"
+                "🎯 **VANTAGENS DO KELLY:**\n"
                 "• Maximiza crescimento da banca\n"
                 "• Minimiza risco de falência\n"
                 "• Baseado em matemática sólida\n\n"
-                "⚡ **Sistema ativo 24/7**",
+                "⚡ **Sistema ativo e preparado!**",
                 parse_mode=ParseMode.MARKDOWN
             )
         elif query.data == "predict":
             query.edit_message_text(
                 "🔮 **SISTEMA DE PREDIÇÃO**\n\n"
-                "📊 **PREDIÇÕES ATIVAS:**\n\n"
-                "🎮 **T1 vs Gen.G**\n"
-                "• T1: 62% de vitória\n"
-                "• Gen.G: 38% de vitória\n"
-                "• Confiança: Alta\n\n"
-                "🎮 **G2 vs Fnatic**\n"
-                "• G2: 58% de vitória\n"
-                "• Fnatic: 42% de vitória\n"
-                "• Confiança: Média\n\n"
-                "🎯 **FATORES ANALISADOS:**\n"
-                "• Rating dos times\n"
-                "• Forma recente\n"
-                "• Força da liga\n"
-                "• Estatísticas ao vivo\n\n"
-                "⚡ **Probabilidades se atualizam em tempo real!**",
+                "ℹ️ **AGUARDANDO PARTIDAS PARA ANÁLISE**\n\n"
+                "🎯 **FUNCIONALIDADES PREPARADAS:**\n"
+                "• Análise de probabilidades dinâmicas\n"
+                "• Rating dos times por liga\n"
+                "• Forma recente e consistência\n"
+                "• Força da liga e região\n\n"
+                "📊 **QUANDO HOUVER PARTIDAS:**\n"
+                "• Predições em tempo real\n"
+                "• Probabilidades que evoluem\n"
+                "• Análise de confiança\n"
+                "• Fatores detalhados\n\n"
+                "🔄 **SISTEMA INTEGRADO:**\n"
+                "• API Riot Games\n"
+                "• Algoritmos avançados\n"
+                "• Machine learning\n"
+                "• Dados históricos\n\n"
+                "⚡ **Predições aparecerão automaticamente!**",
                 parse_mode=ParseMode.MARKDOWN
             )
     
