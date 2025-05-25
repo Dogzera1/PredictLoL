@@ -410,14 +410,19 @@ class BotLoLV3Railway:
     def start(self, update: Update, context):
         """Comando /start"""
         self.health_manager.update_activity()
-        
+        return self.show_main_menu(update, context)
+    
+    def show_main_menu(self, update, context, edit_message=False):
+        """Exibe o menu principal com botões"""
         keyboard = [
             [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
              InlineKeyboardButton("📊 Estatísticas", callback_data="stats")],
             [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
              InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")],
             [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
-             InlineKeyboardButton("💡 Dicas Pro", callback_data="tips")]
+             InlineKeyboardButton("💡 Dicas Pro", callback_data="tips")],
+            [InlineKeyboardButton("🎲 Demo Sistema", callback_data="demo"),
+             InlineKeyboardButton("❓ Ajuda", callback_data="help")]
         ]
         
         message_text = (
@@ -434,11 +439,12 @@ class BotLoLV3Railway:
             "• EV Alto = 2 unidades\n"
             "• Confiança Alta = 2 unidades\n"
             "• Gestão de risco inteligente\n\n"
-            "🌍 **Cobertura global de ligas**"
+            "🌍 **Cobertura global de ligas**\n\n"
+            "👇 **Escolha uma opção abaixo:**"
         )
         
-        if NEW_VERSION:
-            return update.message.reply_text(
+        if edit_message and hasattr(update, 'callback_query'):
+            return update.callback_query.edit_message_text(
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
@@ -453,6 +459,10 @@ class BotLoLV3Railway:
     def help(self, update: Update, context):
         """Comando /help"""
         self.health_manager.update_activity()
+        
+        keyboard = [
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+        ]
         
         message_text = (
             "📚 **GUIA COMPLETO DO BOT**\n\n"
@@ -491,18 +501,20 @@ class BotLoLV3Railway:
         
         return update.message.reply_text(
             message_text,
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
     def partidas(self, update: Update, context):
         """Comando /partidas"""
         self.health_manager.update_activity()
-        
+
         keyboard = [
             [InlineKeyboardButton("🔄 Verificar Novamente", callback_data="partidas"),
              InlineKeyboardButton("💰 Value Betting", callback_data="value")],
             [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
-             InlineKeyboardButton("🎯 Sistema", callback_data="sistema")]
+             InlineKeyboardButton("🎯 Sistema", callback_data="sistema")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
         ]
         
         message_text = (
@@ -538,7 +550,8 @@ class BotLoLV3Railway:
             [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
              InlineKeyboardButton("💰 Value Betting", callback_data="value")],
             [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
-             InlineKeyboardButton("🔄 Atualizar", callback_data="stats")]
+             InlineKeyboardButton("🔄 Atualizar", callback_data="stats")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
         ]
         
         message_text = (
@@ -576,7 +589,8 @@ class BotLoLV3Railway:
             [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
              InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
             [InlineKeyboardButton("💡 Dicas Pro", callback_data="tips"),
-             InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
+             InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
         ]
         
         message_text = (
@@ -623,7 +637,8 @@ class BotLoLV3Railway:
             [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
              InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units")],
             [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
-             InlineKeyboardButton("🔄 Atualizar Dicas", callback_data="tips")]
+             InlineKeyboardButton("🔄 Atualizar Dicas", callback_data="tips")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
         ]
         
         message_text = (
@@ -659,7 +674,8 @@ class BotLoLV3Railway:
             [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
              InlineKeyboardButton("💡 Dicas Pro", callback_data="tips")],
             [InlineKeyboardButton("🔄 Verificar Oportunidades", callback_data="value"),
-             InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
+             InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
         ]
         
         message_text = (
@@ -702,7 +718,8 @@ class BotLoLV3Railway:
             [InlineKeyboardButton("💰 Value Bets", callback_data="value"),
              InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
             [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
-             InlineKeyboardButton("🔄 Atualizar", callback_data="portfolio")]
+             InlineKeyboardButton("🔄 Atualizar", callback_data="portfolio")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
         ]
         
         message_text = (
@@ -745,7 +762,8 @@ class BotLoLV3Railway:
             [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
              InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units")],
             [InlineKeyboardButton("💡 Dicas Pro", callback_data="tips"),
-             InlineKeyboardButton("🔄 Novo Demo", callback_data="demo")]
+             InlineKeyboardButton("🔄 Novo Demo", callback_data="demo")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
         ]
         
         demo_text = self.format_value_demo()
@@ -763,12 +781,18 @@ class BotLoLV3Railway:
         
         self.health_manager.update_activity()
         
-        if query.data == "partidas":
+        # Menu principal
+        if query.data == "menu_principal":
+            return self.show_main_menu(update, context, edit_message=True)
+        
+        # Partidas
+        elif query.data == "partidas":
             keyboard = [
                 [InlineKeyboardButton("🔄 Verificar Novamente", callback_data="partidas"),
                  InlineKeyboardButton("💰 Value Betting", callback_data="value")],
                 [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
-                 InlineKeyboardButton("🎯 Sistema", callback_data="sistema")]
+                 InlineKeyboardButton("🎯 Sistema", callback_data="sistema")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
             ]
             
             message_text = (
@@ -796,7 +820,279 @@ class BotLoLV3Railway:
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         
+        # Stats
+        elif query.data == "stats":
+            keyboard = [
+                [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
+                 InlineKeyboardButton("💰 Value Betting", callback_data="value")],
+                [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
+                 InlineKeyboardButton("🔄 Atualizar", callback_data="stats")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
+            message_text = (
+                "📊 **SISTEMA DE ESTATÍSTICAS AO VIVO**\n\n"
+                "ℹ️ **AGUARDANDO PARTIDAS ATIVAS**\n\n"
+                "🎮 **FUNCIONALIDADES DISPONÍVEIS:**\n"
+                "• Gold, kills, mortes, assists em tempo real\n"
+                "• Dragões, barões, torres dinâmicos\n"
+                "• Probabilidades que evoluem com o tempo\n"
+                "• Análise por fase (Early/Mid/Late Game)\n"
+                "• Vantagens calculadas dinamicamente\n\n"
+                "🔄 **SISTEMA PREPARADO:**\n"
+                "• Monitoramento ativo 24/7\n"
+                "• Detecção automática de partidas\n"
+                "• Estatísticas atualizadas em tempo real\n"
+                "• Probabilidades dinâmicas ativas\n\n"
+                "⚡ **QUANDO HOUVER PARTIDAS:**\n"
+                "• Stats detalhadas aparecerão automaticamente\n"
+                "• Probabilidades se atualizarão em tempo real\n"
+                "• Sistema de value betting será ativado\n\n"
+                f"⏰ **Status:** Sistema operacional - {datetime.now().strftime('%H:%M:%S')}"
+            )
+            
+            return query.edit_message_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        # Value Betting
+        elif query.data == "value":
+            keyboard = [
+                [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
+                 InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
+                [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
+                 InlineKeyboardButton("💡 Dicas Pro", callback_data="tips")],
+                [InlineKeyboardButton("🔄 Verificar Oportunidades", callback_data="value"),
+                 InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
+            message_text = (
+                "💰 **VALUE BETTING - SISTEMA DE UNIDADES**\n\n"
+                "🔍 **MONITORAMENTO ATIVO**\n\n"
+                "ℹ️ **AGUARDANDO PARTIDAS PARA ANÁLISE**\n\n"
+                "🎯 **SISTEMA PREPARADO:**\n"
+                "• Detecção automática de value betting\n"
+                "• Cálculo de unidades baseado em EV + Confiança\n"
+                "• Análise de probabilidades vs odds\n"
+                "• Alertas instantâneos de oportunidades\n\n"
+                "📊 **QUANDO HOUVER PARTIDAS:**\n"
+                "• Value betting calculado automaticamente\n"
+                "• Unidades sugeridas (0.5 a 3.0)\n"
+                "• Análise de EV e confiança detalhada\n"
+                "• Recomendações personalizadas\n\n"
+                "🔄 **CONFIGURAÇÕES ATIVAS:**\n"
+                f"• Unidade base: R$ {self.value_system.base_unit}\n"
+                f"• Banca total: R$ {self.value_system.bankroll:,}\n"
+                f"• EV mínimo: {self.value_system.ev_threshold*100}%\n"
+                f"• Confiança mínima: {self.value_system.confidence_threshold*100}%\n\n"
+                "🎯 **CRITÉRIOS DE UNIDADES:**\n"
+                "• EV Muito Alto (8%+) + Confiança Alta = 2-3 unidades\n"
+                "• EV Alto (5-8%) + Confiança Média = 1-2 unidades\n"
+                "• EV Médio (3-5%) + Confiança Baixa = 0.5-1 unidade\n\n"
+                f"⏰ **Sistema operacional:** {datetime.now().strftime('%H:%M:%S')}"
+            )
+            
+            return query.edit_message_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        # Portfolio
+        elif query.data == "portfolio":
+            keyboard = [
+                [InlineKeyboardButton("💰 Value Bets", callback_data="value"),
+                 InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
+                [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
+                 InlineKeyboardButton("🔄 Atualizar", callback_data="portfolio")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
+            message_text = (
+                "📊 **PORTFOLIO DASHBOARD**\n\n"
+                "💰 **STATUS ATUAL:**\n"
+                "• Sistema: ✅ Operacional\n"
+                "• Monitoramento: 🔄 Ativo\n"
+                "• Bankroll: R$ 10.000\n"
+                "• Risk Level: Conservador\n\n"
+                "🎮 **LIGAS MONITORADAS:**\n"
+                "🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS • 🇧🇷 CBLOL\n"
+                "🇯🇵 LJL • 🇦🇺 LCO • 🌏 PCS • 🇫🇷 LFL • 🇩🇪 Prime League\n\n"
+                "📈 **AGUARDANDO OPORTUNIDADES:**\n"
+                "• Nenhuma partida ativa no momento\n"
+                "• Sistema preparado para detectar value bets\n"
+                "• Análise automática quando houver partidas\n\n"
+                "📊 **CONFIGURAÇÕES DE RISCO:**\n"
+                "• Diversificação: Múltiplas ligas\n"
+                "• Sistema de unidades ativo\n"
+                "• Stop-loss automático\n\n"
+                "🔄 **SISTEMA PREPARADO:**\n"
+                "• Probabilidades dinâmicas ✅\n"
+                "• Monitoramento 24/7 ✅\n"
+                "• API Riot integrada ✅\n"
+                "• Alertas automáticos ✅\n\n"
+                f"⏰ **Status:** Aguardando partidas - {datetime.now().strftime('%H:%M:%S')}"
+            )
+            
+            return query.edit_message_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        # Sistema de Unidades
+        elif query.data == "units":
+            keyboard = [
+                [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
+                 InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
+                [InlineKeyboardButton("💡 Dicas Pro", callback_data="tips"),
+                 InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
+            message_text = (
+                "🎯 **SISTEMA DE UNIDADES BÁSICAS**\n\n"
+                "💰 **CONFIGURAÇÃO ATUAL:**\n"
+                f"• Unidade base: R$ {self.value_system.base_unit}\n"
+                f"• Banca total: R$ {self.value_system.bankroll:,}\n"
+                f"• Máximo por aposta: {self.value_system.max_units_per_bet} unidades\n"
+                f"• EV mínimo: {self.value_system.ev_threshold*100}%\n\n"
+                "📊 **CRITÉRIOS DE UNIDADES:**\n\n"
+                "🔥 **EXPECTED VALUE (EV):**\n"
+                "• EV ≥8%: 2 unidades\n"
+                "• EV 5-8%: 1.5 unidades\n"
+                "• EV 3-5%: 1 unidade\n"
+                "• EV <3%: 0.5 unidade\n\n"
+                "⭐ **CONFIANÇA:**\n"
+                "• ≥85%: 2 unidades\n"
+                "• 75-85%: 1.5 unidades\n"
+                "• 65-75%: 1 unidade\n"
+                "• <65%: 0.5 unidade\n\n"
+                "🎯 **CÁLCULO FINAL:**\n"
+                "Unidades = (EV_units + Conf_units) ÷ 2\n"
+                "Máximo: 3 unidades por aposta\n\n"
+                "🛡️ **GESTÃO DE RISCO:**\n"
+                "• Máximo 5% da banca por dia\n"
+                "• Diversificação obrigatória\n"
+                "• Stop-loss automático\n"
+                "• Reavaliação a cada 100 apostas"
+            )
+            
+            return query.edit_message_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        # Dicas Pro
+        elif query.data == "tips":
+            suggestions = self.value_system.get_portfolio_suggestions()
+            
+            keyboard = [
+                [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
+                 InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units")],
+                [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
+                 InlineKeyboardButton("🔄 Atualizar Dicas", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
+            message_text = (
+                "💡 **DICAS PROFISSIONAIS DE BETTING**\n\n"
+                "💰 **GESTÃO DE BANCA:**\n" +
+                "\n".join(f"• {tip}" for tip in suggestions['bankroll_management']) + "\n\n"
+                "🎯 **CAÇA AO VALUE:**\n" +
+                "\n".join(f"• {tip}" for tip in suggestions['value_hunting']) + "\n\n"
+                "🛡️ **GESTÃO DE RISCO:**\n" +
+                "\n".join(f"• {tip}" for tip in suggestions['risk_management']) + "\n\n"
+                "🧠 **DICAS AVANÇADAS:**\n" +
+                "\n".join(f"• {tip}" for tip in suggestions['advanced_tips']) + "\n\n"
+                "⚡ **LEMBRE-SE:**\n"
+                "• Disciplina é mais importante que sorte\n"
+                "• Value betting é maratona, não sprint\n"
+                "• Sempre mantenha registros detalhados\n"
+                "• Nunca aposte com emoção"
+            )
+            
+            return query.edit_message_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        # Demo Sistema
+        elif query.data == "demo":
+            keyboard = [
+                [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
+                 InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units")],
+                [InlineKeyboardButton("💡 Dicas Pro", callback_data="tips"),
+                 InlineKeyboardButton("🔄 Novo Demo", callback_data="demo")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
+            demo_text = self.format_value_demo()
+            
+            return query.edit_message_text(
+                demo_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        # Help/Ajuda
+        elif query.data == "help":
+            keyboard = [
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
+            message_text = (
+                "📚 **GUIA COMPLETO DO BOT**\n\n"
+                "🎯 **COMANDOS PRINCIPAIS:**\n"
+                "• `/start` - Iniciar o bot\n"
+                "• `/help` - Este guia\n"
+                "• `/partidas` - Partidas ao vivo\n"
+                "• `/stats` - Estatísticas em tempo real\n"
+                "• `/value` - Value betting com unidades\n"
+                "• `/portfolio` - Dashboard do portfolio\n"
+                "• `/units` - Sistema de unidades básicas\n"
+                "• `/tips` - Dicas profissionais de betting\n"
+                "• `/demo` - Exemplos práticos do sistema\n\n"
+                "🎮 **FUNCIONALIDADES:**\n"
+                "• Monitoramento de partidas ao vivo\n"
+                "• Estatísticas detalhadas (gold, kills, objetivos)\n"
+                "• Probabilidades dinâmicas que evoluem\n"
+                "• Sistema de unidades baseado em EV + Confiança\n"
+                "• Análise de portfolio em tempo real\n"
+                "• Dicas profissionais de gestão de banca\n\n"
+                "💰 **SISTEMA DE UNIDADES:**\n"
+                "• EV Alto (8%+) = 2 unidades\n"
+                "• Confiança Alta (85%+) = 2 unidades\n"
+                "• Cálculo: (EV_units + Conf_units) ÷ 2\n"
+                "• Máximo: 3 unidades por aposta\n"
+                "• Gestão de risco inteligente\n\n"
+                "📊 **MÉTRICAS DISPONÍVEIS:**\n"
+                "• Gold, kills, mortes, assists, CS\n"
+                "• Dragões, barões, torres, inibidores\n"
+                "• Expected Value (EV) calculado\n"
+                "• Análise de confiança por partida\n"
+                "• Análise por fase da partida (Early/Mid/Late)\n"
+                "• Vantagens calculadas dinamicamente\n\n"
+                "🔄 **Sistema atualizado em tempo real!**"
+            )
+            
+            return query.edit_message_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        # Sistema
         elif query.data == "sistema":
+            keyboard = [
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="menu_principal")]
+            ]
+            
             message_text = (
                 "🎯 **STATUS DO SISTEMA**\n\n"
                 "✅ **COMPONENTES ATIVOS:**\n"
@@ -818,7 +1114,8 @@ class BotLoLV3Railway:
             
             return query.edit_message_text(
                 message_text,
-                parse_mode=ParseMode.MARKDOWN
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
     
     def get_demo_value_analysis(self):
