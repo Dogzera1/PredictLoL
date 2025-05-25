@@ -1980,7 +1980,7 @@ class BotLoLV3Railway:
                 f"\n\n⚡ **Patch:** {analysis['patch_version']}"
             )
             
-                         return query.edit_message_text(
+            return query.edit_message_text(
                  demo_text,
                  parse_mode=ParseMode.MARKDOWN,
                  reply_markup=InlineKeyboardMarkup(keyboard)
