@@ -21,11 +21,26 @@ import json
 from flask import Flask, jsonify
 import requests
 
-# Telegram Bot - v20.8 compatibility
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-from telegram.constants import ParseMode
-from telegram.error import TelegramError
+# Telegram Bot - Compatibilidade automática
+try:
+    # Tentar versão nova (v20+)
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+    from telegram.constants import ParseMode
+    from telegram.error import TelegramError
+    NEW_VERSION = True
+    print("✅ Usando python-telegram-bot v20+")
+except ImportError:
+    try:
+        # Tentar versão intermediária (v13-19)
+        from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, Filters
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+        from telegram.error import TelegramError
+        NEW_VERSION = False
+        print("✅ Usando python-telegram-bot v13-19")
+    except ImportError:
+        print("❌ Erro: Versão do python-telegram-bot não suportada")
+        sys.exit(1)
 
 # Scientific computing
 import numpy as np
@@ -346,7 +361,15 @@ class BotLoLV3Railway:
     
     def __init__(self):
         """Inicializar o bot com todas as funcionalidades"""
-        self.application = Application.builder().token(TOKEN).build()
+        if NEW_VERSION:
+            # Versão nova (v20+)
+            self.application = Application.builder().token(TOKEN).build()
+            self.bot_instance = self.application
+        else:
+            # Versão antiga (v13-19)
+            self.updater = Updater(TOKEN, use_context=True)
+            self.bot_instance = self.updater
+            
         self.health_manager = HealthCheckManager()
         self.live_stats = LiveStatsSystem()
         self.value_system = ValueBettingSystem()
@@ -359,18 +382,32 @@ class BotLoLV3Railway:
     
     def setup_commands(self):
         """Configurar comandos do bot"""
-        self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("help", self.help))
-        self.application.add_handler(CommandHandler("partidas", self.partidas))
-        self.application.add_handler(CommandHandler("stats", self.stats))
-        self.application.add_handler(CommandHandler("value", self.value))
-        self.application.add_handler(CommandHandler("portfolio", self.portfolio))
-        self.application.add_handler(CommandHandler("units", self.units_info))
-        self.application.add_handler(CommandHandler("tips", self.betting_tips))
-        self.application.add_handler(CommandHandler("demo", self.demo_system))
-        self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        if NEW_VERSION:
+            # Versão nova
+            self.application.add_handler(CommandHandler("start", self.start))
+            self.application.add_handler(CommandHandler("help", self.help))
+            self.application.add_handler(CommandHandler("partidas", self.partidas))
+            self.application.add_handler(CommandHandler("stats", self.stats))
+            self.application.add_handler(CommandHandler("value", self.value))
+            self.application.add_handler(CommandHandler("portfolio", self.portfolio))
+            self.application.add_handler(CommandHandler("units", self.units_info))
+            self.application.add_handler(CommandHandler("tips", self.betting_tips))
+            self.application.add_handler(CommandHandler("demo", self.demo_system))
+            self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        else:
+            # Versão antiga
+            self.updater.dispatcher.add_handler(CommandHandler("start", self.start))
+            self.updater.dispatcher.add_handler(CommandHandler("help", self.help))
+            self.updater.dispatcher.add_handler(CommandHandler("partidas", self.partidas))
+            self.updater.dispatcher.add_handler(CommandHandler("stats", self.stats))
+            self.updater.dispatcher.add_handler(CommandHandler("value", self.value))
+            self.updater.dispatcher.add_handler(CommandHandler("portfolio", self.portfolio))
+            self.updater.dispatcher.add_handler(CommandHandler("units", self.units_info))
+            self.updater.dispatcher.add_handler(CommandHandler("tips", self.betting_tips))
+            self.updater.dispatcher.add_handler(CommandHandler("demo", self.demo_system))
+            self.updater.dispatcher.add_handler(CallbackQueryHandler(self.handle_callback))
     
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def start(self, update: Update, context):
         """Comando /start"""
         self.health_manager.update_activity()
         
@@ -383,7 +420,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("💡 Dicas Pro", callback_data="tips")]
         ]
         
-        await update.message.reply_text(
+        message_text = (
             "🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮\n\n"
             "Olá! Eu sou o bot LoL V3 Ultra Avançado, desenvolvido para fornecer "
             "análises avançadas sobre partidas de League of Legends.\n\n"
@@ -397,16 +434,27 @@ class BotLoLV3Railway:
             "• EV Alto = 2 unidades\n"
             "• Confiança Alta = 2 unidades\n"
             "• Gestão de risco inteligente\n\n"
-            "🌍 **Cobertura global de ligas**",
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "🌍 **Cobertura global de ligas**"
         )
+        
+        if NEW_VERSION:
+            return update.message.reply_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        else:
+            return update.message.reply_text(
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
     
-    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def help(self, update: Update, context):
         """Comando /help"""
         self.health_manager.update_activity()
         
-        await update.message.reply_text(
+        message_text = (
             "📚 **GUIA COMPLETO DO BOT**\n\n"
             "🎯 **COMANDOS PRINCIPAIS:**\n"
             "• `/start` - Iniciar o bot\n"
@@ -438,11 +486,15 @@ class BotLoLV3Railway:
             "• Análise de confiança por partida\n"
             "• Análise por fase da partida (Early/Mid/Late)\n"
             "• Vantagens calculadas dinamicamente\n\n"
-            "🔄 **Sistema atualizado em tempo real!**",
+            "🔄 **Sistema atualizado em tempo real!**"
+        )
+        
+        return update.message.reply_text(
+            message_text,
             parse_mode=ParseMode.MARKDOWN
         )
     
-    async def partidas(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def partidas(self, update: Update, context):
         """Comando /partidas"""
         self.health_manager.update_activity()
         
@@ -453,7 +505,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("🎯 Sistema", callback_data="sistema")]
         ]
         
-        await update.message.reply_text(
+        message_text = (
             "🔍 **MONITORAMENTO DE PARTIDAS**\n\n"
             "ℹ️ **NENHUMA PARTIDA AO VIVO DETECTADA**\n\n"
             "🔄 **SISTEMA ATIVO:**\n"
@@ -469,12 +521,16 @@ class BotLoLV3Railway:
             "• Alertas automáticos quando detectar partidas\n"
             "• Estatísticas em tempo real disponíveis\n\n"
             f"🔄 **Última verificação:** {datetime.now().strftime('%H:%M:%S')}\n"
-            "💡 **Use 'Verificar Novamente' para atualizar**",
+            "💡 **Use 'Verificar Novamente' para atualizar**"
+        )
+        
+        return update.message.reply_text(
+            message_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def stats(self, update: Update, context):
         """Comando /stats - Estatísticas ao vivo"""
         self.health_manager.update_activity()
         
@@ -485,7 +541,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("🔄 Atualizar", callback_data="stats")]
         ]
         
-        await update.message.reply_text(
+        message_text = (
             "📊 **SISTEMA DE ESTATÍSTICAS AO VIVO**\n\n"
             "ℹ️ **AGUARDANDO PARTIDAS ATIVAS**\n\n"
             "🎮 **FUNCIONALIDADES DISPONÍVEIS:**\n"
@@ -503,12 +559,16 @@ class BotLoLV3Railway:
             "• Stats detalhadas aparecerão automaticamente\n"
             "• Probabilidades se atualizarão em tempo real\n"
             "• Sistema de value betting será ativado\n\n"
-            f"⏰ **Status:** Sistema operacional - {datetime.now().strftime('%H:%M:%S')}",
+            f"⏰ **Status:** Sistema operacional - {datetime.now().strftime('%H:%M:%S')}"
+        )
+        
+        return update.message.reply_text(
+            message_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def units_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def units_info(self, update: Update, context):
         """Comando /units - Informações sobre sistema de unidades"""
         self.health_manager.update_activity()
         
@@ -519,7 +579,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
         ]
         
-        await update.message.reply_text(
+        message_text = (
             "🎯 **SISTEMA DE UNIDADES BÁSICAS**\n\n"
             "💰 **CONFIGURAÇÃO ATUAL:**\n"
             f"• Unidade base: R$ {self.value_system.base_unit}\n"
@@ -544,12 +604,16 @@ class BotLoLV3Railway:
             "• Máximo 5% da banca por dia\n"
             "• Diversificação obrigatória\n"
             "• Stop-loss automático\n"
-            "• Reavaliação a cada 100 apostas",
+            "• Reavaliação a cada 100 apostas"
+        )
+        
+        return update.message.reply_text(
+            message_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def betting_tips(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def betting_tips(self, update: Update, context):
         """Comando /tips - Dicas profissionais"""
         self.health_manager.update_activity()
         
@@ -562,7 +626,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("🔄 Atualizar Dicas", callback_data="tips")]
         ]
         
-        await update.message.reply_text(
+        message_text = (
             "💡 **DICAS PROFISSIONAIS DE BETTING**\n\n"
             "💰 **GESTÃO DE BANCA:**\n" +
             "\n".join(f"• {tip}" for tip in suggestions['bankroll_management']) + "\n\n"
@@ -576,12 +640,16 @@ class BotLoLV3Railway:
             "• Disciplina é mais importante que sorte\n"
             "• Value betting é maratona, não sprint\n"
             "• Sempre mantenha registros detalhados\n"
-            "• Nunca aposte com emoção",
+            "• Nunca aposte com emoção"
+        )
+        
+        return update.message.reply_text(
+            message_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def value(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def value(self, update: Update, context):
         """Comando /value - Value betting com sistema de unidades"""
         self.health_manager.update_activity()
         
@@ -594,7 +662,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
         ]
         
-        await update.message.reply_text(
+        message_text = (
             "💰 **VALUE BETTING - SISTEMA DE UNIDADES**\n\n"
             "🔍 **MONITORAMENTO ATIVO**\n\n"
             "ℹ️ **AGUARDANDO PARTIDAS PARA ANÁLISE**\n\n"
@@ -617,12 +685,16 @@ class BotLoLV3Railway:
             "• EV Muito Alto (8%+) + Confiança Alta = 2-3 unidades\n"
             "• EV Alto (5-8%) + Confiança Média = 1-2 unidades\n"
             "• EV Médio (3-5%) + Confiança Baixa = 0.5-1 unidade\n\n"
-            f"⏰ **Sistema operacional:** {datetime.now().strftime('%H:%M:%S')}",
+            f"⏰ **Sistema operacional:** {datetime.now().strftime('%H:%M:%S')}"
+        )
+        
+        return update.message.reply_text(
+            message_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def portfolio(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def portfolio(self, update: Update, context):
         """Comando /portfolio"""
         self.health_manager.update_activity()
         
@@ -633,7 +705,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("🔄 Atualizar", callback_data="portfolio")]
         ]
         
-        await update.message.reply_text(
+        message_text = (
             "📊 **PORTFOLIO DASHBOARD**\n\n"
             "💰 **STATUS ATUAL:**\n"
             "• Sistema: ✅ Operacional\n"
@@ -649,20 +721,23 @@ class BotLoLV3Railway:
             "• Análise automática quando houver partidas\n\n"
             "📊 **CONFIGURAÇÕES DE RISCO:**\n"
             "• Diversificação: Múltiplas ligas\n"
-            "• Max bet individual: 25% da banca\n"
-            "• Kelly Criterion ativo\n"
+            "• Sistema de unidades ativo\n"
             "• Stop-loss automático\n\n"
             "🔄 **SISTEMA PREPARADO:**\n"
             "• Probabilidades dinâmicas ✅\n"
             "• Monitoramento 24/7 ✅\n"
             "• API Riot integrada ✅\n"
             "• Alertas automáticos ✅\n\n"
-            f"⏰ **Status:** Aguardando partidas - {datetime.now().strftime('%H:%M:%S')}",
+            f"⏰ **Status:** Aguardando partidas - {datetime.now().strftime('%H:%M:%S')}"
+        )
+        
+        return update.message.reply_text(
+            message_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def demo_system(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def demo_system(self, update: Update, context):
         """Comando /demo - Demonstração do sistema de unidades"""
         self.health_manager.update_activity()
         
@@ -675,16 +750,16 @@ class BotLoLV3Railway:
         
         demo_text = self.format_value_demo()
         
-        await update.message.reply_text(
+        return update.message.reply_text(
             demo_text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def handle_callback(self, update: Update, context):
         """Handle callback queries"""
         query = update.callback_query
-        await query.answer()
+        query.answer()
         
         self.health_manager.update_activity()
         
@@ -696,7 +771,7 @@ class BotLoLV3Railway:
                  InlineKeyboardButton("🎯 Sistema", callback_data="sistema")]
             ]
             
-            await query.edit_message_text(
+            message_text = (
                 "🔍 **MONITORAMENTO DE PARTIDAS**\n\n"
                 "ℹ️ **NENHUMA PARTIDA AO VIVO DETECTADA**\n\n"
                 "🔄 **SISTEMA ATIVO:**\n"
@@ -712,119 +787,17 @@ class BotLoLV3Railway:
                 "• Alertas automáticos quando detectar partidas\n"
                 "• Estatísticas em tempo real disponíveis\n\n"
                 f"🔄 **Última verificação:** {datetime.now().strftime('%H:%M:%S')}\n"
-                "💡 **Use 'Verificar Novamente' para atualizar**",
+                "💡 **Use 'Verificar Novamente' para atualizar**"
+            )
+            
+            return query.edit_message_text(
+                message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
-            
-        elif query.data == "stats":
-            keyboard = [
-                [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
-                 InlineKeyboardButton("💰 Value Betting", callback_data="value")],
-                [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
-                 InlineKeyboardButton("🔄 Atualizar", callback_data="stats")]
-            ]
-            
-            await query.edit_message_text(
-                "📊 **SISTEMA DE ESTATÍSTICAS AO VIVO**\n\n"
-                "ℹ️ **AGUARDANDO PARTIDAS ATIVAS**\n\n"
-                "🎮 **FUNCIONALIDADES DISPONÍVEIS:**\n"
-                "• Gold, kills, mortes, assists em tempo real\n"
-                "• Dragões, barões, torres dinâmicos\n"
-                "• Probabilidades que evoluem com o tempo\n"
-                "• Análise por fase (Early/Mid/Late Game)\n"
-                "• Vantagens calculadas dinamicamente\n\n"
-                "🔄 **SISTEMA PREPARADO:**\n"
-                "• Monitoramento ativo 24/7\n"
-                "• Detecção automática de partidas\n"
-                "• Estatísticas atualizadas em tempo real\n"
-                "• Probabilidades dinâmicas ativas\n\n"
-                "⚡ **QUANDO HOUVER PARTIDAS:**\n"
-                "• Stats detalhadas aparecerão automaticamente\n"
-                "• Probabilidades se atualizarão em tempo real\n"
-                "• Sistema de value betting será ativado\n\n"
-                f"⏰ **Status:** Sistema operacional - {datetime.now().strftime('%H:%M:%S')}",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            
-        elif query.data == "value":
-            keyboard = [
-                [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
-                 InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
-                [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
-                 InlineKeyboardButton("💡 Dicas Pro", callback_data="tips")],
-                [InlineKeyboardButton("🔄 Verificar Oportunidades", callback_data="value"),
-                 InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
-            ]
-            
-            await query.edit_message_text(
-                "💰 **VALUE BETTING - SISTEMA DE UNIDADES**\n\n"
-                "🔍 **MONITORAMENTO ATIVO**\n\n"
-                "ℹ️ **AGUARDANDO PARTIDAS PARA ANÁLISE**\n\n"
-                "🎯 **SISTEMA PREPARADO:**\n"
-                "• Detecção automática de value betting\n"
-                "• Cálculo de unidades baseado em EV + Confiança\n"
-                "• Análise de probabilidades vs odds\n"
-                "• Alertas instantâneos de oportunidades\n\n"
-                "📊 **QUANDO HOUVER PARTIDAS:**\n"
-                "• Value betting calculado automaticamente\n"
-                "• Unidades sugeridas (0.5 a 3.0)\n"
-                "• Análise de EV e confiança detalhada\n"
-                "• Recomendações personalizadas\n\n"
-                "🔄 **CONFIGURAÇÕES ATIVAS:**\n"
-                f"• Unidade base: R$ {self.value_system.base_unit}\n"
-                f"• Banca total: R$ {self.value_system.bankroll:,}\n"
-                f"• EV mínimo: {self.value_system.ev_threshold*100}%\n"
-                f"• Confiança mínima: {self.value_system.confidence_threshold*100}%\n\n"
-                "🎯 **CRITÉRIOS DE UNIDADES:**\n"
-                "• EV Muito Alto (8%+) + Confiança Alta = 2-3 unidades\n"
-                "• EV Alto (5-8%) + Confiança Média = 1-2 unidades\n"
-                "• EV Médio (3-5%) + Confiança Baixa = 0.5-1 unidade\n\n"
-                f"⏰ **Sistema operacional:** {datetime.now().strftime('%H:%M:%S')}",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            
-        elif query.data == "portfolio":
-            keyboard = [
-                [InlineKeyboardButton("💰 Value Bets", callback_data="value"),
-                 InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
-                [InlineKeyboardButton("🎮 Ver Partidas", callback_data="partidas"),
-                 InlineKeyboardButton("🔄 Atualizar", callback_data="portfolio")]
-            ]
-            
-            await query.edit_message_text(
-                "📊 **PORTFOLIO DASHBOARD**\n\n"
-                "💰 **STATUS ATUAL:**\n"
-                "• Sistema: ✅ Operacional\n"
-                "• Monitoramento: 🔄 Ativo\n"
-                "• Bankroll: R$ 10.000\n"
-                "• Risk Level: Conservador\n\n"
-                "🎮 **LIGAS MONITORADAS:**\n"
-                "🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS • 🇧🇷 CBLOL\n"
-                "🇯🇵 LJL • 🇦🇺 LCO • 🌏 PCS • 🇫🇷 LFL • 🇩🇪 Prime League\n\n"
-                "📈 **AGUARDANDO OPORTUNIDADES:**\n"
-                "• Nenhuma partida ativa no momento\n"
-                "• Sistema preparado para detectar value bets\n"
-                "• Análise automática quando houver partidas\n\n"
-                "📊 **CONFIGURAÇÕES DE RISCO:**\n"
-                "• Diversificação: Múltiplas ligas\n"
-                "• Max bet individual: 25% da banca\n"
-                "• Kelly Criterion ativo\n"
-                "• Stop-loss automático\n\n"
-                "🔄 **SISTEMA PREPARADO:**\n"
-                "• Probabilidades dinâmicas ✅\n"
-                "• Monitoramento 24/7 ✅\n"
-                "• API Riot integrada ✅\n"
-                "• Alertas automáticos ✅\n\n"
-                f"⏰ **Status:** Aguardando partidas - {datetime.now().strftime('%H:%M:%S')}",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            
+        
         elif query.data == "sistema":
-            await query.edit_message_text(
+            message_text = (
                 "🎯 **STATUS DO SISTEMA**\n\n"
                 "✅ **COMPONENTES ATIVOS:**\n"
                 "• Bot Telegram: Online\n"
@@ -840,91 +813,12 @@ class BotLoLV3Railway:
                 f"• Uptime: {datetime.now().strftime('%H:%M:%S')}\n"
                 "• Latência: <100ms\n"
                 "• Status: Operacional\n\n"
-                "⚡ **Sistema preparado para detectar partidas!**",
+                "⚡ **Sistema preparado para detectar partidas!**"
+            )
+            
+            return query.edit_message_text(
+                message_text,
                 parse_mode=ParseMode.MARKDOWN
-            )
-        
-        elif query.data == "units":
-            keyboard = [
-                [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
-                 InlineKeyboardButton("📊 Ver Stats", callback_data="stats")],
-                [InlineKeyboardButton("💡 Dicas Pro", callback_data="tips"),
-                 InlineKeyboardButton("📈 Portfolio", callback_data="portfolio")]
-            ]
-            
-            await query.edit_message_text(
-                "🎯 **SISTEMA DE UNIDADES BÁSICAS**\n\n"
-                "💰 **CONFIGURAÇÃO ATUAL:**\n"
-                f"• Unidade base: R$ {self.value_system.base_unit}\n"
-                f"• Banca total: R$ {self.value_system.bankroll:,}\n"
-                f"• Máximo por aposta: {self.value_system.max_units_per_bet} unidades\n"
-                f"• EV mínimo: {self.value_system.ev_threshold*100}%\n\n"
-                "📊 **CRITÉRIOS DE UNIDADES:**\n\n"
-                "🔥 **EXPECTED VALUE (EV):**\n"
-                "• EV ≥8%: 2 unidades\n"
-                "• EV 5-8%: 1.5 unidades\n"
-                "• EV 3-5%: 1 unidade\n"
-                "• EV <3%: 0.5 unidade\n\n"
-                "⭐ **CONFIANÇA:**\n"
-                "• ≥85%: 2 unidades\n"
-                "• 75-85%: 1.5 unidades\n"
-                "• 65-75%: 1 unidade\n"
-                "• <65%: 0.5 unidade\n\n"
-                "🎯 **CÁLCULO FINAL:**\n"
-                "Unidades = (EV_units + Conf_units) ÷ 2\n"
-                "Máximo: 3 unidades por aposta\n\n"
-                "🛡️ **GESTÃO DE RISCO:**\n"
-                "• Máximo 5% da banca por dia\n"
-                "• Diversificação obrigatória\n"
-                "• Stop-loss automático\n"
-                "• Reavaliação a cada 100 apostas",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        
-        elif query.data == "tips":
-            suggestions = self.value_system.get_portfolio_suggestions()
-            
-            keyboard = [
-                [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
-                 InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units")],
-                [InlineKeyboardButton("📈 Portfolio", callback_data="portfolio"),
-                 InlineKeyboardButton("🔄 Atualizar Dicas", callback_data="tips")]
-            ]
-            
-            await query.edit_message_text(
-                "💡 **DICAS PROFISSIONAIS DE BETTING**\n\n"
-                "💰 **GESTÃO DE BANCA:**\n" +
-                "\n".join(f"• {tip}" for tip in suggestions['bankroll_management']) + "\n\n"
-                "🎯 **CAÇA AO VALUE:**\n" +
-                "\n".join(f"• {tip}" for tip in suggestions['value_hunting']) + "\n\n"
-                "🛡️ **GESTÃO DE RISCO:**\n" +
-                "\n".join(f"• {tip}" for tip in suggestions['risk_management']) + "\n\n"
-                "🧠 **DICAS AVANÇADAS:**\n" +
-                "\n".join(f"• {tip}" for tip in suggestions['advanced_tips']) + "\n\n"
-                "⚡ **LEMBRE-SE:**\n"
-                "• Disciplina é mais importante que sorte\n"
-                "• Value betting é maratona, não sprint\n"
-                "• Sempre mantenha registros detalhados\n"
-                "• Nunca aposte com emoção",
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        
-        elif query.data == "demo":
-            keyboard = [
-                [InlineKeyboardButton("💰 Value Betting", callback_data="value"),
-                 InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units")],
-                [InlineKeyboardButton("💡 Dicas Pro", callback_data="tips"),
-                 InlineKeyboardButton("🔄 Novo Demo", callback_data="demo")]
-            ]
-            
-            demo_text = self.format_value_demo()
-            
-            await query.edit_message_text(
-                demo_text,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=InlineKeyboardMarkup(keyboard)
             )
     
     def get_demo_value_analysis(self):
@@ -1004,7 +898,15 @@ class BotLoLV3Railway:
     def run(self):
         """Executar o bot"""
         logger.info("🚀 Iniciando Bot LoL V3...")
-        self.application.run_polling()
+        
+        if NEW_VERSION:
+            # Versão nova - usar run_polling
+            self.application.run_polling()
+        else:
+            # Versão antiga - usar start_polling + idle
+            self.updater.start_polling()
+            self.updater.idle()
+            
         logger.info("✅ Bot iniciado com sucesso!")
 
 def main():
