@@ -531,26 +531,141 @@ class ValueBettingSystem:
     
     def _calculate_team_strength(self, team_name: str, league: str) -> float:
         """Calcula força do time baseado em nome e liga"""
-        # Base strength por liga
+        # Base strength por liga - EXPANDIDO PARA TODAS AS LIGAS DO MUNDO
         league_strength = {
-            'LCK': 0.9,
-            'LPL': 0.85, 
-            'LEC': 0.75,
-            'LCS': 0.65,
-            'CBLOL': 0.6,
-            'LJL': 0.55,
-            'LCO': 0.5,
-            'LFL': 0.7
+            # TIER 1 - Ligas principais
+            'LCK': 0.9,          # Coreia do Sul
+            'LPL': 0.85,         # China
+            'LEC': 0.75,         # Europa
+            'LCS': 0.65,         # América do Norte
+            
+            # TIER 2 - Ligas regionais fortes
+            'CBLOL': 0.6,        # Brasil
+            'LJL': 0.55,         # Japão
+            'LCO': 0.5,          # Oceania
+            'PCS': 0.58,         # Pacific Championship Series
+            'VCS': 0.52,         # Vietnam
+            
+            # TIER 3 - Ligas secundárias da Europa
+            'LFL': 0.7,          # França (La Ligue Française)
+            'Prime League': 0.68, # Alemanha
+            'Superliga': 0.66,   # Espanha
+            'PG Nationals': 0.64, # Itália
+            'Ultraliga': 0.62,   # Polônia
+            'NLC': 0.60,         # Reino Unido/Irlanda (Northern League)
+            'Greek Legends': 0.58, # Grécia
+            'TCL': 0.65,         # Turquia
+            'LCL': 0.63,         # Rússia/CIS
+            'Baltic Masters': 0.57, # Países Bálticos
+            'Benelux League': 0.59, # Holanda/Bélgica
+            'Austrian Force': 0.56, # Áustria
+            'Swiss NLB': 0.55,   # Suíça
+            'Portuguese League': 0.54, # Portugal
+            'Czech-Slovak': 0.53, # República Tcheca/Eslováquia
+            'Hungarian Championship': 0.52, # Hungria
+            'Romanian League': 0.51, # Romênia
+            'Bulgarian League': 0.50, # Bulgária
+            'Croatian League': 0.49, # Croácia
+            'Serbian League': 0.48, # Sérvia
+            'Slovenian League': 0.47, # Eslovênia
+            
+            # TIER 4 - Outras regiões
+            'LLA': 0.48,         # América Latina
+            'LCSA': 0.45,        # América do Sul (outros países)
+            'LAS': 0.44,         # América Latina Sul
+            'LAN': 0.43,         # América Latina Norte
+            'MSI': 0.42,         # Torneios internacionais menores
+            'Worlds': 0.95,      # Mundial (máxima força)
+            'Rift Rivals': 0.70, # Torneios inter-regionais
+            
+            # TIER 5 - Ligas emergentes e amadoras
+            'University': 0.40,   # Ligas universitárias
+            'Academy': 0.38,     # Ligas de desenvolvimento
+            'Amateur': 0.35,     # Ligas amadoras
+            'Regional': 0.33,    # Ligas regionais menores
+            'Local': 0.30,       # Torneios locais
+            
+            # Ligas específicas por país (adicionais)
+            'LCK CL': 0.75,      # LCK Challengers (Coreia)
+            'LDL': 0.70,         # Liga de desenvolvimento China
+            'ERL': 0.65,         # European Regional Leagues (geral)
+            'NACL': 0.55,        # North American Challengers League
+            'CBLoL Academy': 0.50, # Academia Brasil
+            'LJL Academy': 0.45,  # Academia Japão
+            
+            # Torneios especiais
+            'MSI Play-In': 0.60, # MSI fase de entrada
+            'Worlds Play-In': 0.65, # Worlds fase de entrada
+            'Asian Games': 0.80,  # Jogos Asiáticos
+            'Continental': 0.75,  # Torneios continentais
         }
         
-        # Teams conhecidos com ratings
+        # Teams conhecidos com ratings - EXPANDIDO GLOBALMENTE
         team_ratings = {
-            'T1': 0.95, 'Gen.G': 0.90, 'DRX': 0.85, 'KT': 0.80,
-            'JDG': 0.95, 'BLG': 0.90, 'WBG': 0.85, 'LNG': 0.80,
-            'G2': 0.90, 'Fnatic': 0.85, 'MAD': 0.80, 'Rogue': 0.75,
-            'C9': 0.80, 'TL': 0.78, 'TSM': 0.70, '100T': 0.75,
-            'LOUD': 0.85, 'paiN': 0.80, 'Red Canids': 0.75,
-            'DFM': 0.80, 'SG': 0.75, 'V3': 0.70
+            # LCK (Coreia)
+            'T1': 0.95, 'Gen.G': 0.90, 'DRX': 0.85, 'KT': 0.80, 'Hanwha Life': 0.75,
+            'DWG KIA': 0.88, 'LSB': 0.70, 'Nongshim': 0.72, 'Fredit BRION': 0.68,
+            'Kwangdong Freecs': 0.65, 'BRO': 0.63,
+            
+            # LPL (China)
+            'JDG': 0.95, 'BLG': 0.90, 'WBG': 0.85, 'LNG': 0.80, 'TES': 0.82,
+            'EDG': 0.84, 'RNG': 0.78, 'FPX': 0.76, 'IG': 0.74, 'WE': 0.72,
+            'AL': 0.70, 'OMG': 0.68, 'LGD': 0.66, 'UP': 0.64, 'NIP': 0.62,
+            'RA': 0.75, 'TT': 0.60,
+            
+            # LEC (Europa)
+            'G2': 0.90, 'Fnatic': 0.85, 'MAD': 0.80, 'Rogue': 0.75, 'BDS': 0.73,
+            'Vitality': 0.78, 'KOI': 0.70, 'Heretics': 0.68, 'Giants': 0.65,
+            'SK Gaming': 0.72, 'Astralis': 0.63,
+            
+            # LCS (América do Norte)
+            'C9': 0.80, 'TL': 0.78, 'TSM': 0.70, '100T': 0.75, 'FLY': 0.73,
+            'EG': 0.68, 'CLG': 0.65, 'IMT': 0.63, 'DIG': 0.60, 'GG': 0.58,
+            
+            # CBLOL (Brasil)
+            'LOUD': 0.85, 'paiN': 0.80, 'Red Canids': 0.75, 'FURIA': 0.78,
+            'Flamengo': 0.73, 'KaBuM': 0.70, 'Vivo Keyd': 0.68, 'INTZ': 0.65,
+            'Liberty': 0.63, 'Los Grandes': 0.60,
+            
+            # LJL (Japão)
+            'DFM': 0.80, 'SG': 0.75, 'V3': 0.70, 'CGA': 0.68, 'BC': 0.65,
+            'RJ': 0.63, 'AXZ': 0.60, 'SHG': 0.58,
+            
+            # LCO (Oceania)
+            'ORDER': 0.75, 'Chiefs': 0.70, 'Pentanet': 0.68, 'Gravitas': 0.65,
+            'Peace': 0.63, 'Mammoth': 0.60, 'Dire Wolves': 0.58,
+            
+            # PCS (Pacific)
+            'PSG Talon': 0.78, 'CTBC Flying Oyster': 0.73, 'Beyond Gaming': 0.70,
+            'J Team': 0.68, 'Machi Esports': 0.65, 'ahq': 0.63,
+            
+            # VCS (Vietnam)
+            'GAM Esports': 0.75, 'Saigon Buffalo': 0.70, 'Team Flash': 0.68,
+            'CERBERUS': 0.65, 'Team Secret': 0.63,
+            
+            # LFL (França)
+            'Karmine Corp': 0.85, 'LDLC OL': 0.80, 'Solary': 0.75, 'MCES': 0.73,
+            'Team GO': 0.70, 'Team BDS Academy': 0.68, 'Mirage Elyandra': 0.65,
+            
+            # Prime League (Alemanha)
+            'BIG': 0.82, 'Eintracht Spandau': 0.78, 'mousesports': 0.75,
+            'SK Gaming Prime': 0.73, 'PENTA': 0.70,
+            
+            # Superliga (Espanha)
+            'KOI': 0.80, 'Giants': 0.78, 'Heretics': 0.75, 'MAD Lions Madrid': 0.73,
+            'Movistar Riders': 0.70, 'UCAM': 0.68,
+            
+            # TCL (Turquia)
+            'Galatasaray': 0.78, 'Fenerbahçe': 0.75, 'SuperMassive': 0.73,
+            'Besiktas': 0.70, 'Istanbul Wildcats': 0.68,
+            
+            # LLA (América Latina)
+            'R7': 0.70, 'Estral Esports': 0.68, 'Infinity': 0.65, 'Isurus': 0.63,
+            'All Knights': 0.60, 'Movistar R7': 0.58,
+            
+            # Times genéricos para ligas menores
+            'Team Alpha': 0.60, 'Team Beta': 0.58, 'Team Gamma': 0.56,
+            'Team Delta': 0.54, 'Team Epsilon': 0.52, 'Team Zeta': 0.50,
         }
         
         # Base strength da liga
@@ -655,11 +770,35 @@ class ValueBettingSystem:
         
         # Emoji da liga
         league_emoji = {
-            'LCK': '🇰🇷',
-            'LPL': '🇨🇳',
-            'LEC': '🇪🇺',
-            'LCS': '🇺🇸',
-            'CBLOL': '🇧🇷'
+            # Ligas principais
+            'LCK': '🇰🇷', 'LPL': '🇨🇳', 'LEC': '🇪🇺', 'LCS': '🇺🇸',
+            
+            # Ligas regionais
+            'CBLOL': '🇧🇷', 'LJL': '🇯🇵', 'LCO': '🇦🇺', 'PCS': '🌏', 'VCS': '🇻🇳',
+            
+            # Ligas secundárias da Europa
+            'LFL': '🇫🇷', 'Prime League': '🇩🇪', 'Superliga': '🇪🇸', 'PG Nationals': '🇮🇹',
+            'Ultraliga': '🇵🇱', 'NLC': '🇬🇧', 'Greek Legends': '🇬🇷', 'TCL': '🇹🇷',
+            'LCL': '🇷🇺', 'Baltic Masters': '🇱🇹', 'Benelux League': '🇳🇱',
+            'Austrian Force': '🇦🇹', 'Swiss NLB': '🇨🇭', 'Portuguese League': '🇵🇹',
+            'Czech-Slovak': '🇨🇿', 'Hungarian Championship': '🇭🇺', 'Romanian League': '🇷🇴',
+            'Bulgarian League': '🇧🇬', 'Croatian League': '🇭🇷', 'Serbian League': '🇷🇸',
+            'Slovenian League': '🇸🇮',
+            
+            # Outras regiões
+            'LLA': '🌎', 'LCSA': '🌎', 'LAS': '🌎', 'LAN': '🌎',
+            
+            # Torneios especiais
+            'MSI': '🏆', 'Worlds': '🌍', 'Rift Rivals': '⚔️', 'Asian Games': '🥇',
+            'Continental': '🌐',
+            
+            # Ligas de desenvolvimento
+            'LCK CL': '🇰🇷', 'LDL': '🇨🇳', 'ERL': '🇪🇺', 'NACL': '🇺🇸',
+            'CBLoL Academy': '🇧🇷', 'LJL Academy': '🇯🇵',
+            
+            # Ligas emergentes
+            'University': '🎓', 'Academy': '📚', 'Amateur': '🎮',
+            'Regional': '🏘️', 'Local': '🏠'
         }.get(opportunity['league'], '🎮')
         
         alert_text = f"""🚨 **VALUE BETTING ALERT** 🚨
@@ -1082,7 +1221,32 @@ class DynamicPredictionSystem:
     def _calculate_region_adjustment(self, team1_data: Dict, team2_data: Dict) -> float:
         """Ajuste baseado na força das regiões"""
         region_strength = {
-            'LCK': 0.02, 'LPL': 0.01, 'LEC': 0.00, 'LCS': -0.01, 'CBLOL': -0.02
+            # TIER 1 - Ligas principais
+            'LCK': 0.02, 'LPL': 0.01, 'LEC': 0.00, 'LCS': -0.01,
+            
+            # TIER 2 - Ligas regionais fortes  
+            'CBLOL': -0.02, 'LJL': -0.03, 'LCO': -0.04, 'PCS': -0.025, 'VCS': -0.035,
+            
+            # TIER 3 - Ligas secundárias da Europa
+            'LFL': -0.005, 'Prime League': -0.01, 'Superliga': -0.015, 'PG Nationals': -0.02,
+            'Ultraliga': -0.025, 'NLC': -0.03, 'Greek Legends': -0.035, 'TCL': -0.012,
+            'LCL': -0.018, 'Baltic Masters': -0.04, 'Benelux League': -0.032,
+            'Austrian Force': -0.042, 'Swiss NLB': -0.045, 'Portuguese League': -0.048,
+            'Czech-Slovak': -0.05, 'Hungarian Championship': -0.052, 'Romanian League': -0.055,
+            'Bulgarian League': -0.058, 'Croatian League': -0.06, 'Serbian League': -0.062,
+            'Slovenian League': -0.065,
+            
+            # TIER 4 - Outras regiões
+            'LLA': -0.06, 'LCSA': -0.07, 'LAS': -0.072, 'LAN': -0.075,
+            'MSI': 0.05, 'Worlds': 0.08, 'Rift Rivals': -0.005,
+            
+            # TIER 5 - Ligas emergentes
+            'University': -0.08, 'Academy': -0.085, 'Amateur': -0.09,
+            'Regional': -0.095, 'Local': -0.10,
+            
+            # Ligas específicas
+            'LCK CL': 0.015, 'LDL': 0.005, 'ERL': -0.02, 'NACL': -0.04,
+            'CBLoL Academy': -0.06, 'LJL Academy': -0.07
         }
         
         region1 = team1_data.get('region', 'Unknown')
@@ -1495,11 +1659,35 @@ O sistema monitora continuamente:
                 
                 # Emoji da liga
                 league_emoji = {
-                    'LCK': '🇰🇷',
-                    'LPL': '🇨🇳',
-                    'LEC': '🇪🇺', 
-                    'LCS': '🇺🇸',
-                    'CBLOL': '🇧🇷'
+                    # Ligas principais
+                    'LCK': '🇰🇷', 'LPL': '🇨🇳', 'LEC': '🇪🇺', 'LCS': '🇺🇸',
+                    
+                    # Ligas regionais
+                    'CBLOL': '🇧🇷', 'LJL': '🇯🇵', 'LCO': '🇦🇺', 'PCS': '🌏', 'VCS': '🇻🇳',
+                    
+                    # Ligas secundárias da Europa
+                    'LFL': '🇫🇷', 'Prime League': '🇩🇪', 'Superliga': '🇪🇸', 'PG Nationals': '🇮🇹',
+                    'Ultraliga': '🇵🇱', 'NLC': '🇬🇧', 'Greek Legends': '🇬🇷', 'TCL': '🇹🇷',
+                    'LCL': '🇷🇺', 'Baltic Masters': '🇱🇹', 'Benelux League': '🇳🇱',
+                    'Austrian Force': '🇦🇹', 'Swiss NLB': '🇨🇭', 'Portuguese League': '🇵🇹',
+                    'Czech-Slovak': '🇨🇿', 'Hungarian Championship': '🇭🇺', 'Romanian League': '🇷🇴',
+                    'Bulgarian League': '🇧🇬', 'Croatian League': '🇭🇷', 'Serbian League': '🇷🇸',
+                    'Slovenian League': '🇸🇮',
+                    
+                    # Outras regiões
+                    'LLA': '🌎', 'LCSA': '🌎', 'LAS': '🌎', 'LAN': '🌎',
+                    
+                    # Torneios especiais
+                    'MSI': '🏆', 'Worlds': '🌍', 'Rift Rivals': '⚔️', 'Asian Games': '🥇',
+                    'Continental': '🌐',
+                    
+                    # Ligas de desenvolvimento
+                    'LCK CL': '🇰🇷', 'LDL': '🇨🇳', 'ERL': '🇪🇺', 'NACL': '🇺🇸',
+                    'CBLoL Academy': '🇧🇷', 'LJL Academy': '🇯🇵',
+                    
+                    # Ligas emergentes
+                    'University': '🎓', 'Academy': '📚', 'Amateur': '🎮',
+                    'Regional': '🏘️', 'Local': '🏠'
                 }.get(opp['league'], '🎮')
                 
                 value_text += f"""{conf_emoji} **{opp['team1']} vs {opp['team2']}**
@@ -1663,7 +1851,37 @@ O sistema monitora continuamente:
                 
                 for i, opp in enumerate(current_opportunities[:3], 1):  # Máximo 3
                     conf_emoji = {'Muito Alta': '🔥', 'Alta': '⚡', 'Média': '📊', 'Baixa': '⚠️'}.get(opp['confidence'], '📊')
-                    league_emoji = {'LCK': '🇰🇷', 'LPL': '🇨🇳', 'LEC': '🇪🇺', 'LCS': '🇺🇸', 'CBLOL': '🇧🇷'}.get(opp['league'], '🎮')
+                    league_emoji = {
+                        # Ligas principais
+                        'LCK': '🇰🇷', 'LPL': '🇨🇳', 'LEC': '🇪🇺', 'LCS': '🇺🇸',
+                        
+                        # Ligas regionais
+                        'CBLOL': '🇧🇷', 'LJL': '🇯🇵', 'LCO': '🇦🇺', 'PCS': '🌏', 'VCS': '🇻🇳',
+                        
+                        # Ligas secundárias da Europa
+                        'LFL': '🇫🇷', 'Prime League': '🇩🇪', 'Superliga': '🇪🇸', 'PG Nationals': '🇮🇹',
+                        'Ultraliga': '🇵🇱', 'NLC': '🇬🇧', 'Greek Legends': '🇬🇷', 'TCL': '🇹🇷',
+                        'LCL': '🇷🇺', 'Baltic Masters': '🇱🇹', 'Benelux League': '🇳🇱',
+                        'Austrian Force': '🇦🇹', 'Swiss NLB': '🇨🇭', 'Portuguese League': '🇵🇹',
+                        'Czech-Slovak': '🇨🇿', 'Hungarian Championship': '🇭🇺', 'Romanian League': '🇷🇴',
+                        'Bulgarian League': '🇧🇬', 'Croatian League': '🇭🇷', 'Serbian League': '🇷🇸',
+                        'Slovenian League': '🇸🇮',
+                        
+                        # Outras regiões
+                        'LLA': '🌎', 'LCSA': '🌎', 'LAS': '🌎', 'LAN': '🌎',
+                        
+                        # Torneios especiais
+                        'MSI': '🏆', 'Worlds': '🌍', 'Rift Rivals': '⚔️', 'Asian Games': '🥇',
+                        'Continental': '🌐',
+                        
+                        # Ligas de desenvolvimento
+                        'LCK CL': '🇰🇷', 'LDL': '🇨🇳', 'ERL': '🇪🇺', 'NACL': '🇺🇸',
+                        'CBLoL Academy': '🇧🇷', 'LJL Academy': '🇯🇵',
+                        
+                        # Ligas emergentes
+                        'University': '🎓', 'Academy': '📚', 'Amateur': '🎮',
+                        'Regional': '🏘️', 'Local': '🏠'
+                    }.get(opp['league'], '🎮')
                     
                     kelly_text += f"""{conf_emoji} **{opp['team1']} vs {opp['team2']}**
 {league_emoji} Liga: {opp['league']}
@@ -1760,7 +1978,37 @@ O sistema monitora continuamente:
                 
                 for sentiment in live_sentiments[:4]:  # Máximo 4 times
                     emoji = sentiment.get('emoji', '📊')
-                    league_emoji = {'LCK': '🇰🇷', 'LPL': '🇨🇳', 'LEC': '🇪🇺', 'LCS': '🇺🇸', 'CBLOL': '🇧🇷'}.get(sentiment.get('league', ''), '🎮')
+                    league_emoji = {
+                        # Ligas principais
+                        'LCK': '🇰🇷', 'LPL': '🇨🇳', 'LEC': '🇪🇺', 'LCS': '🇺🇸',
+                        
+                        # Ligas regionais
+                        'CBLOL': '🇧🇷', 'LJL': '🇯🇵', 'LCO': '🇦🇺', 'PCS': '🌏', 'VCS': '🇻🇳',
+                        
+                        # Ligas secundárias da Europa
+                        'LFL': '🇫🇷', 'Prime League': '🇩🇪', 'Superliga': '🇪🇸', 'PG Nationals': '🇮🇹',
+                        'Ultraliga': '🇵🇱', 'NLC': '🇬🇧', 'Greek Legends': '🇬🇷', 'TCL': '🇹🇷',
+                        'LCL': '🇷🇺', 'Baltic Masters': '🇱🇹', 'Benelux League': '🇳🇱',
+                        'Austrian Force': '🇦🇹', 'Swiss NLB': '🇨🇭', 'Portuguese League': '🇵🇹',
+                        'Czech-Slovak': '🇨🇿', 'Hungarian Championship': '🇭🇺', 'Romanian League': '🇷🇴',
+                        'Bulgarian League': '🇧🇬', 'Croatian League': '🇭🇷', 'Serbian League': '🇷🇸',
+                        'Slovenian League': '🇸🇮',
+                        
+                        # Outras regiões
+                        'LLA': '🌎', 'LCSA': '🌎', 'LAS': '🌎', 'LAN': '🌎',
+                        
+                        # Torneios especiais
+                        'MSI': '🏆', 'Worlds': '🌍', 'Rift Rivals': '⚔️', 'Asian Games': '🥇',
+                        'Continental': '🌐',
+                        
+                        # Ligas de desenvolvimento
+                        'LCK CL': '🇰🇷', 'LDL': '🇨🇳', 'ERL': '🇪🇺', 'NACL': '🇺🇸',
+                        'CBLoL Academy': '🇧🇷', 'LJL Academy': '🇯🇵',
+                        
+                        # Ligas emergentes
+                        'University': '🎓', 'Academy': '📚', 'Amateur': '🎮',
+                        'Regional': '🏘️', 'Local': '🏠'
+                    }.get(sentiment.get('league', ''), '🎮')
                     
                     metrics = sentiment.get('metrics', {})
                     factors_text = ' • '.join(sentiment.get('factors', ['Análise padrão'])[:2])
