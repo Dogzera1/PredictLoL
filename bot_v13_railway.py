@@ -414,6 +414,11 @@ class ValueBettingSystem:
         self.monitor_running = False
         self.riot_client = riot_client
         self.recent_opportunities = []
+        # Configuração de alertas automáticos
+        self.auto_alerts_enabled = True
+        self.alert_groups = []  # Lista de chat_ids para enviar alertas
+        self.bot_instance = None  # Referência para o bot
+        self.last_alert_time = {}  # Controle de spam de alertas
         logger.info("💰 ValueBettingSystem inicializado com dados reais")
     
     def start_monitoring(self):
@@ -469,6 +474,9 @@ class ValueBettingSystem:
                             self.recent_opportunities.pop(0)
                         logger.info(f"💰 Value bet detectado: {value_bet['team1']} vs {value_bet['team2']} (Value: {value_bet['value']:.1%})")
                     
+                        # Enviar alerta automático se configurado
+                        self._send_value_alert(value_bet)
+            
         except Exception as e:
             logger.error(f"❌ Erro ao escanear oportunidades: {e}")
     
@@ -600,6 +608,92 @@ class ValueBettingSystem:
         ]
         
         return active_opportunities
+    
+    def set_bot_instance(self, bot_instance):
+        """Define a instância do bot para envio de alertas"""
+        self.bot_instance = bot_instance
+    
+    def add_alert_group(self, chat_id: int):
+        """Adiciona um grupo para receber alertas automáticos"""
+        if chat_id not in self.alert_groups:
+            self.alert_groups.append(chat_id)
+            logger.info(f"✅ Grupo {chat_id} adicionado para alertas de value betting")
+            return True
+        return False
+    
+    def remove_alert_group(self, chat_id: int):
+        """Remove um grupo dos alertas automáticos"""
+        if chat_id in self.alert_groups:
+            self.alert_groups.remove(chat_id)
+            logger.info(f"❌ Grupo {chat_id} removido dos alertas de value betting")
+            return True
+        return False
+    
+    def _send_value_alert(self, opportunity: Dict):
+        """Envia alerta de value betting para grupos configurados"""
+        if not self.bot_instance or not self.alert_groups or not self.auto_alerts_enabled:
+            return
+        
+        # Controle de spam - não enviar o mesmo alerta em menos de 5 minutos
+        match_key = f"{opportunity['team1']}_{opportunity['team2']}"
+        current_time = datetime.now()
+        
+        if match_key in self.last_alert_time:
+            time_diff = current_time - self.last_alert_time[match_key]
+            if time_diff.total_seconds() < 300:  # 5 minutos
+                return
+        
+        self.last_alert_time[match_key] = current_time
+        
+        # Emoji da confiança
+        conf_emoji = {
+            'Muito Alta': '🔥',
+            'Alta': '⚡',
+            'Média': '📊',
+            'Baixa': '⚠️'
+        }.get(opportunity['confidence'], '📊')
+        
+        # Emoji da liga
+        league_emoji = {
+            'LCK': '🇰🇷',
+            'LPL': '🇨🇳',
+            'LEC': '🇪🇺',
+            'LCS': '🇺🇸',
+            'CBLOL': '🇧🇷'
+        }.get(opportunity['league'], '🎮')
+        
+        alert_text = f"""🚨 **VALUE BETTING ALERT** 🚨
+
+{conf_emoji} **{opportunity['team1']} vs {opportunity['team2']}**
+{league_emoji} Liga: {opportunity['league']}
+
+💰 **OPORTUNIDADE DETECTADA:**
+• Value: +{opportunity['value']:.1%}
+• Favorito: {opportunity['favored_team']}
+• Probabilidade: {opportunity['probability']:.0%}
+• Odds: {opportunity['odds']:.2f}
+
+🎯 **KELLY CRITERION:**
+• Fração Kelly: {opportunity['kelly_fraction']:.1%}
+• Stake sugerido: R$ {opportunity['recommended_stake']:.0f}
+• Confiança: {opportunity['confidence']}
+
+⏰ **Status:** {opportunity['status']}
+🔄 **Detectado:** {current_time.strftime('%H:%M:%S')}
+
+📊 **Use /value para mais detalhes**"""
+        
+        # Enviar para todos os grupos configurados
+        for chat_id in self.alert_groups:
+            try:
+                self.bot_instance.updater.bot.send_message(
+                    chat_id=chat_id,
+                    text=alert_text,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.info(f"✅ Alerta enviado para grupo {chat_id}")
+            except Exception as e:
+                logger.error(f"❌ Erro ao enviar alerta para grupo {chat_id}: {e}")
 
 class KellyBetting:
     """Sistema Kelly Criterion para gestão de banca"""
@@ -1147,6 +1241,9 @@ class BotLoLV3Railway:
         dp.add_handler(CommandHandler("sentiment", self.sentiment_analysis))
         dp.add_handler(CommandHandler("predict", self.predict_command))
         dp.add_handler(CommandHandler("predicao", self.predict_command))
+        dp.add_handler(CommandHandler("alertas", self.manage_alerts))
+        dp.add_handler(CommandHandler("ativar_alertas", self.enable_alerts))
+        dp.add_handler(CommandHandler("desativar_alertas", self.disable_alerts))
         dp.add_handler(CallbackQueryHandler(self.handle_callback))
         
         logger.info("✅ Bot inicializado com todos os handlers")
@@ -1154,6 +1251,9 @@ class BotLoLV3Railway:
         # Iniciar systems
         self.health_manager.start_flask_server()
         self.value_betting.start_monitoring()
+        
+        # Configurar instância do bot para alertas
+        self.value_betting.set_bot_instance(self)
         
         # Marcar como saudável
         self.health_manager.mark_healthy()
@@ -1225,6 +1325,11 @@ Olá {user.first_name}! 👋
 • `/portfolio` - Dashboard do portfolio
 • `/kelly` - Análise Kelly Criterion
 • `/sentiment` - Análise de sentimento
++
++🚨 **ALERTAS AUTOMÁTICOS:**
++• `/alertas` - Configurar alertas do grupo
++• `/ativar_alertas` - Ativar alertas automáticos
++• `/desativar_alertas` - Desativar alertas
 
 🤖 **FUNCIONALIDADES AUTOMÁTICAS:**
 • Alertas de value betting em tempo real
@@ -1270,7 +1375,7 @@ Olá {user.first_name}! 👋
 
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
-                 InlineKeyboardButton("🔮 Portfolio", callback_data="predict_refresh")],
+                 InlineKeyboardButton("🔮 Predição", callback_data="predict_refresh")],
                 [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
                  InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
             ]
@@ -1324,7 +1429,7 @@ Olá {user.first_name}! 👋
             
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
-                 InlineKeyboardButton("🔮 Portfolio", callback_data="predict_refresh")],
+                 InlineKeyboardButton("🔮 Predição", callback_data="predict_refresh")],
                 [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
                  InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
             ]
@@ -1857,7 +1962,7 @@ O sistema monitora continuamente:
                 
                 keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="show_matches"),
-                     InlineKeyboardButton("🔮 Portfolio", callback_data="predict_refresh")],
+                     InlineKeyboardButton("🔮 Predição", callback_data="predict_refresh")],
                     [InlineKeyboardButton("💰 Value Bets", callback_data="value_bets"),
                      InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")]
                 ]
@@ -2043,6 +2148,148 @@ O sistema monitora continuamente:
                     "❌ Erro ao carregar predição detalhada.\nTente /predict novamente.",
                     parse_mode=ParseMode.MARKDOWN
                 )
+
+    def manage_alerts(self, update: Update, context: CallbackContext):
+        """Gerencia alertas automáticos de value betting"""
+        self.health_manager.update_activity()
+        
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+        
+        # Verificar se é grupo ou canal
+        if chat_type not in ['group', 'supergroup', 'channel']:
+            update.message.reply_text(
+                "⚠️ **ALERTAS AUTOMÁTICOS**\n\n"
+                "Este comando só funciona em grupos ou canais.\n"
+                "Adicione o bot ao seu grupo de apostas e use `/ativar_alertas`",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+        
+        is_configured = chat_id in self.value_betting.alert_groups
+        
+        alert_text = f"""🚨 **CONFIGURAÇÃO DE ALERTAS**
+
+📊 **Status atual:** {'✅ Ativo' if is_configured else '❌ Inativo'}
+🆔 **Chat ID:** `{chat_id}`
+📱 **Tipo:** {chat_type.title()}
+
+💰 **ALERTAS AUTOMÁTICOS DE VALUE BETTING:**
+• Detecta oportunidades em tempo real
+• Envia alertas instantâneos para o grupo
+• Inclui análise Kelly Criterion
+• Controle anti-spam (5 min entre alertas)
+
+🎯 **COMANDOS:**
+• `/ativar_alertas` - Ativar alertas neste grupo
+• `/desativar_alertas` - Desativar alertas
+• `/value` - Ver oportunidades atuais
+
+⚡ **Sistema monitora 24/7:**
+🏆 LCK, LPL, LEC, LCS, CBLOL
+🥈 LJL, LCO, LFL e outras ligas"""
+        
+        keyboard = [
+            [InlineKeyboardButton("✅ Ativar Alertas" if not is_configured else "❌ Desativar Alertas", 
+                                callback_data=f"toggle_alerts_{chat_id}")],
+            [InlineKeyboardButton("💰 Ver Value Bets", callback_data="value_bets"),
+             InlineKeyboardButton("🎮 Ver Partidas", callback_data="show_matches")]
+        ]
+        
+        update.message.reply_text(
+            alert_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
+    
+    def enable_alerts(self, update: Update, context: CallbackContext):
+        """Ativa alertas automáticos para o grupo atual"""
+        self.health_manager.update_activity()
+        
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+        chat_title = getattr(update.effective_chat, 'title', 'Chat Privado')
+        
+        if chat_type not in ['group', 'supergroup', 'channel']:
+            update.message.reply_text(
+                "⚠️ Este comando só funciona em grupos ou canais.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+        
+        success = self.value_betting.add_alert_group(chat_id)
+        
+        if success:
+            alert_text = f"""✅ **ALERTAS ATIVADOS COM SUCESSO!**
+
+🎯 **Grupo:** {chat_title}
+🆔 **ID:** `{chat_id}`
+
+🚨 **O que você receberá:**
+• Alertas instantâneos de value betting
+• Análise Kelly Criterion automática
+• Oportunidades com +3% de value
+• Dados em tempo real da API Riot
+
+📊 **Monitoramento ativo em:**
+🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS • 🇧🇷 CBLOL
+
+⏰ **Sistema operacional 24/7**
+🔄 **Verificação a cada 1 minuto**
+
+💡 **Use `/desativar_alertas` para parar**"""
+        else:
+            alert_text = f"""ℹ️ **ALERTAS JÁ ESTÃO ATIVOS**
+
+🎯 **Grupo:** {chat_title}
+✅ **Status:** Recebendo alertas automáticos
+
+📊 **Use `/alertas` para mais opções**"""
+        
+        update.message.reply_text(alert_text, parse_mode=ParseMode.MARKDOWN)
+    
+    def disable_alerts(self, update: Update, context: CallbackContext):
+        """Desativa alertas automáticos para o grupo atual"""
+        self.health_manager.update_activity()
+        
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+        chat_title = getattr(update.effective_chat, 'title', 'Chat Privado')
+        
+        if chat_type not in ['group', 'supergroup', 'channel']:
+            update.message.reply_text(
+                "⚠️ Este comando só funciona em grupos ou canais.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+        
+        success = self.value_betting.remove_alert_group(chat_id)
+        
+        if success:
+            alert_text = f"""❌ **ALERTAS DESATIVADOS**
+
+🎯 **Grupo:** {chat_title}
+🆔 **ID:** `{chat_id}`
+
+ℹ️ **Alertas automáticos foram interrompidos**
+
+💡 **Para reativar:**
+• Use `/ativar_alertas`
+• Ou `/alertas` para configurações
+
+📊 **Você ainda pode usar:**
+• `/value` - Ver oportunidades manuais
+• `/partidas` - Ver partidas ao vivo
+• `/kelly` - Análise Kelly Criterion"""
+        else:
+            alert_text = f"""ℹ️ **ALERTAS JÁ ESTÃO INATIVOS**
+
+🎯 **Grupo:** {chat_title}
+❌ **Status:** Não está recebendo alertas
+
+💡 **Use `/ativar_alertas` para ativar**"""
+        
+        update.message.reply_text(alert_text, parse_mode=ParseMode.MARKDOWN)
 
 def main():
     """Função principal"""
