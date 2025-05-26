@@ -13,6 +13,10 @@ import aiohttp
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import pytz
+import threading
+
+# Flask para health check
+from flask import Flask, jsonify
 
 # Detectar versão do python-telegram-bot e importar adequadamente
 try:
@@ -43,9 +47,32 @@ import numpy as np
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
 OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
+PORT = int(os.getenv('PORT', 8000))
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Flask app para healthcheck
+app = Flask(__name__)
+
+@app.route('/health')
+def health_check():
+    """Endpoint de health check para o Railway"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'service': 'bot_lol_v13_railway',
+        'version': TELEGRAM_VERSION
+    })
+
+@app.route('/')
+def root():
+    """Endpoint raiz"""
+    return jsonify({
+        'message': 'Bot LoL V13 Railway está funcionando!',
+        'status': 'online',
+        'telegram_version': TELEGRAM_VERSION
+    })
 
 class RiotAPIClient:
     """Cliente para API oficial da Riot Games baseado na documentação OpenAPI"""
@@ -559,8 +586,20 @@ class BotLoLV3Railway:
                 parse_mode=ParseMode.MARKDOWN
             )
     
+    def start_flask_server(self):
+        """Iniciar servidor Flask em thread separada"""
+        def run_flask():
+            app.run(host='0.0.0.0', port=PORT, debug=False)
+        
+        flask_thread = threading.Thread(target=run_flask, daemon=True)
+        flask_thread.start()
+        logger.info(f"🌐 Servidor Flask iniciado na porta {PORT}")
+    
     def run(self):
         """Executar o bot"""
+        # Iniciar servidor Flask para healthcheck
+        self.start_flask_server()
+        
         logger.info(f"🚀 Iniciando Bot LoL V13 Railway - APENAS API OFICIAL ({TELEGRAM_VERSION})")
         if TELEGRAM_VERSION == "v20+":
             self.application.run_polling()
