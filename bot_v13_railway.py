@@ -17,6 +17,7 @@ import pytz
 # Telegram imports
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, NetworkError
 
 # Flask para health check
 from flask import Flask, jsonify
@@ -101,7 +102,11 @@ class BotLoLV3Railway:
         self.bot_instance = self.updater
         self.riot_client = RiotAPIClient()
         
+        # Lista de usuários bloqueados para evitar spam de logs
+        self.blocked_users = set()
+        
         self.setup_commands()
+        self.setup_error_handlers()
         logger.info("🤖 Bot V13 Railway inicializado - APENAS API OFICIAL DA RIOT")
     
     def setup_commands(self):
@@ -117,6 +122,94 @@ class BotLoLV3Railway:
         
         # Callback handlers
         dp.add_handler(CallbackQueryHandler(self.handle_callback))
+    
+    def setup_error_handlers(self):
+        """Configurar tratamento de erros"""
+        self.updater.dispatcher.add_error_handler(self.error_handler)
+    
+    def error_handler(self, update: Update, context: CallbackContext):
+        """Tratar erros do bot de forma elegante"""
+        try:
+            error = context.error
+            
+            # Obter informações do usuário se disponível
+            user_id = None
+            username = None
+            if update and update.effective_user:
+                user_id = update.effective_user.id
+                username = update.effective_user.username or update.effective_user.first_name
+            
+            # Tratar diferentes tipos de erro
+            if isinstance(error, Unauthorized):
+                # Bot foi bloqueado pelo usuário
+                if user_id and user_id not in self.blocked_users:
+                    self.blocked_users.add(user_id)
+                    logger.warning(f"🚫 Bot bloqueado pelo usuário {username} (ID: {user_id})")
+                # Não fazer nada mais - é normal usuários bloquearem bots
+                return
+                
+            elif isinstance(error, BadRequest):
+                # Requisição inválida (mensagem muito longa, etc.)
+                logger.warning(f"⚠️ Requisição inválida: {error}")
+                if update and update.effective_message:
+                    self.safe_send_message(
+                        update.effective_chat.id,
+                        "❌ Erro na requisição. Tente novamente."
+                    )
+                    
+            elif isinstance(error, TimedOut):
+                # Timeout na conexão
+                logger.warning(f"⏰ Timeout na conexão: {error}")
+                
+            elif isinstance(error, NetworkError):
+                # Erro de rede
+                logger.warning(f"🌐 Erro de rede: {error}")
+                
+            else:
+                # Outros erros
+                logger.error(f"❌ Erro não tratado: {type(error).__name__}: {error}")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro no error_handler: {e}")
+    
+    def safe_send_message(self, chat_id, text, **kwargs):
+        """Enviar mensagem de forma segura com tratamento de erros"""
+        try:
+            return self.updater.bot.send_message(chat_id, text, **kwargs)
+        except Unauthorized:
+            # Usuário bloqueou o bot
+            if chat_id not in self.blocked_users:
+                self.blocked_users.add(chat_id)
+                logger.warning(f"🚫 Usuário {chat_id} bloqueou o bot")
+            return None
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar mensagem para {chat_id}: {e}")
+            return None
+    
+    def safe_edit_message(self, chat_id, message_id, text, **kwargs):
+        """Editar mensagem de forma segura com tratamento de erros"""
+        try:
+            return self.updater.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                **kwargs
+            )
+        except Unauthorized:
+            # Usuário bloqueou o bot
+            if chat_id not in self.blocked_users:
+                self.blocked_users.add(chat_id)
+                logger.warning(f"🚫 Usuário {chat_id} bloqueou o bot")
+            return None
+        except BadRequest as e:
+            if "message is not modified" in str(e).lower():
+                # Mensagem não foi modificada - ignorar
+                return None
+            logger.warning(f"⚠️ Erro ao editar mensagem: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"❌ Erro ao editar mensagem para {chat_id}: {e}")
+            return None
     
     def start(self, update: Update, context):
         """Comando /start"""
@@ -148,13 +241,16 @@ class BotLoLV3Railway:
         )
         
         if edit_message and hasattr(update, 'callback_query'):
-            return update.callback_query.edit_message_text(
+            return self.safe_edit_message(
+                update.callback_query.message.chat_id,
+                update.callback_query.message.message_id,
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
-            return update.message.reply_text(
+            return self.safe_send_message(
+                update.effective_chat.id,
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
@@ -181,7 +277,11 @@ class BotLoLV3Railway:
             "🔄 **Sistema 100% baseado em dados reais!**"
         )
         
-        return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+        return self.safe_send_message(
+            update.effective_chat.id,
+            message_text,
+            parse_mode=ParseMode.MARKDOWN
+        )
     
     def agenda(self, update: Update, context):
         """Comando /agenda - Buscar próximas partidas"""
@@ -223,7 +323,11 @@ class BotLoLV3Railway:
                 "💡 **Tente novamente em alguns minutos**"
             )
         
-        return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+        return self.safe_send_message(
+            update.effective_chat.id,
+            message_text,
+            parse_mode=ParseMode.MARKDOWN
+        )
     
     def partidas_ao_vivo(self, update: Update, context):
         """Comando /partidas - Buscar partidas ao vivo"""
@@ -269,11 +373,16 @@ class BotLoLV3Railway:
                     "💡 **Tente novamente em alguns minutos**"
                 )
             
-            return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+            return self.safe_send_message(
+                update.effective_chat.id,
+                message_text,
+                parse_mode=ParseMode.MARKDOWN
+            )
             
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
-            return update.message.reply_text(
+            return self.safe_send_message(
+                update.effective_chat.id,
                 "❌ **Erro ao buscar partidas ao vivo**\n\n"
                 "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
@@ -392,7 +501,11 @@ class BotLoLV3Railway:
     def handle_callback(self, update: Update, context):
         """Handle callback queries"""
         query = update.callback_query
-        query.answer()
+        
+        try:
+            query.answer()
+        except Exception as e:
+            logger.warning(f"⚠️ Erro ao responder callback: {e}")
         
         if query.data == "menu_principal":
             return self.show_main_menu(update, context, edit_message=True)
@@ -403,7 +516,9 @@ class BotLoLV3Railway:
         elif query.data == "help":
             return self.help(update, context)
         else:
-            return query.edit_message_text(
+            return self.safe_edit_message(
+                query.message.chat_id,
+                query.message.message_id,
                 "🚧 **Funcionalidade em desenvolvimento**\n\n"
                 "Esta funcionalidade será implementada em breve.\n"
                 "Por enquanto, use apenas dados da API oficial da Riot.",
