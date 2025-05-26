@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Bot LoL V13 Railway - Versão Compatível com python-telegram-bot v20+
+Bot LoL V13 Railway - Versão Universal Compatível
 Sistema de apostas esportivas para League of Legends
 Integração com API oficial da Riot Games
 """
@@ -14,11 +14,28 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import pytz
 
-# Telegram imports (v20+)
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from telegram.error import TelegramError
-from telegram.constants import ParseMode
+# Detectar versão do python-telegram-bot e importar adequadamente
+try:
+    # Tentar importar versão v20+
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+    from telegram.error import TelegramError
+    from telegram.constants import ParseMode
+    TELEGRAM_VERSION = "v20+"
+    logger = logging.getLogger(__name__)
+    logger.info("🔍 Detectada versão python-telegram-bot v20+")
+except ImportError:
+    try:
+        # Tentar importar versão v13
+        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+        from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+        from telegram.error import TelegramError, Unauthorized, BadRequest, TimedOut, NetworkError
+        TELEGRAM_VERSION = "v13"
+        logger = logging.getLogger(__name__)
+        logger.info("🔍 Detectada versão python-telegram-bot v13")
+    except ImportError as e:
+        print(f"❌ Erro ao importar python-telegram-bot: {e}")
+        exit(1)
 
 # Scientific computing
 import numpy as np
@@ -29,7 +46,6 @@ OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 class RiotAPIClient:
     """Cliente para API oficial da Riot Games baseado na documentação OpenAPI"""
@@ -91,11 +107,17 @@ class RiotAPIClient:
             return []
 
 class BotLoLV3Railway:
-    """Bot principal do Telegram para League of Legends - Versão v20+"""
+    """Bot principal do Telegram para League of Legends - Versão Universal"""
     
     def __init__(self):
         """Inicializar o bot com todas as funcionalidades"""
-        self.application = Application.builder().token(TOKEN).build()
+        if TELEGRAM_VERSION == "v20+":
+            self.application = Application.builder().token(TOKEN).build()
+            self.bot_instance = self.application.bot
+        else:  # v13
+            self.updater = Updater(TOKEN, use_context=True)
+            self.bot_instance = self.updater.bot
+            
         self.riot_client = RiotAPIClient()
         
         # Lista de usuários bloqueados para evitar spam de logs
@@ -103,76 +125,95 @@ class BotLoLV3Railway:
         
         self.setup_commands()
         self.setup_error_handlers()
-        logger.info("🤖 Bot V13 Railway inicializado - APENAS API OFICIAL DA RIOT (v20+)")
+        logger.info(f"🤖 Bot V13 Railway inicializado - APENAS API OFICIAL DA RIOT ({TELEGRAM_VERSION})")
     
     def setup_commands(self):
         """Configurar comandos do bot"""
-        # Comandos básicos
-        self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("help", self.help))
-        self.application.add_handler(CommandHandler("agenda", self.agenda))
-        self.application.add_handler(CommandHandler("proximas", self.agenda))
-        self.application.add_handler(CommandHandler("partidas", self.partidas_ao_vivo))
-        
-        # Callback handlers
-        self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        if TELEGRAM_VERSION == "v20+":
+            # Comandos para v20+
+            self.application.add_handler(CommandHandler("start", self.start))
+            self.application.add_handler(CommandHandler("help", self.help))
+            self.application.add_handler(CommandHandler("agenda", self.agenda))
+            self.application.add_handler(CommandHandler("proximas", self.agenda))
+            self.application.add_handler(CommandHandler("partidas", self.partidas_ao_vivo))
+            self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        else:  # v13
+            # Comandos para v13
+            dp = self.updater.dispatcher
+            dp.add_handler(CommandHandler("start", self.start))
+            dp.add_handler(CommandHandler("help", self.help))
+            dp.add_handler(CommandHandler("agenda", self.agenda))
+            dp.add_handler(CommandHandler("proximas", self.agenda))
+            dp.add_handler(CommandHandler("partidas", self.partidas_ao_vivo))
+            dp.add_handler(CallbackQueryHandler(self.handle_callback))
     
     def setup_error_handlers(self):
         """Configurar tratamento de erros"""
-        self.application.add_error_handler(self.error_handler)
+        if TELEGRAM_VERSION == "v20+":
+            self.application.add_error_handler(self.error_handler)
+        else:  # v13
+            self.updater.dispatcher.add_error_handler(self.error_handler)
     
-    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Tratar erros do bot de forma elegante"""
+    async def error_handler_v20(self, update: Update, context):
+        """Error handler para v20+"""
+        return await self._handle_error_common(update, context.error, update)
+    
+    def error_handler_v13(self, update: Update, context):
+        """Error handler para v13"""
+        return self._handle_error_common_sync(update, context.error, update)
+    
+    def error_handler(self, update: Update, context):
+        """Error handler universal"""
+        if TELEGRAM_VERSION == "v20+":
+            return self.error_handler_v20(update, context)
+        else:
+            return self.error_handler_v13(update, context)
+    
+    def _handle_error_common_sync(self, update, error, update_obj):
+        """Tratamento comum de erros para v13"""
         try:
-            error = context.error
-            
             # Obter informações do usuário se disponível
             user_id = None
             username = None
-            if update and update.effective_user:
-                user_id = update.effective_user.id
-                username = update.effective_user.username or update.effective_user.first_name
+            if update_obj and update_obj.effective_user:
+                user_id = update_obj.effective_user.id
+                username = update_obj.effective_user.username or update_obj.effective_user.first_name
             
             # Tratar diferentes tipos de erro
-            if "Forbidden: bot was blocked by the user" in str(error):
+            error_str = str(error)
+            if "bot was blocked by the user" in error_str or (hasattr(error, '__class__') and error.__class__.__name__ == 'Unauthorized'):
                 # Bot foi bloqueado pelo usuário
                 if user_id and user_id not in self.blocked_users:
                     self.blocked_users.add(user_id)
                     logger.warning(f"🚫 Bot bloqueado pelo usuário {username} (ID: {user_id})")
-                # Não fazer nada mais - é normal usuários bloquearem bots
                 return
                 
-            elif "Bad Request" in str(error):
-                # Requisição inválida (mensagem muito longa, etc.)
+            elif "Bad Request" in error_str:
                 logger.warning(f"⚠️ Requisição inválida: {error}")
-                if update and update.effective_message:
-                    await self.safe_send_message(
-                        update.effective_chat.id,
-                        "❌ Erro na requisição. Tente novamente."
-                    )
-                    
-            elif "Timed out" in str(error):
-                # Timeout na conexão
+                
+            elif "Timed out" in error_str:
                 logger.warning(f"⏰ Timeout na conexão: {error}")
                 
-            elif "Network" in str(error):
-                # Erro de rede
+            elif "Network" in error_str:
                 logger.warning(f"🌐 Erro de rede: {error}")
                 
             else:
-                # Outros erros
                 logger.error(f"❌ Erro não tratado: {type(error).__name__}: {error}")
                 
         except Exception as e:
             logger.error(f"❌ Erro no error_handler: {e}")
     
-    async def safe_send_message(self, chat_id, text, **kwargs):
+    async def _handle_error_common(self, update, error, update_obj):
+        """Tratamento comum de erros para v20+"""
+        return self._handle_error_common_sync(update, error, update_obj)
+    
+    def safe_send_message(self, chat_id, text, **kwargs):
         """Enviar mensagem de forma segura com tratamento de erros"""
         try:
-            return await self.application.bot.send_message(chat_id, text, **kwargs)
+            return self.bot_instance.send_message(chat_id, text, **kwargs)
         except Exception as e:
-            if "bot was blocked by the user" in str(e):
-                # Usuário bloqueou o bot
+            error_str = str(e)
+            if "bot was blocked by the user" in error_str:
                 if chat_id not in self.blocked_users:
                     self.blocked_users.add(chat_id)
                     logger.warning(f"🚫 Usuário {chat_id} bloqueou o bot")
@@ -181,34 +222,34 @@ class BotLoLV3Railway:
                 logger.error(f"❌ Erro ao enviar mensagem para {chat_id}: {e}")
                 return None
     
-    async def safe_edit_message(self, chat_id, message_id, text, **kwargs):
+    def safe_edit_message(self, chat_id, message_id, text, **kwargs):
         """Editar mensagem de forma segura com tratamento de erros"""
         try:
-            return await self.application.bot.edit_message_text(
+            return self.bot_instance.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
                 text=text,
                 **kwargs
             )
         except Exception as e:
-            if "bot was blocked by the user" in str(e):
-                # Usuário bloqueou o bot
+            error_str = str(e)
+            if "bot was blocked by the user" in error_str:
                 if chat_id not in self.blocked_users:
                     self.blocked_users.add(chat_id)
                     logger.warning(f"🚫 Usuário {chat_id} bloqueou o bot")
                 return None
-            elif "message is not modified" in str(e).lower():
-                # Mensagem não foi modificada - ignorar
+            elif "message is not modified" in error_str.lower():
                 return None
             else:
                 logger.warning(f"⚠️ Erro ao editar mensagem: {e}")
                 return None
     
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Métodos universais que funcionam em ambas as versões
+    def start(self, update: Update, context):
         """Comando /start"""
-        return await self.show_main_menu(update, context)
+        return self.show_main_menu(update, context)
     
-    async def show_main_menu(self, update, context, edit_message=False):
+    def show_main_menu(self, update, context, edit_message=False):
         """Mostrar menu principal"""
         keyboard = [
             [InlineKeyboardButton("📅 Próximas Partidas", callback_data="agenda"),
@@ -234,7 +275,7 @@ class BotLoLV3Railway:
         )
         
         if edit_message and hasattr(update, 'callback_query'):
-            return await self.safe_edit_message(
+            return self.safe_edit_message(
                 update.callback_query.message.chat_id,
                 update.callback_query.message.message_id,
                 message_text,
@@ -242,14 +283,14 @@ class BotLoLV3Railway:
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
-            return await self.safe_send_message(
+            return self.safe_send_message(
                 update.effective_chat.id,
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
     
-    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def help(self, update: Update, context):
         """Comando /help"""
         message_text = (
             "📚 **GUIA DO BOT - APENAS API OFICIAL**\n\n"
@@ -270,15 +311,15 @@ class BotLoLV3Railway:
             "🔄 **Sistema 100% baseado em dados reais!**"
         )
         
-        return await self.safe_send_message(
+        return self.safe_send_message(
             update.effective_chat.id,
             message_text,
             parse_mode=ParseMode.MARKDOWN
         )
     
-    async def agenda(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def agenda(self, update: Update, context):
         """Comando /agenda - Buscar próximas partidas"""
-        agenda_data = await self._get_scheduled_matches()
+        agenda_data = self._get_scheduled_matches()
         
         if agenda_data['matches']:
             message_text = (
@@ -316,16 +357,19 @@ class BotLoLV3Railway:
                 "💡 **Tente novamente em alguns minutos**"
             )
         
-        return await self.safe_send_message(
+        return self.safe_send_message(
             update.effective_chat.id,
             message_text,
             parse_mode=ParseMode.MARKDOWN
         )
     
-    async def partidas_ao_vivo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def partidas_ao_vivo(self, update: Update, context):
         """Comando /partidas - Buscar partidas ao vivo"""
         try:
-            live_matches = await self.riot_client.get_live_matches()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+            loop.close()
             
             if live_matches:
                 message_text = (
@@ -363,7 +407,7 @@ class BotLoLV3Railway:
                     "💡 **Tente novamente em alguns minutos**"
                 )
             
-            return await self.safe_send_message(
+            return self.safe_send_message(
                 update.effective_chat.id,
                 message_text,
                 parse_mode=ParseMode.MARKDOWN
@@ -371,14 +415,14 @@ class BotLoLV3Railway:
             
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
-            return await self.safe_send_message(
+            return self.safe_send_message(
                 update.effective_chat.id,
                 "❌ **Erro ao buscar partidas ao vivo**\n\n"
                 "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
             )
     
-    async def _get_scheduled_matches(self):
+    def _get_scheduled_matches(self):
         """Buscar partidas agendadas APENAS da API oficial da Riot Games"""
         try:
             brazil_tz = pytz.timezone('America/Sao_Paulo')
@@ -389,7 +433,10 @@ class BotLoLV3Railway:
             all_matches = []
             
             try:
-                riot_matches = await self.riot_client.get_scheduled_matches()
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                riot_matches = loop.run_until_complete(self.riot_client.get_scheduled_matches())
                 
                 if riot_matches:
                     logger.info(f"✅ API Riot: {len(riot_matches)} partidas encontradas")
@@ -428,6 +475,8 @@ class BotLoLV3Railway:
                         except Exception as e:
                             logger.error(f"Erro ao processar partida da API Riot: {e}")
                             continue
+                
+                loop.close()
                 
                 all_matches.sort(key=lambda x: x['scheduled_time'])
                 
@@ -483,25 +532,25 @@ class BotLoLV3Railway:
             else:
                 return f"AGORA ({scheduled_time.strftime('%H:%M')})"
     
-    async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def handle_callback(self, update: Update, context):
         """Handle callback queries"""
         query = update.callback_query
         
         try:
-            await query.answer()
+            query.answer()
         except Exception as e:
             logger.warning(f"⚠️ Erro ao responder callback: {e}")
         
         if query.data == "menu_principal":
-            return await self.show_main_menu(update, context, edit_message=True)
+            return self.show_main_menu(update, context, edit_message=True)
         elif query.data == "agenda":
-            return await self.agenda(update, context)
+            return self.agenda(update, context)
         elif query.data == "partidas":
-            return await self.partidas_ao_vivo(update, context)
+            return self.partidas_ao_vivo(update, context)
         elif query.data == "help":
-            return await self.help(update, context)
+            return self.help(update, context)
         else:
-            return await self.safe_edit_message(
+            return self.safe_edit_message(
                 query.message.chat_id,
                 query.message.message_id,
                 "🚧 **Funcionalidade em desenvolvimento**\n\n"
@@ -512,8 +561,12 @@ class BotLoLV3Railway:
     
     def run(self):
         """Executar o bot"""
-        logger.info("🚀 Iniciando Bot LoL V13 Railway - APENAS API OFICIAL (v20+)")
-        self.application.run_polling()
+        logger.info(f"🚀 Iniciando Bot LoL V13 Railway - APENAS API OFICIAL ({TELEGRAM_VERSION})")
+        if TELEGRAM_VERSION == "v20+":
+            self.application.run_polling()
+        else:  # v13
+            self.updater.start_polling()
+            self.updater.idle()
 
 def main():
     """Função principal"""
