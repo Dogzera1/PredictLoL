@@ -322,8 +322,9 @@ class RiotAPIClient:
 class ValueBettingSystem:
     """Sistema de Value Betting com análise avançada"""
     
-    def __init__(self, riot_client=None):
+    def __init__(self, riot_client=None, alert_system=None):
         self.riot_client = riot_client or RiotAPIClient()
+        self.alert_system = alert_system
         self.opportunities = []
         self.monitoring = False
         self.last_scan = None
@@ -361,6 +362,10 @@ class ValueBettingSystem:
                 opportunity = self._analyze_match_value(match)
                 if opportunity:
                     new_opportunities.append(opportunity)
+                    
+                    # Enviar alerta se sistema de alertas estiver disponível
+                    if self.alert_system and opportunity['value_percentage'] >= 5:
+                        self.alert_system.send_value_alert(opportunity)
             
             # Atualizar lista de oportunidades
             self.opportunities = new_opportunities
@@ -463,11 +468,14 @@ class ValueBettingSystem:
         """Cria objeto de oportunidade de value"""
         favored_team_name = team1 if favored_team == 1 else team2
         
-        # Calcular Kelly Criterion
-        kelly_fraction = (prob * odds - 1) / (odds - 1)
-        kelly_percentage = max(0, min(kelly_fraction * 100, 25))  # Max 25% do bankroll
+        # Determinar confiança
+        confidence = 'Alta' if value > 0.15 else 'Média' if value > 0.08 else 'Baixa'
         
-        return {
+        # Calcular unidades usando o sistema de unidades
+        units_system = UnitsSystem()
+        units_data = units_system.calculate_units(prob, odds, confidence)
+        
+        opportunity = {
             'id': f"{team1}_{team2}_{int(time.time())}",
             'match': f"{team1} vs {team2}",
             'league': match.get('league', 'Unknown'),
@@ -476,11 +484,16 @@ class ValueBettingSystem:
             'market_odds': odds,
             'expected_value': value,
             'value_percentage': value * 100,
-            'kelly_percentage': kelly_percentage,
-            'confidence': 'Alta' if value > 0.15 else 'Média' if value > 0.08 else 'Baixa',
+            'units': units_data['units'],
+            'stake_amount': units_data['stake_amount'],
+            'confidence': confidence,
+            'recommendation': units_data['recommendation'],
+            'risk_level': units_data['risk_level'],
             'timestamp': datetime.now(),
             'status': 'Ativa'
         }
+        
+        return opportunity
     
     def get_current_opportunities(self) -> List[Dict]:
         """Retorna oportunidades atuais"""
@@ -494,62 +507,188 @@ class ValueBettingSystem:
         
         return active_opportunities
 
-class KellyBetting:
-    """Sistema Kelly Criterion para gestão de bankroll"""
+class UnitsSystem:
+    """Sistema de Unidades para gestão de apostas"""
     
     def __init__(self):
-        logger.info("📊 Sistema Kelly Criterion inicializado")
+        self.base_unit = 100  # R$ 100 por unidade
+        self.bankroll = 10000  # R$ 10.000
+        self.max_units_per_bet = 3  # Máximo 3 unidades por aposta
+        logger.info("🎯 Sistema de Unidades inicializado")
     
-    def calculate_kelly(self, win_prob: float, odds: float, bankroll: float) -> Dict:
-        """Calcula fração Kelly ótima"""
+    def calculate_units(self, win_prob: float, odds: float, confidence: str) -> Dict:
+        """Calcula unidades baseado em EV, probabilidade e confiança"""
         try:
-            # Kelly Criterion: f = (bp - q) / b
-            # f = fração do bankroll
-            # b = odds - 1
-            # p = probabilidade de ganhar
-            # q = probabilidade de perder (1 - p)
+            # Calcular Expected Value
+            ev = (win_prob * odds) - 1
+            ev_percentage = ev * 100
             
-            b = odds - 1
-            p = win_prob
-            q = 1 - p
+            # Base de unidades baseada no EV
+            if ev_percentage >= 15:
+                base_units = 3.0
+            elif ev_percentage >= 10:
+                base_units = 2.5
+            elif ev_percentage >= 7:
+                base_units = 2.0
+            elif ev_percentage >= 5:
+                base_units = 1.5
+            elif ev_percentage >= 3:
+                base_units = 1.0
+            else:
+                base_units = 0.5
             
-            kelly_fraction = (b * p - q) / b
+            # Ajustar por confiança
+            confidence_multiplier = {
+                'Alta': 1.0,
+                'Média': 0.8,
+                'Baixa': 0.6
+            }.get(confidence, 0.5)
             
-            # Aplicar limitadores de segurança
-            kelly_fraction = max(0, kelly_fraction)  # Não apostar se negativo
-            kelly_fraction = min(kelly_fraction, 0.25)  # Máximo 25% do bankroll
+            # Ajustar por probabilidade (apostas mais seguras = mais unidades)
+            prob_multiplier = 1.0
+            if win_prob >= 0.7:
+                prob_multiplier = 1.1
+            elif win_prob <= 0.4:
+                prob_multiplier = 0.9
             
-            recommended_stake = bankroll * kelly_fraction
+            # Calcular unidades finais
+            final_units = base_units * confidence_multiplier * prob_multiplier
+            final_units = max(0.5, min(self.max_units_per_bet, final_units))
+            
+            # Calcular valor em reais
+            stake_amount = final_units * self.base_unit
             
             return {
-                'kelly_fraction': kelly_fraction,
-                'kelly_percentage': kelly_fraction * 100,
-                'recommended_stake': recommended_stake,
-                'max_stake': bankroll * 0.25,
-                'risk_level': self._get_risk_level(kelly_fraction)
+                'units': round(final_units, 1),
+                'stake_amount': stake_amount,
+                'ev_percentage': ev_percentage,
+                'risk_level': self._get_risk_level(final_units),
+                'recommendation': self._get_recommendation(final_units, ev_percentage),
+                'confidence_factor': confidence_multiplier,
+                'probability_factor': prob_multiplier
             }
             
         except Exception as e:
-            logger.error(f"Erro no cálculo Kelly: {e}")
-            return {'kelly_fraction': 0, 'kelly_percentage': 0, 'recommended_stake': 0}
+            logger.error(f"Erro no cálculo de unidades: {e}")
+            return {'units': 0, 'stake_amount': 0, 'ev_percentage': 0}
     
-    def _get_risk_level(self, kelly_fraction: float) -> str:
-        """Determina nível de risco baseado na fração Kelly"""
-        if kelly_fraction >= 0.15:
+    def _get_risk_level(self, units: float) -> str:
+        """Determina nível de risco baseado nas unidades"""
+        if units >= 2.5:
             return "Alto"
-        elif kelly_fraction >= 0.08:
+        elif units >= 1.5:
             return "Médio"
-        elif kelly_fraction >= 0.03:
+        elif units >= 1.0:
             return "Baixo"
         else:
             return "Muito Baixo"
+    
+    def _get_recommendation(self, units: float, ev_percentage: float) -> str:
+        """Gera recomendação baseada nas unidades e EV"""
+        if units >= 2.5 and ev_percentage >= 10:
+            return "🔥 APOSTA FORTE - Excelente oportunidade"
+        elif units >= 2.0 and ev_percentage >= 7:
+            return "✅ APOSTA SÓLIDA - Boa oportunidade"
+        elif units >= 1.0 and ev_percentage >= 4:
+            return "👍 APOSTA VÁLIDA - Considerar"
+        else:
+            return "⚠️ APOSTA CAUTELOSA - Baixo valor"
+
+class AlertSystem:
+    """Sistema de alertas para grupos do Telegram"""
+    
+    def __init__(self, bot_instance=None):
+        self.bot_instance = bot_instance
+        self.subscribed_groups = set()
+        self.last_alert_time = {}
+        self.alert_cooldown = 300  # 5 minutos entre alertas
+        logger.info("🚨 Sistema de Alertas inicializado")
+    
+    def subscribe_group(self, chat_id: int) -> bool:
+        """Inscrever grupo para receber alertas"""
+        try:
+            self.subscribed_groups.add(chat_id)
+            logger.info(f"✅ Grupo {chat_id} inscrito para alertas")
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao inscrever grupo {chat_id}: {e}")
+            return False
+    
+    def unsubscribe_group(self, chat_id: int) -> bool:
+        """Desinscrever grupo dos alertas"""
+        try:
+            self.subscribed_groups.discard(chat_id)
+            logger.info(f"❌ Grupo {chat_id} desinscrito dos alertas")
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao desinscrever grupo {chat_id}: {e}")
+            return False
+    
+    def send_value_alert(self, opportunity: Dict) -> None:
+        """Enviar alerta de value betting para grupos inscritos"""
+        try:
+            current_time = datetime.now()
+            
+            # Verificar cooldown
+            if (opportunity['id'] in self.last_alert_time and 
+                (current_time - self.last_alert_time[opportunity['id']]).seconds < self.alert_cooldown):
+                return
+            
+            # Criar mensagem de alerta
+            alert_message = self._create_alert_message(opportunity)
+            
+            # Enviar para todos os grupos inscritos
+            for chat_id in self.subscribed_groups.copy():
+                try:
+                    if self.bot_instance:
+                        self.bot_instance.send_message(
+                            chat_id=chat_id,
+                            text=alert_message,
+                            parse_mode=ParseMode.MARKDOWN
+                        )
+                        logger.info(f"🚨 Alerta enviado para grupo {chat_id}")
+                except Exception as e:
+                    logger.error(f"Erro ao enviar alerta para grupo {chat_id}: {e}")
+                    # Remover grupo se bot foi removido
+                    if "bot was blocked" in str(e) or "chat not found" in str(e):
+                        self.subscribed_groups.discard(chat_id)
+            
+            # Atualizar último envio
+            self.last_alert_time[opportunity['id']] = current_time
+            
+        except Exception as e:
+            logger.error(f"Erro no sistema de alertas: {e}")
+    
+    def _create_alert_message(self, opportunity: Dict) -> str:
+        """Criar mensagem de alerta formatada"""
+        confidence_emoji = "🔥" if opportunity['confidence'] == 'Alta' else "⚡" if opportunity['confidence'] == 'Média' else "💡"
+        
+        message = (
+            f"🚨 **ALERTA VALUE BETTING** {confidence_emoji}\n\n"
+            f"🎮 **{opportunity['match']}**\n"
+            f"🏆 **Liga:** {opportunity['league']}\n"
+            f"🎯 **Favorito:** {opportunity['favored_team']}\n"
+            f"📊 **Probabilidade:** {opportunity['win_probability']:.1%}\n"
+            f"💰 **Odds:** {opportunity['market_odds']:.2f}\n"
+            f"📈 **Value:** {opportunity['value_percentage']:.1f}%\n"
+            f"🎲 **Unidades:** {opportunity.get('units', 'N/A')}\n"
+            f"{confidence_emoji} **Confiança:** {opportunity['confidence']}\n\n"
+            f"⏰ **Detectado:** {opportunity['timestamp'].strftime('%H:%M:%S')}\n"
+            f"🤖 **BOT LOL V3 ULTRA AVANÇADO**"
+        )
+        
+        return message
+    
+    def get_subscribed_groups_count(self) -> int:
+        """Retornar número de grupos inscritos"""
+        return len(self.subscribed_groups)
 
 class PortfolioManager:
     """Gerenciador de portfolio de apostas"""
     
     def __init__(self, value_betting_system=None):
         self.value_betting_system = value_betting_system
-        self.kelly_system = KellyBetting()
+        self.units_system = UnitsSystem()
         self.portfolio_data = {}
         self.last_update = None
         logger.info("📈 Portfolio Manager inicializado")
@@ -578,11 +717,7 @@ class PortfolioManager:
             
             # Calcular valor total em apostas ativas
             total_active_stakes = sum([
-                self.kelly_system.calculate_kelly(
-                    o['win_probability'], 
-                    o['market_odds'], 
-                    current_bankroll
-                )['recommended_stake'] 
+                o.get('stake_amount', 0)
                 for o in opportunities
             ])
             
@@ -616,7 +751,7 @@ class PortfolioManager:
         if not opportunities:
             return "Baixo"
         
-        high_risk_count = len([o for o in opportunities if o['kelly_percentage'] > 15])
+        high_risk_count = len([o for o in opportunities if o.get('risk_level') == 'Alto'])
         total_count = len(opportunities)
         
         risk_ratio = high_risk_count / total_count
@@ -1059,7 +1194,8 @@ class BotLoLV3Railway:
             
         # Inicializar todos os sistemas
         self.riot_client = RiotAPIClient()
-        self.value_betting = ValueBettingSystem(self.riot_client)
+        self.alert_system = AlertSystem(self.bot_instance)
+        self.value_betting = ValueBettingSystem(self.riot_client, self.alert_system)
         self.portfolio_manager = PortfolioManager(self.value_betting)
         self.sentiment_analyzer = SentimentAnalyzer(self.riot_client)
         self.prediction_system = DynamicPredictionSystem()
@@ -1088,6 +1224,9 @@ class BotLoLV3Railway:
             self.application.add_handler(CommandHandler("kelly", self.kelly_analysis))
             self.application.add_handler(CommandHandler("sentimento", self.sentiment_analysis))
             self.application.add_handler(CommandHandler("predict", self.predict_command))
+            self.application.add_handler(CommandHandler("alertas", self.manage_alerts))
+            self.application.add_handler(CommandHandler("inscrever", self.subscribe_alerts))
+            self.application.add_handler(CommandHandler("desinscrever", self.unsubscribe_alerts))
             self.application.add_handler(CallbackQueryHandler(self.handle_callback))
         else:  # v13
             # Comandos para v13
@@ -1101,6 +1240,9 @@ class BotLoLV3Railway:
             dp.add_handler(CommandHandler("kelly", self.kelly_analysis))
             dp.add_handler(CommandHandler("sentimento", self.sentiment_analysis))
             dp.add_handler(CommandHandler("predict", self.predict_command))
+            dp.add_handler(CommandHandler("alertas", self.manage_alerts))
+            dp.add_handler(CommandHandler("inscrever", self.subscribe_alerts))
+            dp.add_handler(CommandHandler("desinscrever", self.unsubscribe_alerts))
             dp.add_handler(CallbackQueryHandler(self.handle_callback))
     
     def setup_error_handlers(self):
@@ -1209,8 +1351,8 @@ class BotLoLV3Railway:
              InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")],
             [InlineKeyboardButton("🧠 Análise Sentimento", callback_data="sentiment"),
              InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
-            [InlineKeyboardButton("📈 Kelly Criterion", callback_data="kelly"),
-             InlineKeyboardButton("⚔️ Análise Draft", callback_data="draft")],
+                         [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
+              InlineKeyboardButton("🚨 Alertas", callback_data="alerts")],
             [InlineKeyboardButton("❓ Ajuda", callback_data="help"),
              InlineKeyboardButton("⚙️ Configurações", callback_data="settings")]
         ]
@@ -1221,11 +1363,11 @@ class BotLoLV3Railway:
             "🔗 **API OFICIAL DA RIOT GAMES + IA AVANÇADA**\n\n"
             "💎 **FUNCIONALIDADES PREMIUM:**\n"
             "• 💰 **Value Betting** - Oportunidades de valor em tempo real\n"
-            "• 📊 **Portfolio Manager** - Gestão profissional de bankroll\n"
-            "• 🧠 **Análise de Sentimento** - IA para análise de times\n"
-            "• 🔮 **Predições Avançadas** - Sistema de IA para resultados\n"
-            "• 📈 **Kelly Criterion** - Gestão matemática de apostas\n"
-            "• ⚔️ **Análise de Draft** - Composições e meta\n\n"
+                         "• 📊 **Portfolio Manager** - Gestão profissional de bankroll\n"
+             "• 🧠 **Análise de Sentimento** - IA para análise de times\n"
+             "• 🔮 **Predições Avançadas** - Sistema de IA para resultados\n"
+             "• 🎯 **Sistema de Unidades** - Gestão inteligente de stakes\n"
+             "• 🚨 **Alertas para Grupos** - Notificações automáticas\n\n"
             "🌍 **COBERTURA GLOBAL COMPLETA:**\n"
             "🇰🇷 LCK • 🇨🇳 LPL • 🇪🇺 LEC • 🇺🇸 LCS\n"
             "🇧🇷 CBLOL • 🇯🇵 LJL • 🌏 PCS • 🇻🇳 VCS\n\n"
@@ -1251,7 +1393,7 @@ class BotLoLV3Railway:
             "• `/portfolio` - Status do portfolio\n"
             "• `/sentimento` - Análise de sentimento\n"
             "• `/predict` - Predições com IA\n"
-            "• `/kelly` - Análise Kelly Criterion\n\n"
+            "• `/alertas` - Gerenciar alertas do grupo\n\n"
             "💰 **VALUE BETTING:**\n"
             "Sistema que identifica apostas com valor positivo\n"
             "baseado em análise matemática e probabilística\n\n"
@@ -1264,9 +1406,12 @@ class BotLoLV3Railway:
             "🔮 **PREDIÇÕES AVANÇADAS:**\n"
             "Sistema de IA que considera múltiplos fatores:\n"
             "força dos times, forma atual, meta, histórico\n\n"
-            "📈 **KELLY CRITERION:**\n"
-            "Fórmula matemática para calcular o tamanho\n"
-            "ótimo de cada aposta baseado na vantagem\n\n"
+            "🎯 **SISTEMA DE UNIDADES:**\n"
+            "Sistema inteligente para calcular o tamanho\n"
+            "das apostas baseado em EV e confiança\n\n"
+            "🚨 **ALERTAS PARA GRUPOS:**\n"
+            "Notificações automáticas de oportunidades\n"
+            "de value betting enviadas para grupos\n\n"
             "🔗 **FONTE DOS DADOS:**\n"
             "• API oficial da Riot Games\n"
             "• Dados de mercado em tempo real\n"
@@ -1430,7 +1575,7 @@ class BotLoLV3Railway:
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_value"),
                  InlineKeyboardButton("📊 Portfolio", callback_data="portfolio")],
-                [InlineKeyboardButton("📈 Kelly Analysis", callback_data="kelly"),
+                [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
                  InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
             ]
             
@@ -1493,7 +1638,7 @@ class BotLoLV3Railway:
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_portfolio"),
                  InlineKeyboardButton("💰 Value Bets", callback_data="value_betting")],
-                [InlineKeyboardButton("📈 Kelly Analysis", callback_data="kelly"),
+                [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
                  InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
             ]
             
@@ -1513,80 +1658,87 @@ class BotLoLV3Railway:
                 parse_mode=ParseMode.MARKDOWN
             )
     
-    def kelly_analysis(self, update: Update, context):
-        """Análise Kelly Criterion"""
+    def units_analysis(self, update: Update, context):
+        """Análise do Sistema de Unidades"""
         try:
             opportunities = self.value_betting.get_current_opportunities()
             
-            message_text = "📈 **KELLY CRITERION ANALYSIS**\n\n"
+            message_text = "🎯 **SISTEMA DE UNIDADES - ANÁLISE**\n\n"
             
             if opportunities:
-                message_text += f"🎯 **ANÁLISE DE {len(opportunities)} OPORTUNIDADES:**\n\n"
+                message_text += f"📊 **ANÁLISE DE {len(opportunities)} OPORTUNIDADES:**\n\n"
                 
-                total_kelly = 0
-                bankroll = 1000.0  # Bankroll exemplo
+                total_units = 0
+                total_stake = 0
                 
                 for i, opp in enumerate(opportunities[:5], 1):
-                    kelly_data = self.portfolio_manager.kelly_system.calculate_kelly(
-                        opp['win_probability'], 
-                        opp['market_odds'], 
-                        bankroll
-                    )
+                    units = opp.get('units', 0)
+                    stake = opp.get('stake_amount', 0)
+                    risk_level = opp.get('risk_level', 'Baixo')
+                    recommendation = opp.get('recommendation', 'N/A')
                     
-                    total_kelly += kelly_data['kelly_percentage']
+                    total_units += units
+                    total_stake += stake
                     
-                    risk_emoji = "🔴" if kelly_data['risk_level'] == 'Alto' else "🟡" if kelly_data['risk_level'] == 'Médio' else "🟢"
+                    risk_emoji = "🔴" if risk_level == 'Alto' else "🟡" if risk_level == 'Médio' else "🟢"
                     
                     message_text += (
                         f"**{i}. {opp['match']}**\n"
-                        f"📊 **Kelly:** {kelly_data['kelly_percentage']:.2f}%\n"
-                        f"💰 **Stake recomendado:** R$ {kelly_data['recommended_stake']:.2f}\n"
-                        f"{risk_emoji} **Risco:** {kelly_data['risk_level']}\n"
-                        f"🎯 **Odds:** {opp['market_odds']:.2f} | **Prob:** {opp['win_probability']:.1%}\n\n"
+                        f"🎲 **Unidades:** {units}\n"
+                        f"💰 **Stake:** R$ {stake:.2f}\n"
+                        f"{risk_emoji} **Risco:** {risk_level}\n"
+                        f"📈 **EV:** {opp['value_percentage']:.1f}%\n"
+                        f"✅ **Recomendação:** {recommendation}\n\n"
                     )
                 
                 # Resumo geral
-                avg_kelly = total_kelly / len(opportunities[:5])
+                avg_units = total_units / len(opportunities[:5]) if opportunities else 0
                 message_text += (
                     f"📊 **RESUMO GERAL:**\n"
-                    f"• **Kelly médio:** {avg_kelly:.2f}%\n"
-                    f"• **Kelly total:** {total_kelly:.2f}%\n"
-                    f"• **Exposição máxima:** 25.00%\n\n"
+                    f"• **Unidades médias:** {avg_units:.1f}\n"
+                    f"• **Total de unidades:** {total_units:.1f}\n"
+                    f"• **Valor total:** R$ {total_stake:.2f}\n"
+                    f"• **Máximo por aposta:** 3.0 unidades\n\n"
                     
                     f"⚠️ **RECOMENDAÇÕES:**\n"
                 )
                 
-                if total_kelly > 25:
-                    message_text += "• 🔴 **Exposição muito alta! Reduza stakes**\n"
-                elif total_kelly > 15:
-                    message_text += "• 🟡 **Exposição moderada, monitore risco**\n"
+                if total_units > 10:
+                    message_text += "• 🔴 **Muitas unidades ativas! Monitore exposição**\n"
+                elif total_units > 6:
+                    message_text += "• 🟡 **Exposição moderada, boa diversificação**\n"
                 else:
-                    message_text += "• 🟢 **Exposição conservadora, boa gestão**\n"
+                    message_text += "• 🟢 **Exposição conservadora, gestão segura**\n"
                 
             else:
                 message_text += (
                     "ℹ️ **NENHUMA OPORTUNIDADE PARA ANÁLISE**\n\n"
-                    "📚 **SOBRE KELLY CRITERION:**\n"
-                    "Fórmula matemática que calcula o tamanho ótimo\n"
-                    "de cada aposta baseado na vantagem estatística.\n\n"
-                    "**Fórmula:** f = (bp - q) / b\n"
-                    "• f = fração do bankroll\n"
-                    "• b = odds - 1\n"
-                    "• p = probabilidade de ganhar\n"
-                    "• q = probabilidade de perder\n\n"
+                    "📚 **SOBRE SISTEMA DE UNIDADES:**\n"
+                    "Sistema inteligente que calcula o tamanho ideal\n"
+                    "das apostas baseado em EV e nível de confiança.\n\n"
+                    "🎯 **COMO FUNCIONA:**\n"
+                    "• EV alto = mais unidades\n"
+                    "• Confiança alta = multiplicador maior\n"
+                    "• Probabilidade segura = ajuste positivo\n"
+                    "• Máximo 3 unidades por aposta\n\n"
+                    
+                    "💰 **VALORES:**\n"
+                    "• 1 unidade = R$ 100\n"
+                    "• Bankroll base = R$ 10.000\n"
+                    "• Exposição máxima = 30%\n\n"
                 )
             
             message_text += (
-                "📚 **PRINCÍPIOS KELLY:**\n"
-                "• Nunca aposte mais que 25% do bankroll\n"
-                "• Kelly negativo = não apostar\n"
-                "• Maior vantagem = maior stake\n"
-                "• Gestão matemática de risco"
+                "📚 **PRINCÍPIOS DO SISTEMA:**\n"
+                "• Gestão baseada em Expected Value\n"
+                "• Ajuste por nível de confiança\n"
+                "• Proteção contra over-betting\n"
+                "• Diversificação automática de risco"
             )
             
             # Botões
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_kelly"),
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_units"),
                  InlineKeyboardButton("💰 Value Bets", callback_data="value_betting")],
                 [InlineKeyboardButton("📊 Portfolio", callback_data="portfolio"),
                  InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
@@ -1600,10 +1752,10 @@ class BotLoLV3Railway:
             )
             
         except Exception as e:
-            logger.error(f"Erro na análise Kelly: {e}")
+            logger.error(f"Erro na análise de unidades: {e}")
             return self.safe_send_message(
                 update.effective_chat.id,
-                "❌ **Erro na análise Kelly**\n\n"
+                "❌ **Erro na análise de unidades**\n\n"
                 "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -1840,6 +1992,146 @@ class BotLoLV3Railway:
                 parse_mode=ParseMode.MARKDOWN
             )
     
+    def manage_alerts(self, update: Update, context):
+        """Comando para gerenciar alertas"""
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+        
+        if chat_type not in ['group', 'supergroup']:
+            return self.safe_send_message(
+                chat_id,
+                "🚨 **SISTEMA DE ALERTAS**\n\n"
+                "⚠️ **Este comando só funciona em grupos!**\n\n"
+                "Para usar os alertas:\n"
+                "1. Adicione o bot ao seu grupo\n"
+                "2. Use `/inscrever` para ativar alertas\n"
+                "3. Use `/desinscrever` para desativar\n\n"
+                "🎯 **Alertas incluem:**\n"
+                "• Oportunidades de value betting\n"
+                "• Partidas com alto EV\n"
+                "• Notificações em tempo real",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        is_subscribed = chat_id in self.alert_system.subscribed_groups
+        total_groups = self.alert_system.get_subscribed_groups_count()
+        
+        status_text = "✅ **ATIVO**" if is_subscribed else "❌ **INATIVO**"
+        
+        message_text = (
+            f"🚨 **SISTEMA DE ALERTAS - GRUPO**\n\n"
+            f"📊 **Status:** {status_text}\n"
+            f"👥 **Total de grupos inscritos:** {total_groups}\n\n"
+            f"🎯 **FUNCIONALIDADES:**\n"
+            f"• Alertas de value betting automáticos\n"
+            f"• Notificações de oportunidades >5% EV\n"
+            f"• Cooldown de 5 minutos entre alertas\n"
+            f"• Dados em tempo real da API Riot\n\n"
+            f"⚙️ **COMANDOS:**\n"
+            f"• `/inscrever` - Ativar alertas\n"
+            f"• `/desinscrever` - Desativar alertas\n\n"
+            f"🔔 **Próximo alerta:** Quando houver oportunidade"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("✅ Inscrever Grupo" if not is_subscribed else "❌ Desinscrever Grupo", 
+                                callback_data="toggle_alerts")],
+            [InlineKeyboardButton("🔄 Atualizar Status", callback_data="refresh_alerts"),
+             InlineKeyboardButton("💰 Ver Value Bets", callback_data="value_betting")]
+        ]
+        
+        return self.safe_send_message(
+            chat_id,
+            message_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    def subscribe_alerts(self, update: Update, context):
+        """Comando para inscrever grupo nos alertas"""
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+        
+        if chat_type not in ['group', 'supergroup']:
+            return self.safe_send_message(
+                chat_id,
+                "⚠️ **Este comando só funciona em grupos!**\n\n"
+                "Adicione o bot ao seu grupo primeiro.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        if chat_id in self.alert_system.subscribed_groups:
+            return self.safe_send_message(
+                chat_id,
+                "✅ **GRUPO JÁ INSCRITO!**\n\n"
+                "Este grupo já recebe alertas de value betting.\n"
+                "Use `/desinscrever` para parar de receber.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        success = self.alert_system.subscribe_group(chat_id)
+        
+        if success:
+            return self.safe_send_message(
+                chat_id,
+                "🎉 **GRUPO INSCRITO COM SUCESSO!**\n\n"
+                "✅ **Alertas ativados para este grupo**\n\n"
+                "🚨 **Você receberá notificações de:**\n"
+                "• Oportunidades de value betting >5% EV\n"
+                "• Partidas com alto potencial de lucro\n"
+                "• Análises em tempo real\n\n"
+                "⏰ **Cooldown:** 5 minutos entre alertas\n"
+                "🔕 **Para desativar:** `/desinscrever`",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            return self.safe_send_message(
+                chat_id,
+                "❌ **Erro ao inscrever grupo**\n\n"
+                "Tente novamente em alguns minutos.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+    
+    def unsubscribe_alerts(self, update: Update, context):
+        """Comando para desinscrever grupo dos alertas"""
+        chat_id = update.effective_chat.id
+        chat_type = update.effective_chat.type
+        
+        if chat_type not in ['group', 'supergroup']:
+            return self.safe_send_message(
+                chat_id,
+                "⚠️ **Este comando só funciona em grupos!**",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        if chat_id not in self.alert_system.subscribed_groups:
+            return self.safe_send_message(
+                chat_id,
+                "ℹ️ **GRUPO NÃO INSCRITO**\n\n"
+                "Este grupo não recebe alertas.\n"
+                "Use `/inscrever` para ativar.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        success = self.alert_system.unsubscribe_group(chat_id)
+        
+        if success:
+            return self.safe_send_message(
+                chat_id,
+                "✅ **GRUPO DESINSCRITO COM SUCESSO!**\n\n"
+                "🔕 **Alertas desativados para este grupo**\n\n"
+                "Você não receberá mais notificações automáticas.\n"
+                "Para reativar, use `/inscrever`",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            return self.safe_send_message(
+                chat_id,
+                "❌ **Erro ao desinscrever grupo**\n\n"
+                "Tente novamente em alguns minutos.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+
     def handle_callback(self, update: Update, context):
         """Handle callback queries"""
         query = update.callback_query
@@ -1858,8 +2150,32 @@ class BotLoLV3Railway:
             return self.show_value_bets(update, context)
         elif query.data == "portfolio" or query.data == "refresh_portfolio":
             return self.show_portfolio(update, context)
-        elif query.data == "kelly" or query.data == "refresh_kelly":
-            return self.kelly_analysis(update, context)
+        elif query.data == "units" or query.data == "refresh_units":
+            return self.units_analysis(update, context)
+        elif query.data == "alerts" or query.data == "refresh_alerts":
+            return self.manage_alerts(update, context)
+        elif query.data == "toggle_alerts":
+            chat_id = query.message.chat_id
+            if chat_id in self.alert_system.subscribed_groups:
+                self.alert_system.unsubscribe_group(chat_id)
+                return self.safe_edit_message(
+                    chat_id,
+                    query.message.message_id,
+                    "✅ **ALERTAS DESATIVADOS**\n\n"
+                    "Grupo desinscrito dos alertas automáticos.\n"
+                    "Use `/inscrever` para reativar.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            else:
+                self.alert_system.subscribe_group(chat_id)
+                return self.safe_edit_message(
+                    chat_id,
+                    query.message.message_id,
+                    "🎉 **ALERTAS ATIVADOS**\n\n"
+                    "Grupo inscrito para receber alertas automáticos!\n"
+                    "Use `/desinscrever` para desativar.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
         elif query.data == "sentiment" or query.data == "refresh_sentiment":
             return self.sentiment_analysis(update, context)
         elif query.data == "predictions" or query.data == "refresh_predictions":
