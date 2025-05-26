@@ -53,6 +53,170 @@ OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+class RiotAPIClient:
+    """Cliente para API oficial da Riot Games baseado na documentação OpenAPI"""
+    
+    def __init__(self):
+        self.api_key = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"  # Chave oficial da documentação
+        self.base_urls = {
+            'esports': 'https://esports-api.lolesports.com/persisted/gw',
+            'prod': 'https://prod-relapi.ewp.gg/persisted/gw',
+            'livestats': 'https://feed.lolesports.com/livestats/v1'
+        }
+        self.headers = {
+            'x-api-key': self.api_key,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+            'Referer': 'https://lolesports.com/',
+            'Origin': 'https://lolesports.com'
+        }
+        logger.info("🔗 RiotAPIClient inicializado com API oficial")
+    
+    async def get_live_matches(self):
+        """Buscar partidas ao vivo usando endpoint oficial /getLive"""
+        try:
+            import aiohttp
+            
+            url = f"{self.base_urls['esports']}/getLive"
+            params = {'hl': 'pt-BR'}
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=self.headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        events = data.get('data', {}).get('schedule', {}).get('events', [])
+                        
+                        live_matches = []
+                        for event in events or []:
+                            if event:  # Verificar se não é None
+                                match_data = {
+                                    'id': event.get('id'),
+                                    'league': event.get('league', {}).get('name', 'Unknown'),
+                                    'teams': [],
+                                    'status': 'live'
+                                }
+                                
+                                # Extrair times
+                                match = event.get('match', {})
+                                teams = match.get('teams', [])
+                                for team in teams:
+                                    match_data['teams'].append({
+                                        'name': team.get('slug', 'Unknown'),
+                                        'result': team.get('result', {})
+                                    })
+                                
+                                live_matches.append(match_data)
+                        
+                        logger.info(f"✅ API Riot: {len(live_matches)} partidas ao vivo encontradas")
+                        return live_matches
+                    else:
+                        logger.warning(f"⚠️ API Riot getLive retornou status {response.status}")
+                        return []
+                        
+        except Exception as e:
+            logger.error(f"❌ Erro na API Riot getLive: {e}")
+            return []
+    
+    async def get_scheduled_matches(self, league_ids=None):
+        """Buscar partidas agendadas usando endpoint oficial /getSchedule"""
+        try:
+            import aiohttp
+            
+            url = f"{self.base_urls['esports']}/getSchedule"
+            params = {'hl': 'pt-BR'}
+            
+            if league_ids:
+                params['leagueId'] = league_ids
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=self.headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        schedule = data.get('data', {}).get('schedule', {})
+                        events = schedule.get('events', [])
+                        
+                        scheduled_matches = []
+                        for event in events:
+                            match_data = {
+                                'id': event.get('id'),
+                                'startTime': event.get('startTime'),
+                                'league': event.get('league', {}).get('name', 'Unknown'),
+                                'tournament': event.get('league', {}).get('name', 'Unknown'),
+                                'teams': [],
+                                'status': 'scheduled'
+                            }
+                            
+                            # Extrair times
+                            match = event.get('match', {})
+                            teams = match.get('teams', [])
+                            for team in teams:
+                                match_data['teams'].append({
+                                    'name': team.get('slug', 'Unknown'),
+                                    'record': team.get('record', {}),
+                                    'result': team.get('result', {})
+                                })
+                            
+                            scheduled_matches.append(match_data)
+                        
+                        logger.info(f"✅ API Riot: {len(scheduled_matches)} partidas agendadas encontradas")
+                        return scheduled_matches
+                    else:
+                        logger.warning(f"⚠️ API Riot getSchedule retornou status {response.status}")
+                        return []
+                        
+        except Exception as e:
+            logger.error(f"❌ Erro na API Riot getSchedule: {e}")
+            return []
+    
+    async def get_leagues(self):
+        """Buscar ligas disponíveis usando endpoint oficial /getLeagues"""
+        try:
+            import aiohttp
+            
+            url = f"{self.base_urls['esports']}/getLeagues"
+            params = {'hl': 'pt-BR'}
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=self.headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        leagues = data.get('data', {}).get('leagues', [])
+                        
+                        logger.info(f"✅ API Riot: {len(leagues)} ligas encontradas")
+                        return leagues
+                    else:
+                        logger.warning(f"⚠️ API Riot getLeagues retornou status {response.status}")
+                        return []
+                        
+        except Exception as e:
+            logger.error(f"❌ Erro na API Riot getLeagues: {e}")
+            return []
+    
+    async def get_event_details(self, event_id):
+        """Buscar detalhes de um evento específico usando /getEventDetails"""
+        try:
+            import aiohttp
+            
+            url = f"{self.base_urls['esports']}/getEventDetails"
+            params = {'hl': 'pt-BR', 'id': event_id}
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=self.headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        event = data.get('data', {}).get('event', {})
+                        
+                        logger.info(f"✅ API Riot: Detalhes do evento {event_id} obtidos")
+                        return event
+                    else:
+                        logger.warning(f"⚠️ API Riot getEventDetails retornou status {response.status}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"❌ Erro na API Riot getEventDetails: {e}")
+            return None
+
 class HealthCheckManager:
     """Gerenciador de healthcheck para Railway"""
     
@@ -1122,6 +1286,7 @@ class BotLoLV3Railway:
             self.bot_instance = self.updater
             
         self.health_manager = HealthCheckManager()
+        self.riot_client = RiotAPIClient()  # Cliente da API oficial da Riot
         self.value_system = AdvancedValueBettingSystem()
         self.alert_system = AlertSystem(self)
         
@@ -1129,7 +1294,7 @@ class BotLoLV3Railway:
         self.health_manager.start_flask_server()
         self.health_manager.mark_healthy()
         
-        logger.info("🤖 Bot V13 Railway inicializado com sistema de unidades")
+        logger.info("🤖 Bot V13 Railway inicializado com API da Riot Games oficial")
     
     def setup_commands(self):
         """Configurar comandos do bot"""
@@ -1337,17 +1502,75 @@ class BotLoLV3Railway:
         )
     
     def _get_scheduled_matches(self):
-        """Buscar partidas agendadas da API real com horários do Brasil"""
+        """Buscar partidas agendadas da API oficial da Riot com fallback para dados estáticos"""
         try:
             # Configurar fuso horário do Brasil
             brazil_tz = pytz.timezone('America/Sao_Paulo')
             utc_tz = pytz.UTC
             now_brazil = datetime.now(brazil_tz)
             
-            logger.info("🔍 Buscando partidas agendadas reais...")
+            logger.info("🔍 Buscando partidas da API oficial da Riot Games...")
             
             # Lista de partidas encontradas
             all_matches = []
+            
+            # PRIMEIRA TENTATIVA: API oficial da Riot Games
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Buscar partidas agendadas da API oficial
+                riot_matches = loop.run_until_complete(self.riot_client.get_scheduled_matches())
+                
+                if riot_matches:
+                    logger.info(f"✅ API Riot: {len(riot_matches)} partidas encontradas")
+                    
+                    for match in riot_matches:
+                        try:
+                            # Processar dados da API da Riot
+                            teams = match.get('teams', [])
+                            if len(teams) >= 2:
+                                team1_name = teams[0].get('name', 'Team 1')
+                                team2_name = teams[1].get('name', 'Team 2')
+                                
+                                # Converter horário
+                                start_time_str = match.get('startTime')
+                                if start_time_str:
+                                    # Assumir que vem em UTC ISO format
+                                    scheduled_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                                    scheduled_time = scheduled_time.astimezone(brazil_tz)
+                                else:
+                                    # Se não tem horário, usar horário futuro genérico
+                                    scheduled_time = now_brazil + timedelta(hours=2)
+                                
+                                processed_match = {
+                                    'team1': team1_name,
+                                    'team2': team2_name,
+                                    'league': match.get('league', 'Unknown League'),
+                                    'tournament': match.get('tournament', match.get('league', 'Unknown Tournament')),
+                                    'scheduled_time': scheduled_time,
+                                    'status': 'scheduled',
+                                    'stream': 'https://lolesports.com',
+                                    'format': 'Bo3',
+                                    'source': 'riot_api'
+                                }
+                                
+                                all_matches.append(processed_match)
+                                
+                        except Exception as e:
+                            logger.error(f"Erro ao processar partida da API Riot: {e}")
+                            continue
+                
+                loop.close()
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Erro na API da Riot, usando dados de fallback: {e}")
+            
+            # FALLBACK: Dados estáticos se API falhar ou retornar poucos dados
+            if len(all_matches) < 5:
+                logger.info("📋 Complementando com dados estáticos de partidas...")
+                
+                # Dados estáticos como fallback
             
             # Dados reais de TODAS as ligas do mundo (Tier 1, 2 e 3)
             real_matches_data = [
@@ -1695,7 +1918,8 @@ class BotLoLV3Railway:
                             'status': status,
                             'stream': match_data['stream'],
                             'format': match_data.get('format', 'Bo3'),
-                            'hours_until': hours_until
+                            'hours_until': hours_until,
+                            'source': 'static_data'
                         }
                         
                         all_matches.append(processed_match)
@@ -1782,10 +2006,24 @@ class BotLoLV3Railway:
             ]
             
             if agenda_data['matches']:
+                # Verificar fonte dos dados
+                riot_api_count = sum(1 for match in agenda_data['matches'] if match.get('source') == 'riot_api')
+                static_count = sum(1 for match in agenda_data['matches'] if match.get('source') == 'static_data')
+                
+                source_info = ""
+                if riot_api_count > 0:
+                    source_info += f"🔗 **API Riot:** {riot_api_count} partidas"
+                if static_count > 0:
+                    if source_info:
+                        source_info += f" • 📋 **Dados estáticos:** {static_count} partidas"
+                    else:
+                        source_info += f"📋 **Dados estáticos:** {static_count} partidas"
+                
                 message_text = (
                     "📅 **PRÓXIMAS PARTIDAS AGENDADAS**\n\n"
                     f"🔄 **Última atualização:** {datetime.now().strftime('%H:%M:%S')}\n"
                     f"📊 **Total de partidas:** {len(agenda_data['matches'])}\n"
+                    f"{source_info}\n"
                     f"🇧🇷 **Horários em Brasília (GMT-3)**\n\n"
                 )
                 

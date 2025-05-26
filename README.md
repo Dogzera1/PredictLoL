@@ -217,8 +217,9 @@ OWNER_ID=seu_id_aqui
 
 ## 📞 Suporte
 
-### 🆘 **Problemas Conhecidos**
-- ⚠️ API da Riot Games em desenvolvimento
+### 🆘 **Status Atual**
+- ✅ **API da Riot Games integrada** - Endpoints oficiais implementados
+- 🔄 **Sistema híbrido** - API oficial + dados estáticos como fallback
 - ⚠️ Dados de odds aguardando integração
 - ⚠️ Algumas funcionalidades em modo demonstração
 
@@ -234,6 +235,16 @@ Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalh
 ---
 
 ## 🔄 Changelog
+
+### v3.0.2 - API da Riot Games Integrada (25/05/2025)
+- ✅ **API oficial da Riot Games implementada** - Endpoints /getLive, /getSchedule, /getLeagues
+- ✅ **Sistema híbrido inteligente** - API oficial como fonte primária + dados estáticos como fallback
+- ✅ **Indicador de fonte** - Mostra se dados vêm da API oficial ou dados estáticos
+- ✅ **Chave de API oficial** - Usando chave documentada: 0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z
+- ✅ **Headers otimizados** - User-Agent e headers para máxima compatibilidade
+- ✅ **Tratamento de erros robusto** - Fallback automático em caso de falha da API
+- ✅ **Dependência aiohttp adicionada** - Para requisições assíncronas
+- ✅ **Teste de integração criado** - Script test_riot_api_integrada.py
 
 ### v3.0.1 - Dados Reais Apenas
 - ✅ **REMOÇÃO COMPLETA de dados fictícios** das funcionalidades principais
