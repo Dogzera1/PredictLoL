@@ -1,0 +1,107 @@
+# BOT LOL V3 ULTRA AVANÇADO - Configurações
+
+# =============================================================================
+# TELEGRAM BOT
+# =============================================================================
+TELEGRAM_TOKEN=7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg
+OWNER_ID=6404423764
+PORT=8000
+
+# =============================================================================
+# APIs DE ODDS REAIS (OPCIONAL - Para substituir dados simulados)
+# =============================================================================
+
+# The Odds API - Plano gratuito: 500 requests/mês
+# Cadastro: https://the-odds-api.com/
+# Documentação: https://the-odds-api.com/liveapi/guides/v4/
+THE_ODDS_API_KEY=8cff2fb4dafc21c0ac5c04862903990d
+
+# PandaScore - Especializado em Esports (Pago)
+# Cadastro: https://pandascore.co/
+# Documentação: https://developers.pandascore.co/
+PANDASCORE_API_KEY=YOUR_PANDASCORE_API_KEY_HERE
+
+# OddsMatrix - Teste grátis de 1 mês
+# Cadastro: https://oddsmatrix.com/
+ODDSMATRIX_API_KEY=YOUR_ODDSMATRIX_API_KEY_HERE
+
+# Oddin.gg - Especializado em Esports (Pago)
+# Contato: https://oddin.gg/
+ODDIN_API_KEY=YOUR_ODDIN_API_KEY_HERE
+
+# Bayes Esports - Dados granulares (Pago)
+# Cadastro: https://docs.bayesesports.com/
+BAYES_ESPORTS_API_KEY=YOUR_BAYES_API_KEY_HERE
+
+# =============================================================================
+# CONFIGURAÇÕES DE ODDS
+# =============================================================================
+
+# Usar odds reais (true) ou simuladas (false)
+USE_REAL_ODDS=false
+
+# Provider principal de odds (the_odds_api, pandascore, oddsmatrix, etc.)
+PRIMARY_ODDS_PROVIDER=the_odds_api
+
+# Providers de fallback (separados por vírgula)
+FALLBACK_ODDS_PROVIDERS=pandascore,oddsmatrix
+
+# Cache de odds em segundos (300 = 5 minutos)
+ODDS_CACHE_DURATION=300
+
+# Limite de requests por hora para evitar rate limiting
+ODDS_RATE_LIMIT=100
+
+# =============================================================================
+# ANÁLISE DE SENTIMENTO REAL (OPCIONAL)
+# =============================================================================
+
+# Twitter/X API v2
+TWITTER_BEARER_TOKEN=YOUR_TWITTER_BEARER_TOKEN_HERE
+
+# Reddit API
+REDDIT_CLIENT_ID=YOUR_REDDIT_CLIENT_ID_HERE
+REDDIT_CLIENT_SECRET=YOUR_REDDIT_CLIENT_SECRET_HERE
+
+# NewsAPI para notícias de esports
+NEWS_API_KEY=YOUR_NEWS_API_KEY_HERE
+
+# =============================================================================
+# CONFIGURAÇÕES AVANÇADAS
+# =============================================================================
+
+# Nível de log (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=INFO
+
+# Timeout para requests HTTP em segundos
+HTTP_TIMEOUT=15
+
+# Máximo de tentativas para requests falhados
+MAX_RETRIES=3
+
+# Intervalo entre tentativas em segundos
+RETRY_DELAY=5
+
+# =============================================================================
+# RAILWAY DEPLOYMENT
+# =============================================================================
+
+# Estas variáveis são configuradas automaticamente pelo Railway
+# RAILWAY_STATIC_URL=
+# RAILWAY_PUBLIC_DOMAIN=
+# PORT=
+
+# =============================================================================
+# INSTRUÇÕES DE USO
+# =============================================================================
+
+# 1. Copie este arquivo para .env
+# 2. Substitua os valores YOUR_*_HERE pelas suas chaves reais
+# 3. Configure USE_REAL_ODDS=true para usar APIs reais
+# 4. Mantenha false para usar dados simulados (padrão)
+
+# IMPORTANTE:
+# - Nunca commite o arquivo .env com chaves reais
+# - Use apenas as APIs que você tem acesso
+# - Monitore o uso para não exceder limites
+# - Comece com The Odds API (plano gratuito) 

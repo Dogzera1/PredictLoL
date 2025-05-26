@@ -50,6 +50,15 @@ except ImportError:
 import numpy as np
 import aiohttp
 
+# Sistema de estatísticas ao vivo
+try:
+    from live_match_stats_system import LiveMatchStatsSystem
+    LIVE_STATS_AVAILABLE = True
+    logger.info("✅ Sistema de estatísticas ao vivo carregado")
+except ImportError as e:
+    LIVE_STATS_AVAILABLE = False
+    logger.warning(f"⚠️ Sistema de estatísticas não disponível: {e}")
+
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
 OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
@@ -1612,6 +1621,14 @@ class BotLoLV3Railway:
         self.prediction_system = DynamicPredictionSystem()
         self.champion_analyzer = ChampionAnalyzer()
         
+        # Sistema de estatísticas ao vivo
+        if LIVE_STATS_AVAILABLE:
+            self.live_stats_system = LiveMatchStatsSystem()
+            logger.info("🎮 Sistema de estatísticas ao vivo inicializado")
+        else:
+            self.live_stats_system = None
+            logger.warning("⚠️ Sistema de estatísticas ao vivo não disponível")
+        
         # Lista de usuários bloqueados para evitar spam de logs
         self.blocked_users = set()
         
@@ -1639,6 +1656,8 @@ class BotLoLV3Railway:
             self.application.add_handler(CommandHandler("inscrever", self.subscribe_alerts))
             self.application.add_handler(CommandHandler("desinscrever", self.unsubscribe_alerts))
             self.application.add_handler(CommandHandler("draft", self.draft_analysis))
+            self.application.add_handler(CommandHandler("stats", self.live_stats_command))
+            self.application.add_handler(CommandHandler("estatisticas", self.live_stats_command))
             self.application.add_handler(CallbackQueryHandler(self.handle_callback))
         else:  # v13
             # Comandos para v13
@@ -1656,6 +1675,8 @@ class BotLoLV3Railway:
             dp.add_handler(CommandHandler("inscrever", self.subscribe_alerts))
             dp.add_handler(CommandHandler("desinscrever", self.unsubscribe_alerts))
             dp.add_handler(CommandHandler("draft", self.draft_analysis))
+            dp.add_handler(CommandHandler("stats", self.live_stats_command))
+            dp.add_handler(CommandHandler("estatisticas", self.live_stats_command))
             dp.add_handler(CallbackQueryHandler(self.handle_callback))
     
     def setup_error_handlers(self):
@@ -1876,6 +1897,8 @@ class BotLoLV3Railway:
                             f"🏆 {league} • 🔴 AO VIVO\n"
                             f"📺 https://lolesports.com\n\n"
                         )
+                
+                message_text += "📊 **Use /stats para ver estatísticas detalhadas**\n\n"
             else:
                 message_text += "🔴 **NENHUMA PARTIDA AO VIVO NO MOMENTO**\n\n"
             
@@ -1922,9 +1945,10 @@ class BotLoLV3Railway:
             
             # Adicionar botões
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_matches"),
-                 InlineKeyboardButton("💰 Ver Value Bets", callback_data="value_betting")],
-                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("📊 Stats Detalhadas", callback_data="live_stats"),
+                 InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_matches")],
+                [InlineKeyboardButton("💰 Ver Value Bets", callback_data="value_betting"),
+                 InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
             ]
             
             return self.safe_send_message(
@@ -2677,6 +2701,79 @@ class BotLoLV3Railway:
                 "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
             )
+    
+    def live_stats_command(self, update: Update, context):
+        """Comando /stats - Mostrar estatísticas detalhadas de partidas ao vivo"""
+        try:
+            if not self.live_stats_system:
+                return self.safe_send_message(
+                    update.effective_chat.id,
+                    "❌ **Sistema de estatísticas não disponível**\n\n"
+                    "O sistema de estatísticas detalhadas não está configurado.\n"
+                    "Use `/partidas` para ver partidas básicas.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            
+            # Buscar partidas com estatísticas detalhadas
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            matches_with_stats = loop.run_until_complete(self.live_stats_system.get_live_matches_with_stats())
+            loop.close()
+            
+            if matches_with_stats:
+                message_text = f"🎮 **ESTATÍSTICAS AO VIVO** ({len(matches_with_stats)} partidas)\n\n"
+                
+                for i, match in enumerate(matches_with_stats[:3], 1):  # Máximo 3 partidas
+                    stats_message = self.live_stats_system.format_match_stats_message(match)
+                    message_text += f"**═══ PARTIDA {i} ═══**\n{stats_message}\n\n"
+                
+                if len(matches_with_stats) > 3:
+                    message_text += f"➕ **E mais {len(matches_with_stats) - 3} partidas...**\n\n"
+                
+                message_text += "🔄 **Use /stats para atualizar**"
+                
+            else:
+                message_text = (
+                    "ℹ️ **NENHUMA PARTIDA AO VIVO NO MOMENTO**\n\n"
+                    "🔍 **Não há partidas de LoL Esports acontecendo agora**\n\n"
+                    "🎮 **Ligas monitoradas:**\n"
+                    "🏆 LCK, LPL, LEC, LCS\n"
+                    "🥈 CBLOL, LJL, PCS, VCS\n"
+                    "🌍 Ligas regionais\n\n"
+                    "⏰ **Tente novamente em alguns minutos**\n\n"
+                    "📊 **Exemplo de dados disponíveis:**\n"
+                    "• ⚔️ Kills, mortes, assists por time\n"
+                    "• 💰 Gold total e diferença\n"
+                    "• 🐉 Dragões, barão, torres\n"
+                    "• 🗡️ CS (creep score) total\n"
+                    "• ⏱️ Tempo de jogo em tempo real\n"
+                    "• 📈 Vantagens e desvantagens"
+                )
+            
+            # Botões
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar Stats", callback_data="refresh_live_stats"),
+                 InlineKeyboardButton("🎮 Ver Partidas", callback_data="live_matches")],
+                [InlineKeyboardButton("💰 Value Bets", callback_data="value_betting"),
+                 InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
+            ]
+            
+            return self.safe_send_message(
+                update.effective_chat.id,
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar estatísticas ao vivo: {e}")
+            return self.safe_send_message(
+                update.effective_chat.id,
+                "❌ **Erro ao buscar estatísticas**\n\n"
+                "Tente novamente em alguns minutos.\n"
+                "Use `/partidas` para ver partidas básicas.",
+                parse_mode=ParseMode.MARKDOWN
+            )
 
     def handle_callback(self, update: Update, context):
         """Handle callback queries"""
@@ -2744,6 +2841,8 @@ class BotLoLV3Railway:
                 "🔙 Use /start para voltar ao menu",
                 parse_mode=ParseMode.MARKDOWN
             )
+        elif query.data == "live_stats" or query.data == "refresh_live_stats":
+            return self.live_stats_command(update, context)
         else:
             return self.safe_edit_message(
                 query.message.chat_id,
