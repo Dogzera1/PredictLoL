@@ -89,7 +89,7 @@ except ImportError as e:
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
 OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
-PORT = int(os.getenv('PORT', 8000))
+PORT = int(os.getenv('PORT', 5000))
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

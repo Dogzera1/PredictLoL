@@ -4,7 +4,7 @@ builder = "dockerFile"
 [deploy]
 startCommand = "python bot_v13_railway.py"
 healthcheckPath = "/health"
-healthcheckTimeout = 10
+healthcheckTimeout = 30
 restartPolicyType = "never"
 
 [env]
