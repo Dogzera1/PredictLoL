@@ -692,91 +692,288 @@ class ValueBettingSystem:
         return active_opportunities
 
 class UnitsSystem:
-    """Sistema de Unidades para gestão de apostas"""
+    """Sistema de Unidades Otimizado para gestão de apostas"""
     
     def __init__(self):
         self.base_unit = 100  # R$ 100 por unidade
         self.bankroll = 10000  # R$ 10.000
         self.max_units_per_bet = 3  # Máximo 3 unidades por aposta
-        logger.info("🎯 Sistema de Unidades inicializado")
+        self.min_units_per_bet = 0.25  # Mínimo 0.25 unidades
+        
+        # Configurações avançadas
+        self.kelly_factor = 0.25  # Fator conservador do Kelly (25% do Kelly completo)
+        self.confidence_weight = 0.4  # Peso da confiança no cálculo final
+        self.ev_weight = 0.6  # Peso do EV no cálculo final
+        
+        logger.info("🎯 Sistema de Unidades Otimizado inicializado")
     
     def calculate_units(self, win_prob: float, odds: float, confidence: str) -> Dict:
-        """Calcula unidades baseado em EV, probabilidade e confiança"""
+        """Calcula unidades baseado em EV, probabilidade e confiança (versão otimizada)"""
         try:
             # Calcular Expected Value
             ev = (win_prob * odds) - 1
             ev_percentage = ev * 100
             
-            # Base de unidades baseada no EV
-            if ev_percentage >= 15:
-                base_units = 3.0
-            elif ev_percentage >= 10:
-                base_units = 2.5
-            elif ev_percentage >= 7:
-                base_units = 2.0
-            elif ev_percentage >= 5:
-                base_units = 1.5
-            elif ev_percentage >= 3:
-                base_units = 1.0
-            else:
-                base_units = 0.5
+            # Sistema de pontuação por EV (mais granular)
+            ev_score = self._calculate_ev_score(ev_percentage)
             
-            # Ajustar por confiança
-            confidence_multiplier = {
-                'Alta': 1.0,
-                'Média': 0.8,
-                'Baixa': 0.6
-            }.get(confidence, 0.5)
+            # Sistema de pontuação por confiança (mais granular)
+            confidence_score = self._calculate_confidence_score(confidence, ev_percentage)
             
-            # Ajustar por probabilidade (apostas mais seguras = mais unidades)
-            prob_multiplier = 1.0
-            if win_prob >= 0.7:
-                prob_multiplier = 1.1
-            elif win_prob <= 0.4:
-                prob_multiplier = 0.9
+            # Fator de probabilidade (apostas mais seguras = ligeiro boost)
+            probability_factor = self._calculate_probability_factor(win_prob)
             
-            # Calcular unidades finais
-            final_units = base_units * confidence_multiplier * prob_multiplier
-            final_units = max(0.5, min(self.max_units_per_bet, final_units))
+            # Cálculo Kelly Criterion modificado
+            kelly_units = self._calculate_kelly_units(win_prob, odds)
+            
+            # Combinação inteligente dos fatores
+            combined_score = (
+                ev_score * self.ev_weight + 
+                confidence_score * self.confidence_weight
+            ) * probability_factor
+            
+            # Unidades baseadas na combinação, limitadas pelo Kelly
+            base_units = min(combined_score, kelly_units)
+            
+            # Aplicar limites finais
+            final_units = max(self.min_units_per_bet, min(self.max_units_per_bet, base_units))
+            final_units = round(final_units * 4) / 4  # Arredondar para 0.25
             
             # Calcular valor em reais
             stake_amount = final_units * self.base_unit
             
+            # Análise de risco avançada
+            risk_analysis = self._advanced_risk_analysis(final_units, ev_percentage, confidence, win_prob)
+            
             return {
-                'units': round(final_units, 1),
+                'units': final_units,
                 'stake_amount': stake_amount,
                 'ev_percentage': ev_percentage,
-                'risk_level': self._get_risk_level(final_units),
-                'recommendation': self._get_recommendation(final_units, ev_percentage),
-                'confidence_factor': confidence_multiplier,
-                'probability_factor': prob_multiplier
+                'confidence_score': confidence_score,
+                'ev_score': ev_score,
+                'probability_factor': probability_factor,
+                'kelly_units': kelly_units,
+                'combined_score': combined_score,
+                'risk_level': risk_analysis['risk_level'],
+                'recommendation': risk_analysis['recommendation'],
+                'detailed_analysis': risk_analysis['detailed_analysis'],
+                'bankroll_percentage': (stake_amount / self.bankroll) * 100,
+                'confidence_factor': confidence_score / 3.0,  # Normalizado para compatibilidade
+                'probability_factor_legacy': probability_factor  # Para compatibilidade
             }
             
         except Exception as e:
             logger.error(f"Erro no cálculo de unidades: {e}")
             return {'units': 0, 'stake_amount': 0, 'ev_percentage': 0}
     
-    def _get_risk_level(self, units: float) -> str:
-        """Determina nível de risco baseado nas unidades"""
-        if units >= 2.5:
-            return "Alto"
-        elif units >= 1.5:
-            return "Médio"
-        elif units >= 1.0:
-            return "Baixo"
+    def _calculate_ev_score(self, ev_percentage: float) -> float:
+        """Calcula pontuação baseada no EV (sistema mais granular)"""
+        if ev_percentage >= 20:
+            return 3.0  # EV excepcional
+        elif ev_percentage >= 15:
+            return 2.8  # EV muito alto
+        elif ev_percentage >= 12:
+            return 2.5  # EV alto
+        elif ev_percentage >= 10:
+            return 2.2  # EV bom
+        elif ev_percentage >= 8:
+            return 1.8  # EV médio-alto
+        elif ev_percentage >= 6:
+            return 1.5  # EV médio
+        elif ev_percentage >= 4:
+            return 1.0  # EV baixo-médio
+        elif ev_percentage >= 2:
+            return 0.7  # EV baixo
         else:
-            return "Muito Baixo"
+            return 0.3  # EV muito baixo
     
-    def _get_recommendation(self, units: float, ev_percentage: float) -> str:
-        """Gera recomendação baseada nas unidades e EV"""
-        if units >= 2.5 and ev_percentage >= 10:
-            return "🔥 APOSTA FORTE - Excelente oportunidade"
-        elif units >= 2.0 and ev_percentage >= 7:
-            return "✅ APOSTA SÓLIDA - Boa oportunidade"
-        elif units >= 1.0 and ev_percentage >= 4:
-            return "👍 APOSTA VÁLIDA - Considerar"
+    def _calculate_confidence_score(self, confidence: str, ev_percentage: float) -> float:
+        """Calcula pontuação baseada na confiança (correlacionada com EV)"""
+        base_scores = {
+            'Alta': 3.0,
+            'Média': 2.0,
+            'Baixa': 1.0
+        }
+        
+        base_score = base_scores.get(confidence, 0.5)
+        
+        # Boost adicional quando confiança alta coincide com EV alto
+        if confidence == 'Alta' and ev_percentage >= 10:
+            base_score *= 1.2  # 20% de boost
+        elif confidence == 'Alta' and ev_percentage >= 7:
+            base_score *= 1.1  # 10% de boost
+        elif confidence == 'Média' and ev_percentage >= 12:
+            base_score *= 1.15  # Confiança média mas EV muito alto
+        
+        # Penalidade quando confiança não condiz com EV
+        if confidence == 'Alta' and ev_percentage < 5:
+            base_score *= 0.8  # Reduz 20%
+        elif confidence == 'Baixa' and ev_percentage >= 15:
+            base_score *= 1.3  # EV alto compensa confiança baixa
+        
+        return min(3.0, base_score)  # Máximo 3.0
+    
+    def _calculate_probability_factor(self, win_prob: float) -> float:
+        """Calcula fator baseado na probabilidade de vitória"""
+        if win_prob >= 0.75:
+            return 1.15  # Apostas muito seguras
+        elif win_prob >= 0.65:
+            return 1.10  # Apostas seguras
+        elif win_prob >= 0.55:
+            return 1.05  # Ligeiramente favorável
+        elif win_prob >= 0.45:
+            return 1.0   # Equilibrado
+        elif win_prob >= 0.35:
+            return 0.95  # Ligeiramente desfavorável
         else:
-            return "⚠️ APOSTA CAUTELOSA - Baixo valor"
+            return 0.90  # Apostas arriscadas
+    
+    def _calculate_kelly_units(self, win_prob: float, odds: float) -> float:
+        """Calcula unidades usando Kelly Criterion modificado"""
+        try:
+            # Kelly = (bp - q) / b
+            # onde b = odds - 1, p = win_prob, q = 1 - win_prob
+            b = odds - 1
+            p = win_prob
+            q = 1 - win_prob
+            
+            if b <= 0:
+                return 0
+            
+            kelly_fraction = (b * p - q) / b
+            
+            # Aplicar fator conservador
+            conservative_kelly = kelly_fraction * self.kelly_factor
+            
+            # Converter para unidades (assumindo que 1 unidade = 1% do bankroll)
+            kelly_units = conservative_kelly * 100 / (self.base_unit / self.bankroll * 100)
+            
+            return max(0, min(self.max_units_per_bet, kelly_units))
+            
+        except Exception as e:
+            logger.warning(f"Erro no cálculo Kelly: {e}")
+            return 1.0  # Valor padrão conservador
+    
+    def _advanced_risk_analysis(self, units: float, ev_percentage: float, 
+                               confidence: str, win_prob: float) -> Dict:
+        """Análise de risco avançada"""
+        
+        # Calcular score de risco
+        risk_factors = []
+        
+        # Fator de unidades
+        if units >= 2.5:
+            risk_factors.append(('units_high', 3))
+        elif units >= 1.5:
+            risk_factors.append(('units_medium', 2))
+        else:
+            risk_factors.append(('units_low', 1))
+        
+        # Fator de EV
+        if ev_percentage >= 10:
+            risk_factors.append(('ev_excellent', 1))
+        elif ev_percentage >= 6:
+            risk_factors.append(('ev_good', 1))
+        elif ev_percentage >= 3:
+            risk_factors.append(('ev_medium', 2))
+        else:
+            risk_factors.append(('ev_low', 3))
+        
+        # Fator de confiança
+        confidence_risk = {'Alta': 1, 'Média': 2, 'Baixa': 3}
+        risk_factors.append(('confidence', confidence_risk.get(confidence, 3)))
+        
+        # Fator de probabilidade
+        if win_prob >= 0.7:
+            risk_factors.append(('prob_safe', 1))
+        elif win_prob >= 0.5:
+            risk_factors.append(('prob_medium', 2))
+        else:
+            risk_factors.append(('prob_risky', 3))
+        
+        # Calcular risco médio
+        avg_risk = sum(factor[1] for factor in risk_factors) / len(risk_factors)
+        
+        # Determinar nível de risco
+        if avg_risk <= 1.5:
+            risk_level = "Muito Baixo"
+            risk_emoji = "🟢"
+        elif avg_risk <= 2.0:
+            risk_level = "Baixo"
+            risk_emoji = "🟡"
+        elif avg_risk <= 2.5:
+            risk_level = "Médio"
+            risk_emoji = "🟠"
+        else:
+            risk_level = "Alto"
+            risk_emoji = "🔴"
+        
+        # Gerar recomendação
+        recommendation = self._generate_advanced_recommendation(
+            units, ev_percentage, confidence, risk_level
+        )
+        
+        # Análise detalhada
+        detailed_analysis = {
+            'risk_factors': risk_factors,
+            'avg_risk_score': avg_risk,
+            'bankroll_exposure': (units * self.base_unit / self.bankroll) * 100,
+            'kelly_compliance': units <= self._calculate_kelly_units(win_prob, 2.0),  # Teste conservador
+            'ev_quality': 'Excelente' if ev_percentage >= 10 else 'Bom' if ev_percentage >= 6 else 'Médio' if ev_percentage >= 3 else 'Baixo'
+        }
+        
+        return {
+            'risk_level': risk_level,
+            'risk_emoji': risk_emoji,
+            'recommendation': recommendation,
+            'detailed_analysis': detailed_analysis
+        }
+    
+    def _generate_advanced_recommendation(self, units: float, ev_percentage: float, 
+                                        confidence: str, risk_level: str) -> str:
+        """Gera recomendação avançada baseada em múltiplos fatores"""
+        
+        if units >= 2.5 and ev_percentage >= 12 and confidence == 'Alta':
+            return "🔥 APOSTA EXCEPCIONAL - Máxima prioridade, oportunidade premium"
+        elif units >= 2.0 and ev_percentage >= 8 and confidence in ['Alta', 'Média']:
+            return "⭐ APOSTA PREMIUM - Muito forte, alta recomendação"
+        elif units >= 1.5 and ev_percentage >= 6:
+            return "✅ APOSTA FORTE - Boa oportunidade, recomendada"
+        elif units >= 1.0 and ev_percentage >= 4:
+            return "👍 APOSTA SÓLIDA - Oportunidade válida, considerar"
+        elif units >= 0.75 and ev_percentage >= 2:
+            return "⚠️ APOSTA CAUTELOSA - Valor marginal, avaliar contexto"
+        elif units >= 0.5:
+            return "💡 APOSTA ESPECULATIVA - Apenas para carteira diversificada"
+        else:
+            return "❌ APOSTA FRACA - Evitar, risco muito alto"
+    
+    def get_units_explanation(self, units_data: Dict) -> str:
+        """Gera explicação detalhada do cálculo de unidades"""
+        explanation = (
+            f"🎯 **ANÁLISE DETALHADA DAS UNIDADES**\n\n"
+            f"📊 **Unidades Calculadas:** {units_data['units']}\n"
+            f"💰 **Valor da Aposta:** R$ {units_data['stake_amount']:.2f}\n"
+            f"📈 **Expected Value:** {units_data['ev_percentage']:.1f}%\n"
+            f"🏦 **% do Bankroll:** {units_data['bankroll_percentage']:.2f}%\n\n"
+            
+            f"🔍 **FATORES DE CÁLCULO:**\n"
+            f"• **Score EV:** {units_data['ev_score']:.1f}/3.0\n"
+            f"• **Score Confiança:** {units_data['confidence_score']:.1f}/3.0\n"
+            f"• **Fator Probabilidade:** {units_data['probability_factor']:.2f}\n"
+            f"• **Kelly Sugerido:** {units_data['kelly_units']:.2f} unidades\n"
+            f"• **Score Combinado:** {units_data['combined_score']:.2f}\n\n"
+            
+            f"{units_data['detailed_analysis']['risk_emoji']} **Risco:** {units_data['risk_level']}\n"
+            f"💡 **Recomendação:** {units_data['recommendation']}\n\n"
+            
+            f"📋 **QUALIDADE DA OPORTUNIDADE:**\n"
+            f"• **EV:** {units_data['detailed_analysis']['ev_quality']}\n"
+            f"• **Exposição:** {units_data['detailed_analysis']['bankroll_exposure']:.2f}% do bankroll\n"
+            f"• **Kelly Compliance:** {'✅' if units_data['detailed_analysis']['kelly_compliance'] else '⚠️'}"
+        )
+        
+        return explanation
 
 class AlertSystem:
     """Sistema de alertas para grupos do Telegram"""
@@ -1415,6 +1612,7 @@ class BotLoLV3Railway:
             self.application.add_handler(CommandHandler("historico", self.betting_history_command))
             self.application.add_handler(CommandHandler("performance", self.performance_stats_command))
             self.application.add_handler(CommandHandler("tips", self.tips_history_command))
+            self.application.add_handler(CommandHandler("unidades_detalhes", self.units_detailed_explanation))
             self.application.add_handler(CallbackQueryHandler(self.handle_callback))
         else:  # v13
             # Comandos para v13
@@ -1435,6 +1633,7 @@ class BotLoLV3Railway:
             dp.add_handler(CommandHandler("historico", self.betting_history_command))
             dp.add_handler(CommandHandler("performance", self.performance_stats_command))
             dp.add_handler(CommandHandler("tips", self.tips_history_command))
+            dp.add_handler(CommandHandler("unidades_detalhes", self.units_detailed_explanation))
             dp.add_handler(CallbackQueryHandler(self.handle_callback))
     
     def setup_error_handlers(self):
@@ -1543,7 +1742,7 @@ class BotLoLV3Railway:
              InlineKeyboardButton("📊 Stats Detalhadas", callback_data="live_stats")],
             [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions"),
              InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units")],
-            [InlineKeyboardButton("⚔️ Análise Draft", callback_data="draft"),
+            [InlineKeyboardButton("📚 Unidades Detalhes", callback_data="units_detailed"),
              InlineKeyboardButton("🚨 Alertas", callback_data="alerts")],
             [InlineKeyboardButton("📊 Histórico Tips", callback_data="betting_history"),
              InlineKeyboardButton("📈 Performance", callback_data="performance")],
@@ -1772,14 +1971,31 @@ class BotLoLV3Railway:
                 for i, opp in enumerate(opportunities[:5], 1):
                     confidence_emoji = "🔥" if opp['confidence'] == 'Alta' else "⚡" if opp['confidence'] == 'Média' else "💡"
                     
+                    # Dados do sistema otimizado
+                    units = opp.get('units', 0)
+                    stake = opp.get('stake_amount', 0)
+                    ev_score = opp.get('ev_score', 'N/A')
+                    confidence_score = opp.get('confidence_score', 'N/A')
+                    kelly_units = opp.get('kelly_units', 'N/A')
+                    bankroll_pct = opp.get('bankroll_percentage', 0)
+                    
+                    # Emoji de risco do sistema otimizado
+                    if hasattr(opp.get('detailed_analysis', {}), 'get'):
+                        risk_emoji = opp['detailed_analysis'].get('risk_emoji', "🟡")
+                    else:
+                        risk_level = opp.get('risk_level', 'Médio')
+                        risk_emoji = "🔴" if risk_level == 'Alto' else "🟠" if risk_level == 'Médio' else "🟡" if risk_level == 'Baixo' else "🟢"
+                    
                     message_text += (
-                        f"**{i}. {opp['match']}**\n"
+                        f"**{i}. {opp['match']}** {confidence_emoji}{risk_emoji}\n"
                         f"🏆 {opp['league']}\n"
                         f"🎯 **Favorito:** {opp['favored_team']}\n"
                         f"📊 **Probabilidade:** {opp['win_probability']:.1%}\n"
                         f"💰 **Odds:** {opp['market_odds']:.2f}\n"
                         f"📈 **Value:** {opp['value_percentage']:.1f}%\n"
-                        f"🎲 **Unidades:** {opp.get('units', 'N/A')}\n"
+                        f"🎲 **Unidades:** {units} (Kelly: {kelly_units if isinstance(kelly_units, str) else f'{kelly_units:.2f}'})\n"
+                        f"💵 **Stake:** R$ {stake:.2f} ({bankroll_pct:.1f}% bankroll)\n"
+                        f"📊 **Scores:** EV {ev_score if isinstance(ev_score, str) else f'{ev_score:.1f}'} • Conf {confidence_score if isinstance(confidence_score, str) else f'{confidence_score:.1f}'}\n"
                         f"{confidence_emoji} **Confiança:** {opp['confidence']}\n\n"
                     )
                 
@@ -1840,17 +2056,18 @@ class BotLoLV3Railway:
 
     
     def units_analysis(self, update: Update, context):
-        """Análise do Sistema de Unidades"""
+        """Análise do Sistema de Unidades Otimizado"""
         try:
             opportunities = self.value_betting.get_current_opportunities()
             
-            message_text = "🎯 **SISTEMA DE UNIDADES - ANÁLISE**\n\n"
+            message_text = "🎯 **SISTEMA DE UNIDADES OTIMIZADO - ANÁLISE**\n\n"
             
             if opportunities:
                 message_text += f"📊 **ANÁLISE DE {len(opportunities)} OPORTUNIDADES:**\n\n"
                 
                 total_units = 0
                 total_stake = 0
+                total_bankroll_exposure = 0
                 
                 for i, opp in enumerate(opportunities[:5], 1):
                     units = opp.get('units', 0)
@@ -1858,63 +2075,97 @@ class BotLoLV3Railway:
                     risk_level = opp.get('risk_level', 'Baixo')
                     recommendation = opp.get('recommendation', 'N/A')
                     
+                    # Dados do sistema otimizado
+                    ev_score = opp.get('ev_score', 'N/A')
+                    confidence_score = opp.get('confidence_score', 'N/A')
+                    kelly_units = opp.get('kelly_units', 'N/A')
+                    bankroll_pct = opp.get('bankroll_percentage', 0)
+                    
                     total_units += units
                     total_stake += stake
+                    total_bankroll_exposure += bankroll_pct
                     
-                    risk_emoji = "🔴" if risk_level == 'Alto' else "🟡" if risk_level == 'Médio' else "🟢"
+                    # Emoji de risco baseado no sistema otimizado
+                    if hasattr(opp.get('detailed_analysis', {}), 'get'):
+                        risk_emoji = opp['detailed_analysis'].get('risk_emoji', "🟡")
+                    else:
+                        risk_emoji = "🔴" if risk_level == 'Alto' else "🟠" if risk_level == 'Médio' else "🟡" if risk_level == 'Baixo' else "🟢"
                     
                     message_text += (
-                        f"**{i}. {opp['match']}**\n"
-                        f"🎲 **Unidades:** {units}\n"
-                        f"💰 **Stake:** R$ {stake:.2f}\n"
-                        f"{risk_emoji} **Risco:** {risk_level}\n"
-                        f"📈 **EV:** {opp['value_percentage']:.1f}%\n"
-                        f"✅ **Recomendação:** {recommendation}\n\n"
+                        f"**{i}. {opp['match']}** {risk_emoji}\n"
+                        f"🎲 **Unidades:** {units} (Kelly: {kelly_units if isinstance(kelly_units, str) else f'{kelly_units:.2f}'})\n"
+                        f"💰 **Stake:** R$ {stake:.2f} ({bankroll_pct:.2f}% bankroll)\n"
+                        f"📊 **Scores:** EV {ev_score if isinstance(ev_score, str) else f'{ev_score:.1f}'}/3.0 • Conf {confidence_score if isinstance(confidence_score, str) else f'{confidence_score:.1f}'}/3.0\n"
+                        f"📈 **EV:** {opp['value_percentage']:.1f}% • 🎯 **Conf:** {opp['confidence']}\n"
+                        f"✅ **{recommendation}**\n\n"
                     )
                 
-                # Resumo geral
+                # Resumo geral otimizado
                 avg_units = total_units / len(opportunities[:5]) if opportunities else 0
+                avg_exposure = total_bankroll_exposure / len(opportunities[:5]) if opportunities else 0
+                
                 message_text += (
-                    f"📊 **RESUMO GERAL:**\n"
-                    f"• **Unidades médias:** {avg_units:.1f}\n"
-                    f"• **Total de unidades:** {total_units:.1f}\n"
+                    f"📊 **RESUMO GERAL OTIMIZADO:**\n"
+                    f"• **Unidades médias:** {avg_units:.2f} (Kelly-adjusted)\n"
+                    f"• **Total de unidades:** {total_units:.2f}\n"
                     f"• **Valor total:** R$ {total_stake:.2f}\n"
-                    f"• **Máximo por aposta:** 3.0 unidades\n\n"
+                    f"• **Exposição média:** {avg_exposure:.2f}% por aposta\n"
+                    f"• **Exposição total:** {total_bankroll_exposure:.2f}% do bankroll\n"
+                    f"• **Range:** 0.25 - 3.0 unidades\n\n"
                     
-                    f"⚠️ **RECOMENDAÇÕES:**\n"
+                    f"⚠️ **ANÁLISE DE RISCO:**\n"
                 )
                 
-                if total_units > 10:
-                    message_text += "• 🔴 **Muitas unidades ativas! Monitore exposição**\n"
-                elif total_units > 6:
-                    message_text += "• 🟡 **Exposição moderada, boa diversificação**\n"
+                if total_bankroll_exposure > 15:
+                    message_text += "• 🔴 **ALTA EXPOSIÇÃO!** Considere reduzir posições\n"
+                elif total_bankroll_exposure > 10:
+                    message_text += "• 🟠 **Exposição moderada-alta** - Monitore cuidadosamente\n"
+                elif total_bankroll_exposure > 5:
+                    message_text += "• 🟡 **Exposição moderada** - Gestão adequada\n"
                 else:
-                    message_text += "• 🟢 **Exposição conservadora, gestão segura**\n"
+                    message_text += "• 🟢 **Exposição conservadora** - Gestão segura\n"
+                
+                if avg_units > 2.0:
+                    message_text += "• 🔥 **Oportunidades premium** detectadas\n"
+                elif avg_units > 1.5:
+                    message_text += "• ⭐ **Boas oportunidades** no portfólio\n"
+                else:
+                    message_text += "• 💡 **Oportunidades moderadas** - Seleção conservadora\n"
                 
             else:
                 message_text += (
                     "ℹ️ **NENHUMA OPORTUNIDADE PARA ANÁLISE**\n\n"
-                    "📚 **SOBRE SISTEMA DE UNIDADES:**\n"
-                    "Sistema inteligente que calcula o tamanho ideal\n"
-                    "das apostas baseado em EV e nível de confiança.\n\n"
-                    "🎯 **COMO FUNCIONA:**\n"
-                    "• EV alto = mais unidades\n"
-                    "• Confiança alta = multiplicador maior\n"
-                    "• Probabilidade segura = ajuste positivo\n"
-                    "• Máximo 3 unidades por aposta\n\n"
+                    "📚 **SOBRE SISTEMA OTIMIZADO:**\n"
+                    "Sistema inteligente que correlaciona EV + Confiança\n"
+                    "usando Kelly Criterion e análise de risco avançada.\n\n"
+                    "🎯 **COMO FUNCIONA (OTIMIZADO):**\n"
+                    "• **Score EV:** 0.3-3.0 baseado no Expected Value\n"
+                    "• **Score Confiança:** 1.0-3.0 correlacionado com EV\n"
+                    "• **Fator Probabilidade:** 0.9-1.15 baseado na segurança\n"
+                    "• **Kelly Criterion:** Limitador conservador (25%)\n"
+                    "• **Combinação inteligente:** EV 60% + Confiança 40%\n\n"
                     
-                    "💰 **VALORES:**\n"
-                    "• 1 unidade = R$ 100\n"
-                    "• Bankroll base = R$ 10.000\n"
-                    "• Exposição máxima = 30%\n\n"
+                    "💰 **CONFIGURAÇÕES:**\n"
+                    "• 1 unidade = R$ 100 (1% do bankroll)\n"
+                    "• Bankroll = R$ 10.000\n"
+                    "• Range: 0.25 - 3.0 unidades\n"
+                    "• Kelly Factor: 25% (conservador)\n\n"
+                    
+                    "🔍 **CORRELAÇÕES INTELIGENTES:**\n"
+                    "• Confiança Alta + EV Alto = Boost 20%\n"
+                    "• Confiança Alta + EV Baixo = Penalidade 20%\n"
+                    "• EV Excepcional + Confiança Baixa = Compensação\n"
+                    "• Probabilidade >70% = Boost segurança\n\n"
                 )
             
             message_text += (
-                "📚 **PRINCÍPIOS DO SISTEMA:**\n"
-                "• Gestão baseada em Expected Value\n"
-                "• Ajuste por nível de confiança\n"
-                "• Proteção contra over-betting\n"
-                "• Diversificação automática de risco"
+                "📚 **PRINCÍPIOS OTIMIZADOS:**\n"
+                "• **Kelly Criterion** para gestão matemática\n"
+                "• **Correlação EV-Confiança** inteligente\n"
+                "• **Análise de risco** multifatorial\n"
+                "• **Proteção de bankroll** avançada\n"
+                "• **Granularidade** em incrementos de 0.25\n"
+                "• **Compliance** com melhores práticas"
             )
             
             # Botões
@@ -2799,6 +3050,167 @@ class BotLoLV3Railway:
                 "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
             )
+    
+    def units_detailed_explanation(self, update: Update, context):
+        """Comando /unidades_detalhes - Explicação detalhada do sistema de unidades"""
+        try:
+            opportunities = self.value_betting.get_current_opportunities()
+            
+            if opportunities:
+                # Pegar a primeira oportunidade para exemplo detalhado
+                opp = opportunities[0]
+                units_system = UnitsSystem()
+                
+                # Recalcular para ter todos os dados
+                units_data = units_system.calculate_units(
+                    opp['win_probability'], 
+                    opp['market_odds'], 
+                    opp['confidence']
+                )
+                
+                # Usar o método de explicação detalhada
+                explanation = units_system.get_units_explanation(units_data)
+                
+                message_text = (
+                    f"🔍 **EXPLICAÇÃO DETALHADA - SISTEMA DE UNIDADES**\n\n"
+                    f"📋 **EXEMPLO PRÁTICO:**\n"
+                    f"🎮 **Partida:** {opp['match']}\n"
+                    f"🏆 **Liga:** {opp['league']}\n\n"
+                    f"{explanation}\n\n"
+                    
+                    f"🧮 **FÓRMULA MATEMÁTICA:**\n"
+                    f"```\n"
+                    f"Score Final = (EV_Score × 0.6 + Conf_Score × 0.4) × Prob_Factor\n"
+                    f"Unidades = min(Score_Final, Kelly_Units, 3.0)\n"
+                    f"Kelly = (bp - q) / b × 0.25 (conservador)\n"
+                    f"```\n\n"
+                    
+                    f"📊 **TABELA DE SCORES EV:**\n"
+                    f"• **20%+ EV:** 3.0 pontos (Excepcional)\n"
+                    f"• **15-20% EV:** 2.8 pontos (Muito Alto)\n"
+                    f"• **12-15% EV:** 2.5 pontos (Alto)\n"
+                    f"• **10-12% EV:** 2.2 pontos (Bom)\n"
+                    f"• **8-10% EV:** 1.8 pontos (Médio-Alto)\n"
+                    f"• **6-8% EV:** 1.5 pontos (Médio)\n"
+                    f"• **4-6% EV:** 1.0 pontos (Baixo-Médio)\n"
+                    f"• **2-4% EV:** 0.7 pontos (Baixo)\n"
+                    f"• **<2% EV:** 0.3 pontos (Muito Baixo)\n\n"
+                    
+                    f"🎯 **SCORES DE CONFIANÇA:**\n"
+                    f"• **Alta:** 3.0 pontos base\n"
+                    f"• **Média:** 2.0 pontos base\n"
+                    f"• **Baixa:** 1.0 pontos base\n\n"
+                    
+                    f"🔄 **CORRELAÇÕES INTELIGENTES:**\n"
+                    f"• **Alta + EV ≥10%:** +20% boost\n"
+                    f"• **Alta + EV ≥7%:** +10% boost\n"
+                    f"• **Média + EV ≥12%:** +15% boost\n"
+                    f"• **Alta + EV <5%:** -20% penalidade\n"
+                    f"• **Baixa + EV ≥15%:** +30% compensação\n\n"
+                    
+                    f"⚖️ **FATORES DE PROBABILIDADE:**\n"
+                    f"• **≥75%:** 1.15× (Muito Seguro)\n"
+                    f"• **65-75%:** 1.10× (Seguro)\n"
+                    f"• **55-65%:** 1.05× (Favorável)\n"
+                    f"• **45-55%:** 1.00× (Equilibrado)\n"
+                    f"• **35-45%:** 0.95× (Desfavorável)\n"
+                    f"• **<35%:** 0.90× (Arriscado)\n\n"
+                    
+                    f"🛡️ **PROTEÇÕES DE SEGURANÇA:**\n"
+                    f"• **Mínimo:** 0.25 unidades\n"
+                    f"• **Máximo:** 3.0 unidades\n"
+                    f"• **Kelly Factor:** 25% (conservador)\n"
+                    f"• **Granularidade:** 0.25 incrementos\n"
+                    f"• **Bankroll Protection:** Máximo 3% por aposta"
+                )
+                
+            else:
+                message_text = (
+                    f"🔍 **EXPLICAÇÃO DETALHADA - SISTEMA DE UNIDADES**\n\n"
+                    f"ℹ️ **Nenhuma oportunidade ativa para exemplo prático**\n\n"
+                    
+                    f"🎯 **COMO FUNCIONA O SISTEMA OTIMIZADO:**\n\n"
+                    
+                    f"**1. CÁLCULO DO SCORE EV (60% do peso):**\n"
+                    f"Baseado no Expected Value da aposta:\n"
+                    f"• EV = (Probabilidade × Odds) - 1\n"
+                    f"• Score varia de 0.3 a 3.0 pontos\n"
+                    f"• Quanto maior o EV, maior o score\n\n"
+                    
+                    f"**2. CÁLCULO DO SCORE CONFIANÇA (40% do peso):**\n"
+                    f"Baseado no nível de confiança da análise:\n"
+                    f"• Alta: 3.0 pontos base\n"
+                    f"• Média: 2.0 pontos base\n"
+                    f"• Baixa: 1.0 pontos base\n"
+                    f"• **CORRELAÇÃO:** Ajustado pelo EV!\n\n"
+                    
+                    f"**3. FATOR DE PROBABILIDADE:**\n"
+                    f"Multiplicador baseado na segurança da aposta:\n"
+                    f"• Apostas mais seguras (>70%) = boost\n"
+                    f"• Apostas arriscadas (<40%) = redução\n\n"
+                    
+                    f"**4. KELLY CRITERION (Limitador):**\n"
+                    f"Proteção matemática contra over-betting:\n"
+                    f"• Kelly = (bp - q) / b\n"
+                    f"• Aplicamos apenas 25% do Kelly (conservador)\n"
+                    f"• Nunca excede o Kelly calculado\n\n"
+                    
+                    f"**5. COMBINAÇÃO FINAL:**\n"
+                    f"```\n"
+                    f"Score = (EV_Score × 0.6 + Conf_Score × 0.4) × Prob_Factor\n"
+                    f"Unidades = min(Score, Kelly_Units, 3.0)\n"
+                    f"Unidades = max(Unidades, 0.25)\n"
+                    f"```\n\n"
+                    
+                    f"🔍 **CORRELAÇÕES INTELIGENTES:**\n"
+                    f"O sistema é inteligente e correlaciona confiança com EV:\n"
+                    f"• **Confiança Alta + EV Alto = BOOST**\n"
+                    f"• **Confiança Alta + EV Baixo = PENALIDADE**\n"
+                    f"• **EV Excepcional compensa Confiança Baixa**\n\n"
+                    
+                    f"💡 **EXEMPLO PRÁTICO:**\n"
+                    f"```\n"
+                    f"Partida: T1 vs GEN\n"
+                    f"EV: 12% → Score EV: 2.5\n"
+                    f"Confiança: Alta → Score: 3.0\n"
+                    f"Boost (Alta+EV>10%): 3.0 × 1.2 = 3.6 → 3.0 (máx)\n"
+                    f"Probabilidade: 68% → Fator: 1.10\n"
+                    f"Score Final: (2.5×0.6 + 3.0×0.4) × 1.10 = 2.64\n"
+                    f"Kelly: 1.8 unidades\n"
+                    f"Resultado: min(2.64, 1.8, 3.0) = 1.8 unidades\n"
+                    f"```\n\n"
+                    
+                    f"🛡️ **PROTEÇÕES:**\n"
+                    f"• Nunca menos que 0.25 unidades\n"
+                    f"• Nunca mais que 3.0 unidades\n"
+                    f"• Limitado pelo Kelly conservador\n"
+                    f"• Máximo 3% do bankroll por aposta\n"
+                    f"• Granularidade de 0.25 para precisão"
+                )
+            
+            # Botões
+            keyboard = [
+                [InlineKeyboardButton("🎯 Sistema Unidades", callback_data="units"),
+                 InlineKeyboardButton("💰 Value Bets", callback_data="value_betting")],
+                [InlineKeyboardButton("📊 Performance", callback_data="performance"),
+                 InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
+            ]
+            
+            return self.safe_send_message(
+                update.effective_chat.id,
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro na explicação detalhada: {e}")
+            return self.safe_send_message(
+                update.effective_chat.id,
+                "❌ **Erro ao gerar explicação detalhada**\n\n"
+                "Tente novamente em alguns minutos.",
+                parse_mode=ParseMode.MARKDOWN
+            )
 
     def handle_callback(self, update: Update, context):
         """Handle callback queries"""
@@ -2818,6 +3230,8 @@ class BotLoLV3Railway:
             return self.show_value_bets(update, context)
         elif query.data == "units" or query.data == "refresh_units":
             return self.units_analysis(update, context)
+        elif query.data == "units_detailed":
+            return self.units_detailed_explanation(update, context)
         elif query.data == "alerts" or query.data == "refresh_alerts":
             return self.manage_alerts(update, context)
         elif query.data == "toggle_alerts":
