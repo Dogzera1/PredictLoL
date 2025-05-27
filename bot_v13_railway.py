@@ -460,23 +460,26 @@ class RiotAPIClient:
             return []
     
     def _generate_simulated_schedule(self, limit: int) -> List[Dict]:
-        """Gera agenda simulada para demonstração com horários do Brasil"""
-        # Agenda fixa para demonstração com horários realistas
+        """Gera agenda simulada para demonstração com horários do Brasil incluindo mais LPL"""
+        # Agenda fixa para demonstração com horários realistas (mais LPL)
         demo_matches = [
             ('LCK', 'T1', 'GEN', 2),      # Hoje + 2 horas
             ('LCK', 'DK', 'KT', 5),       # Hoje + 5 horas  
-            ('LPL', 'JDG', 'BLG', 8),     # Hoje + 8 horas
-            ('LPL', 'WBG', 'TES', 12),    # Hoje + 12 horas
+            ('LPL', 'JDG', 'BLG', 8),     # Hoje + 8 horas - LPL
+            ('LPL', 'WBG', 'TES', 12),    # Hoje + 12 horas - LPL
+            ('LPL', 'EDG', 'IG', 16),     # Hoje + 16 horas - LPL
             ('LEC', 'G2', 'FNC', 18),     # Hoje + 18 horas
             ('LEC', 'MAD', 'VIT', 24),    # Amanhã
+            ('LPL', 'RNG', 'FPX', 28),    # Amanhã + 4 horas - LPL
             ('LCS', 'C9', 'TL', 30),      # Amanhã + 6 horas
             ('LCS', 'TSM', '100T', 36),   # Amanhã + 12 horas
             ('CBLOL', 'LOUD', 'FURIA', 42), # Amanhã + 18 horas
             ('CBLOL', 'RED', 'KBM', 48),  # Depois de amanhã
             ('LCK', 'DRX', 'BRO', 54),    # Depois de amanhã + 6 horas
-            ('LPL', 'EDG', 'IG', 60),     # Depois de amanhã + 12 horas
+            ('LPL', 'LNG', 'TOP', 60),    # Depois de amanhã + 12 horas - LPL
             ('LEC', 'SK', 'BDS', 66),     # Depois de amanhã + 18 horas
             ('LCS', 'FLY', 'EG', 72),     # 3 dias
+            ('LPL', 'WE', 'AL', 76),      # 3 dias + 4 horas - LPL
             ('CBLOL', 'VK', 'PNG', 78)    # 3 dias + 6 horas
         ]
         
@@ -536,7 +539,7 @@ class ValueBettingSystem:
                 time.sleep(60)
     
     def _scan_for_opportunities(self):
-        """Escaneia por oportunidades de value betting"""
+        """Escaneia por oportunidades de value betting - CORRIGIDO"""
         try:
             # Buscar partidas ao vivo
             loop = asyncio.new_event_loop()
@@ -545,15 +548,29 @@ class ValueBettingSystem:
             loop.close()
             
             new_opportunities = []
+            current_time = datetime.now()
             
             for match in live_matches:
                 opportunity = self._analyze_match_value(match)
                 if opportunity:
+                    # Verificar se já foi alertado recentemente (evitar spam)
+                    opp_id = opportunity['id']
+                    should_alert = True
+                    
+                    if hasattr(self, 'alert_cooldown') and opp_id in self.alert_cooldown:
+                        time_since_last_alert = (current_time - self.alert_cooldown[opp_id]).seconds
+                        if time_since_last_alert < 1800:  # 30 minutos de cooldown
+                            should_alert = False
+                    
                     new_opportunities.append(opportunity)
                     
-                    # Enviar alerta se sistema de alertas estiver disponível
-                    if self.alert_system and opportunity['value_percentage'] >= 5:
+                    # Enviar alerta apenas se não foi alertado recentemente
+                    if should_alert and self.alert_system and opportunity['value_percentage'] >= 5:
                         self.alert_system.send_value_alert(opportunity)
+                        if not hasattr(self, 'alert_cooldown'):
+                            self.alert_cooldown = {}
+                        self.alert_cooldown[opp_id] = current_time
+                        logger.info(f"🚨 Alerta enviado para oportunidade: {opportunity['match']}")
                     
                     # Registrar no histórico se disponível
                     if hasattr(self, 'betting_history') and self.betting_history and opportunity['value_percentage'] >= 5:
@@ -565,6 +582,14 @@ class ValueBettingSystem:
             
             if new_opportunities:
                 logger.info(f"💎 {len(new_opportunities)} oportunidades de value encontradas")
+            
+            # Limpar cache de alertas antigos (mais de 2 horas)
+            if hasattr(self, 'alert_cooldown'):
+                cutoff_time = current_time - timedelta(hours=2)
+                self.alert_cooldown = {
+                    opp_id: timestamp for opp_id, timestamp in self.alert_cooldown.items()
+                    if timestamp > cutoff_time
+                }
             
         except Exception as e:
             logger.error(f"Erro ao escanear oportunidades: {e}")
@@ -625,18 +650,26 @@ class ValueBettingSystem:
         
         base_multiplier = league_multipliers.get(league.upper(), 0.5)
         
-        # Força base dos times conhecidos
+        # Força base dos times conhecidos (LPL expandida)
         team_strengths = {
             # LCK
-            'T1': 95, 'GEN': 90, 'DK': 88, 'KT': 85, 'DRX': 82,
-            # LPL  
-            'JDG': 92, 'BLG': 90, 'WBG': 87, 'TES': 85, 'EDG': 83,
+            'T1': 95, 'GEN': 90, 'DK': 88, 'KT': 85, 'DRX': 82, 'BRO': 78, 'KDF': 75,
+            # LPL - Expandida com mais times
+            'JDG': 94, 'BLG': 92, 'WBG': 89, 'TES': 87, 'EDG': 85, 'IG': 82,
+            'LNG': 80, 'FPX': 78, 'RNG': 83, 'TOP': 81, 'WE': 77, 'AL': 75,
+            'OMG': 73, 'NIP': 70, 'LGD': 72, 'UP': 69,
             # LEC
-            'G2': 88, 'FNC': 85, 'MAD': 82, 'VIT': 80, 'SK': 78,
+            'G2': 88, 'FNC': 85, 'MAD': 82, 'VIT': 80, 'SK': 78, 'BDS': 76,
             # LCS
-            'C9': 82, 'TL': 80, 'TSM': 78, '100T': 76, 'FLY': 74,
+            'C9': 82, 'TL': 80, 'TSM': 78, '100T': 76, 'FLY': 74, 'EG': 72,
             # CBLOL
-            'LOUD': 75, 'FURIA': 73, 'RED': 70, 'KBM': 68, 'VK': 66
+            'LOUD': 75, 'FURIA': 73, 'RED': 70, 'KBM': 68, 'VK': 66, 'PNG': 64,
+            # LJL
+            'DFM': 72, 'SG': 70, 'V3': 68,
+            # PCS
+            'PSG': 74, 'CFO': 72,
+            # VCS
+            'GAM': 70, 'SGB': 68
         }
         
         # Buscar força do time (case insensitive)
@@ -1123,12 +1156,17 @@ class DynamicPredictionSystem:
                 'league': league,
                 'team1': team1,
                 'team2': team2,
+                'win_probability': final_prob * 100,
                 'team1_win_probability': final_prob,
                 'team2_win_probability': 1 - final_prob,
+                'favored_team': team1 if final_prob > 0.5 else team2,
                 'predicted_winner': team1 if final_prob > 0.5 else team2,
                 'confidence': self._calculate_confidence(team1_data, team2_data),
                 'score_prediction': "2-1" if final_prob > 0.6 else "1-2",
+                'analysis': self._generate_match_analysis(team1, team2, team1_data, team2_data, final_prob),
                 'key_factors': self._generate_match_analysis(team1, team2, team1_data, team2_data, final_prob),
+                'min_odds': 1.50 + (abs(final_prob - 0.5) * 2),
+                'risk_level': 'Baixo' if self._calculate_confidence(team1_data, team2_data) == 'Alta' else 'Médio',
                 'timestamp': datetime.now(),
                 'model_version': '3.1.0'
             }
@@ -1246,12 +1284,17 @@ class DynamicPredictionSystem:
             'league': 'Unknown',
             'team1': 'Team 1',
             'team2': 'Team 2',
+            'win_probability': 50.0,
             'team1_win_probability': 0.5,
             'team2_win_probability': 0.5,
+            'favored_team': 'Team 1',
             'predicted_winner': 'Indefinido',
             'confidence': 'Baixa',
             'score_prediction': '2-1',
+            'analysis': 'Dados insuficientes para análise',
             'key_factors': 'Dados insuficientes para análise',
+            'min_odds': 1.50,
+            'risk_level': 'Alto',
             'timestamp': datetime.now(),
             'model_version': '3.1.0'
         }
@@ -1952,12 +1995,13 @@ class BotLoLV3Railway:
                 "🔗 **Fonte:** API oficial da Riot Games"
             )
             
-            # Adicionar botões
+            # Adicionar botões incluindo predições para partidas ao vivo
             keyboard = [
-                [InlineKeyboardButton("📊 Stats Detalhadas", callback_data="live_stats"),
-                 InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_matches")],
-                [InlineKeyboardButton("💰 Ver Value Bets", callback_data="value_betting"),
-                 InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions_live"),
+                 InlineKeyboardButton("📊 Stats Detalhadas", callback_data="live_stats")],
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_matches"),
+                 InlineKeyboardButton("💰 Ver Value Bets", callback_data="value_betting")],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
             ]
             
             return self.safe_send_message(
@@ -3296,6 +3340,8 @@ class BotLoLV3Railway:
             )
         elif query.data == "live_stats" or query.data == "refresh_live_stats":
             return self.live_stats_command(update, context)
+        elif query.data == "predictions_live":
+            return self.show_live_predictions(update, context)
         elif query.data == "betting_history" or query.data == "refresh_history":
             return self.betting_history_command(update, context)
         elif query.data == "performance" or query.data == "refresh_performance":
@@ -3309,6 +3355,105 @@ class BotLoLV3Railway:
                 "🚧 **Funcionalidade em desenvolvimento**\n\n"
                 "Esta funcionalidade será implementada em breve.\n"
                 "🔙 Use /start para voltar ao menu principal",
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+    def show_live_predictions(self, update: Update, context):
+        """Mostrar predições para partidas ao vivo"""
+        try:
+            chat_id = update.effective_chat.id
+            
+            # Buscar partidas ao vivo
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+            loop.close()
+            
+            if not live_matches:
+                message_text = (
+                    f"🔮 **PREDIÇÕES IA - PARTIDAS AO VIVO**\n\n"
+                    f"⚠️ **Nenhuma partida ao vivo encontrada**\n\n"
+                    f"As predições aparecerão aqui quando houver partidas acontecendo.\n\n"
+                    f"🔄 **Próxima verificação:** {(datetime.now() + timedelta(minutes=5)).strftime('%H:%M')}\n"
+                    f"📅 **Última atualização:** {datetime.now().strftime('%H:%M:%S')}"
+                )
+            else:
+                message_text = f"🔮 **PREDIÇÕES IA - PARTIDAS AO VIVO**\n\n"
+                
+                for i, match in enumerate(live_matches[:5], 1):
+                    # Gerar predição usando o sistema de predições
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    prediction = loop.run_until_complete(self.prediction_system.predict_live_match(match))
+                    loop.close()
+                    
+                    team1 = match.get('team1', 'Time 1')
+                    team2 = match.get('team2', 'Time 2')
+                    league = match.get('league', 'Liga')
+                    status = match.get('status', 'Ao Vivo')
+                    
+                    # Emojis baseados na confiança
+                    confidence_emoji = {
+                        'Alta': '🔥',
+                        'Média': '⚡',
+                        'Baixa': '💡'
+                    }.get(prediction.get('confidence', 'Média'), '⚡')
+                    
+                    # Emoji do favorito
+                    favored_team = prediction.get('favored_team', team1)
+                    win_prob = prediction.get('win_probability', 50)
+                    
+                    message_text += (
+                        f"🎮 **{team1} vs {team2}**\n"
+                        f"🏆 **Liga:** {league} | 🔴 **{status}**\n\n"
+                        
+                        f"🎯 **PREDIÇÃO IA:**\n"
+                        f"🏅 **Favorito:** {favored_team}\n"
+                        f"📊 **Probabilidade:** {win_prob:.1f}%\n"
+                        f"{confidence_emoji} **Confiança:** {prediction.get('confidence', 'Média')}\n\n"
+                        
+                        f"📈 **ANÁLISE:**\n"
+                        f"{prediction.get('analysis', 'Análise em processamento...')}\n\n"
+                        
+                        f"💰 **RECOMENDAÇÃO:**\n"
+                        f"• **Aposta Sugerida:** {favored_team} Vence\n"
+                        f"• **Odds Mínimas:** {prediction.get('min_odds', 1.50):.2f}\n"
+                        f"• **Risco:** {prediction.get('risk_level', 'Médio')}\n"
+                    )
+                    
+                    if i < len(live_matches):
+                        message_text += "\n" + "─" * 30 + "\n\n"
+                
+                message_text += (
+                    f"\n🤖 **SOBRE AS PREDIÇÕES:**\n"
+                    f"• Baseadas em força dos times, forma atual e histórico\n"
+                    f"• Atualizadas em tempo real durante as partidas\n"
+                    f"• Consideram meta atual e matchups específicos\n\n"
+                    
+                    f"🔄 **Atualizado:** {datetime.now().strftime('%H:%M:%S')}"
+                )
+            
+            # Botões
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar Predições", callback_data="predictions_live"),
+                 InlineKeyboardButton("📊 Stats Detalhadas", callback_data="live_stats")],
+                [InlineKeyboardButton("💰 Value Bets", callback_data="value_betting"),
+                 InlineKeyboardButton("🔙 Menu", callback_data="main_menu")]
+            ]
+            
+            return self.safe_send_message(
+                chat_id,
+                message_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro nas predições ao vivo: {e}")
+            return self.safe_send_message(
+                update.effective_chat.id,
+                "❌ **Erro ao carregar predições**\n\n"
+                "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
             )
     
