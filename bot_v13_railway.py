@@ -9,7 +9,6 @@ Integração com API oficial da Riot Games + Sistema de Healthcheck
 import os
 import sys
 import time
-import random
 import asyncio
 import logging
 import threading
@@ -461,31 +460,40 @@ class RiotAPIClient:
             return []
     
     def _generate_simulated_schedule(self, limit: int) -> List[Dict]:
-        """Gera agenda simulada para demonstração"""
-        teams_by_league = {
-            'LCK': [('T1', 'GEN'), ('DK', 'KT'), ('DRX', 'BRO'), ('NS', 'LSB')],
-            'LPL': [('JDG', 'BLG'), ('WBG', 'TES'), ('EDG', 'IG'), ('LNG', 'WE')],
-            'LEC': [('G2', 'FNC'), ('MAD', 'VIT'), ('SK', 'BDS'), ('XL', 'GX')],
-            'LCS': [('C9', 'TL'), ('TSM', '100T'), ('FLY', 'EG'), ('DIG', 'IMT')],
-            'CBLOL': [('LOUD', 'FURIA'), ('RED', 'KBM'), ('VK', 'PNG'), ('FLA', 'LOS')]
-        }
+        """Gera agenda simulada para demonstração com horários do Brasil"""
+        # Agenda fixa para demonstração com horários realistas
+        demo_matches = [
+            ('LCK', 'T1', 'GEN', 2),      # Hoje + 2 horas
+            ('LCK', 'DK', 'KT', 5),       # Hoje + 5 horas  
+            ('LPL', 'JDG', 'BLG', 8),     # Hoje + 8 horas
+            ('LPL', 'WBG', 'TES', 12),    # Hoje + 12 horas
+            ('LEC', 'G2', 'FNC', 18),     # Hoje + 18 horas
+            ('LEC', 'MAD', 'VIT', 24),    # Amanhã
+            ('LCS', 'C9', 'TL', 30),      # Amanhã + 6 horas
+            ('LCS', 'TSM', '100T', 36),   # Amanhã + 12 horas
+            ('CBLOL', 'LOUD', 'FURIA', 42), # Amanhã + 18 horas
+            ('CBLOL', 'RED', 'KBM', 48),  # Depois de amanhã
+            ('LCK', 'DRX', 'BRO', 54),    # Depois de amanhã + 6 horas
+            ('LPL', 'EDG', 'IG', 60),     # Depois de amanhã + 12 horas
+            ('LEC', 'SK', 'BDS', 66),     # Depois de amanhã + 18 horas
+            ('LCS', 'FLY', 'EG', 72),     # 3 dias
+            ('CBLOL', 'VK', 'PNG', 78)    # 3 dias + 6 horas
+        ]
         
         matches = []
         current_time = datetime.now()
         
-        for i in range(limit):
-            # Escolher liga aleatória
-            league = random.choice(list(teams_by_league.keys()))
-            team_pair = random.choice(teams_by_league[league])
+        # Gerar partidas baseadas na lista fixa
+        for i in range(min(limit, len(demo_matches))):
+            league, team1, team2, hours_ahead = demo_matches[i]
             
-            # Gerar horário futuro
-            hours_ahead = random.randint(1, 72)  # 1 a 72 horas no futuro
+            # Calcular horário futuro
             match_time = current_time + timedelta(hours=hours_ahead)
             
             match = {
                 'teams': [
-                    {'name': team_pair[0], 'code': team_pair[0][:3], 'score': 0},
-                    {'name': team_pair[1], 'code': team_pair[1][:3], 'score': 0}
+                    {'name': team1, 'code': team1[:3], 'score': 0},
+                    {'name': team2, 'code': team2[:3], 'score': 0}
                 ],
                 'league': league,
                 'status': 'scheduled',
@@ -641,8 +649,9 @@ class ValueBettingSystem:
         # Aplicar multiplicador da liga
         final_strength = base_strength * base_multiplier
         
-        # Adicionar variação aleatória para simular forma atual
-        variation = random.uniform(0.9, 1.1)
+        # Adicionar variação fixa baseada no hash do nome do time para consistência
+        team_hash = hash(team_name) % 21  # 0-20
+        variation = 0.9 + (team_hash / 100)  # 0.9 a 1.1
         final_strength *= variation
         
         return max(final_strength, 30)  # Mínimo de 30
@@ -1118,7 +1127,7 @@ class DynamicPredictionSystem:
                 'team2_win_probability': 1 - final_prob,
                 'predicted_winner': team1 if final_prob > 0.5 else team2,
                 'confidence': self._calculate_confidence(team1_data, team2_data),
-                'score_prediction': f"2-{random.choice([0, 1])}" if final_prob > 0.6 else f"{random.choice([1, 2])}-2",
+                'score_prediction': "2-1" if final_prob > 0.6 else "1-2",
                 'key_factors': self._generate_match_analysis(team1, team2, team1_data, team2_data, final_prob),
                 'timestamp': datetime.now(),
                 'model_version': '3.1.0'
@@ -1147,16 +1156,19 @@ class DynamicPredictionSystem:
                 base_rating = rating
                 break
         
+        # Usar hash do nome do time para valores consistentes
+        team_hash = hash(team)
+        
         return {
             'name': team,
             'league': league,
             'base_rating': base_rating,
-            'recent_form': random.uniform(0.7, 1.3),
+            'recent_form': 0.7 + ((team_hash % 60) / 100),  # 0.7 a 1.3
             'region_strength': self._get_region_strength(league),
-            'meta_adaptation': random.uniform(0.8, 1.2),
-            'player_performance': random.uniform(0.85, 1.15),
-            'head_to_head_record': random.choice([0.4, 0.5, 0.6]),
-            'current_streak': random.randint(-3, 5)
+            'meta_adaptation': 0.8 + ((team_hash % 40) / 100),  # 0.8 a 1.2
+            'player_performance': 0.85 + ((team_hash % 30) / 100),  # 0.85 a 1.15
+            'head_to_head_record': [0.4, 0.5, 0.6][team_hash % 3],
+            'current_streak': (team_hash % 9) - 3  # -3 a 5
         }
     
     def _get_region_strength(self, league: str) -> float:
@@ -1454,16 +1466,22 @@ class ChampionAnalyzer:
     
     def _analyze_power_spikes(self, team1: List[str], team2: List[str]) -> Dict:
         """Analisa power spikes dos times"""
+        # Usar hash dos nomes dos times para valores consistentes
+        team1_hash = hash(team1[0] if team1 else 'team1')
+        team2_hash = hash(team2[0] if team2 else 'team2')
+        
+        power_levels = ['Forte', 'Médio', 'Fraco']
+        
         return {
             'team1': {
-                'early_game': random.choice(['Forte', 'Médio', 'Fraco']),
-                'mid_game': random.choice(['Forte', 'Médio', 'Fraco']),
-                'late_game': random.choice(['Forte', 'Médio', 'Fraco'])
+                'early_game': power_levels[team1_hash % 3],
+                'mid_game': power_levels[(team1_hash + 1) % 3],
+                'late_game': power_levels[(team1_hash + 2) % 3]
             },
             'team2': {
-                'early_game': random.choice(['Forte', 'Médio', 'Fraco']),
-                'mid_game': random.choice(['Forte', 'Médio', 'Fraco']),
-                'late_game': random.choice(['Forte', 'Médio', 'Fraco'])
+                'early_game': power_levels[team2_hash % 3],
+                'mid_game': power_levels[(team2_hash + 1) % 3],
+                'late_game': power_levels[(team2_hash + 2) % 3]
             }
         }
     
