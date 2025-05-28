@@ -2996,7 +2996,10 @@ def main():
             dispatcher.add_handler(CommandHandler("alerts", bot.alerts_command))
             dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler))
             
-            logger.info(f"✅ {len(dispatcher.handlers)} handlers registrados no dispatcher v13")
+            # Contar handlers corretamente
+            total_handlers = sum(len(handlers) for handlers in dispatcher.handlers.values())
+            logger.info(f"✅ {total_handlers} handlers registrados no dispatcher v13")
+            logger.info(f"📋 Comandos disponíveis: /start, /menu, /tips, /live, /schedule, /monitoring, /predictions, /alerts")
             
             if is_railway:
                 # Modo Railway - Webhook v13
@@ -3031,8 +3034,20 @@ def main():
                             update = Update.de_json(update_data, updater.bot)
                             logger.info(f"📨 Update processado: {update.update_id if update else 'None'}")
                             
+                            # Log detalhado do update
+                            if update and update.message:
+                                message = update.message
+                                logger.info(f"📨 Mensagem: {message.text}")
+                                logger.info(f"📨 Chat ID: {message.chat_id}")
+                                logger.info(f"📨 User: {message.from_user.username if message.from_user else 'Unknown'}")
+                            
+                            # Verificar se dispatcher tem handlers
+                            total_handlers = sum(len(handlers) for handlers in dispatcher.handlers.values())
+                            logger.info(f"📨 Dispatcher tem {total_handlers} handlers disponíveis")
+                            
                             # Processar update de forma thread-safe
                             dispatcher.process_update(update)
+                            logger.info(f"📨 Update {update.update_id} processado com sucesso")
                             
                         return "OK", 200
                     except Exception as e:
