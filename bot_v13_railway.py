@@ -1511,8 +1511,17 @@ class LoLBotV3UltraAdvanced:
 
     async def start_command(self, update: Update, context) -> None:
         """Comando /start"""
-        user = update.effective_user
-        welcome_message = f"""
+        logger.info("🔷 COMANDO /start CHAMADO!")
+        logger.info(f"🔷 Update ID: {update.update_id}")
+        logger.info(f"🔷 Chat ID: {update.effective_chat.id}")
+        logger.info(f"🔷 User ID: {update.effective_user.id}")
+        logger.info(f"🔷 Username: {update.effective_user.username or 'Sem username'}")
+        
+        try:
+            user = update.effective_user
+            logger.info(f"🔷 Processando comando /start para usuário: {user.first_name}")
+            
+            welcome_message = f"""
 🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
 
 Olá {user.first_name}! 👋
@@ -1534,20 +1543,35 @@ Olá {user.first_name}! 👋
 Use /menu para ver todas as opções!
         """
 
-        keyboard = [
-            [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
-            [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
-            [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
-            [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
-            [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
-            [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            keyboard = [
+                [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
+                [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
+                [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            logger.info(f"🔷 Enviando mensagem de boas-vindas...")
 
-        if TELEGRAM_VERSION == "v20+":
-            await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-        else:
-            await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            if TELEGRAM_VERSION == "v20+":
+                await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            else:
+                await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            
+            logger.info(f"🔷 Comando /start processado com SUCESSO!")
+            
+        except Exception as e:
+            logger.error(f"❌ ERRO CRÍTICO no comando /start: {e}", exc_info=True)
+            try:
+                error_message = "❌ Erro interno no comando /start. Tente novamente."
+                if TELEGRAM_VERSION == "v20+":
+                    await update.message.reply_text(error_message)
+                else:
+                    await update.message.reply_text(error_message)
+            except Exception as reply_error:
+                logger.error(f"❌ Erro ao enviar mensagem de erro: {reply_error}", exc_info=True)
 
     async def menu_command(self, update: Update, context) -> None:
         """Comando /menu"""
@@ -2464,7 +2488,20 @@ Use o botão "Cadastrar Grupo" abaixo
         # O 'context' para CommandHandler (v13) é um CallbackContext, 
         # para v20+ é ContextTypes.DEFAULT_TYPE.
         # Para simplificar a chamada direta, passamos o bot.
-        mock_context_obj = MockContext(query.message.bot)
+        # CORRIGIDO: usar query.bot ou self.bot_application em vez de query.message.bot
+        if hasattr(query, 'bot'):
+            bot_instance = query.bot
+        elif hasattr(self, 'bot_application') and self.bot_application:
+            if TELEGRAM_VERSION == "v20+":
+                bot_instance = self.bot_application.bot
+            else:
+                bot_instance = self.bot_application.bot
+        else:
+            logger.error("❌ Não foi possível obter instância do bot para predictions callback")
+            await query.edit_message_text("❌ Erro interno no callback de predições")
+            return
+            
+        mock_context_obj = MockContext(bot_instance)
 
         await self.predictions_command(mock_update_obj, mock_context_obj)
 
@@ -2852,7 +2889,33 @@ def main():
             application.add_handler(CommandHandler("predictions", bot.predictions_command))
             application.add_handler(CommandHandler("alerts", bot.alerts_command))
             application.add_handler(CallbackQueryHandler(bot.callback_handler))
-
+            
+            # Log detalhado dos handlers registrados
+            logger.info("🔷 V20+ Handlers registrados:")
+            for group_id, handlers_list in application.handlers.items():
+                logger.info(f"🔷 Grupo {group_id}: {len(handlers_list)} handlers")
+                for handler in handlers_list:
+                    if hasattr(handler, 'command'):
+                        logger.info(f"🔷   - CommandHandler: /{handler.command[0]} -> {handler.callback.__name__}")
+                    elif hasattr(handler, 'callback'):
+                        logger.info(f"🔷   - {handler.__class__.__name__} -> {handler.callback.__name__}")
+                    else:
+                        logger.info(f"🔷   - {handler.__class__.__name__}")
+            
+            # Testar se o bot responde
+            logger.info("🔷 Testando conexão com o bot...")
+            try:
+                bot_info = None
+                if TELEGRAM_VERSION == "v20+":
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    bot_info = loop.run_until_complete(application.bot.get_me())
+                else:
+                    bot_info = application.bot.get_me()
+                logger.info(f"🔷 Bot conectado com sucesso: @{bot_info.username} (ID: {bot_info.id})")
+            except Exception as e:
+                logger.error(f"❌ Erro ao testar conexão com bot: {e}", exc_info=True)
+            
             # Definir aplicação para sistema de alertas
             bot.set_bot_application(application)
 
@@ -2880,21 +2943,41 @@ def main():
                 # Adicionar rota webhook ao Flask
                 @app.route(webhook_path, methods=['POST'])
                 def webhook():
+                    logger.info("🔷 Webhook V20+ RECEBIDO!") # Log de entrada
                     try:
                         from flask import request
+                        logger.info(f"🔷 Request method: {request.method}, path: {request.path}")
+                        
                         update_data = request.get_json(force=True)
-
+                        logger.info(f"🔷 Webhook V20+ Data recebido: {bool(update_data)}")
+                        
                         if update_data:
+                            logger.info(f"🔷 Update data keys: {list(update_data.keys()) if isinstance(update_data, dict) else 'Not dict'}")
+                            
                             from telegram import Update
                             update_obj = Update.de_json(update_data, application.bot) # Renomeado para evitar conflito com módulo
+                            logger.info(f"🔷 Webhook V20+ Update processado: {update_obj.update_id if update_obj else 'None'}")
+                            
+                            # Log detalhado do update
+                            if update_obj and update_obj.message:
+                                message = update_obj.message
+                                logger.info(f"🔷 Mensagem recebida: '{message.text}'")
+                                logger.info(f"🔷 Chat ID: {message.chat_id}")
+                                logger.info(f"🔷 User: {message.from_user.username if message.from_user else 'Unknown'}")
+                                logger.info(f"🔷 É comando: {message.text.startswith('/') if message.text else False}")
 
                             # Processar update
+                            logger.info("🔷 Iniciando processamento do update...")
                             current_loop = asyncio.get_event_loop() # Usar o loop atual
                             current_loop.run_until_complete(application.process_update(update_obj))
+                            logger.info(f"🔷 Webhook V20+ Update {update_obj.update_id if update_obj else 'N/A'} processado com SUCESSO!")
+                            
+                        else:
+                            logger.warning("🔷 Webhook recebido mas sem dados de update")
 
                         return "OK", 200
                     except Exception as e:
-                        logger.error(f"❌ Erro no webhook: {e}")
+                        logger.error(f"❌ Erro CRÍTICO no webhook V20+: {e}", exc_info=True) # Traceback completo
                         return "Error", 500
 
                 # Configurar webhook URL
@@ -3027,7 +3110,7 @@ def main():
             dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler))
 
             # Contar handlers corretamente
-            total_handlers = sum(len(handlers_list) for group, handlers_list in dispatcher.handlers.items()) # Corrigido para iterar sobre items
+            total_handlers = sum(len(h_list) for group, h_list in dispatcher.handlers.items()) # Corrigido para iterar sobre items
             logger.info(f"✅ {total_handlers} handlers registrados no dispatcher v13")
             logger.info(f"📋 Comandos disponíveis: /start, /menu, /tips, /live, /schedule, /monitoring, /predictions, /alerts")
 
@@ -3048,38 +3131,51 @@ def main():
 
                 @app.route(webhook_path, methods=['POST'])
                 def webhook_v13():
+                    logger.info("🔷 Webhook V13 RECEBIDO!") # Log de entrada aprimorado
                     try:
                         from flask import request
-                        logger.info(f"📨 Webhook v13 recebido: {request.method} {request.path}")
-
+                        logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
+                        
                         update_data = request.get_json(force=True)
-                        logger.info(f"📨 Dados recebidos: {bool(update_data)}")
-
+                        logger.info(f"🔷 Webhook V13 dados recebidos: {bool(update_data)}")
+                        
                         if update_data:
+                            logger.info(f"🔷 V13 Update data keys: {list(update_data.keys()) if isinstance(update_data, dict) else 'Not dict'}")
+                            
                             from telegram import Update as TelegramUpdate # Alias para evitar conflito
                             update_obj = TelegramUpdate.de_json(update_data, updater.bot)
-                            logger.info(f"📨 Update processado: {update_obj.update_id if update_obj else 'None'}")
+                            logger.info(f"🔷 Webhook V13 Update processado: {update_obj.update_id if update_obj else 'None'}")
 
                             # Log detalhado do update
                             if update_obj and update_obj.message:
                                 message = update_obj.message
-                                logger.info(f"📨 Mensagem: {message.text}")
-                                logger.info(f"📨 Chat ID: {message.chat_id}")
-                                logger.info(f"📨 User: {message.from_user.username if message.from_user else 'Unknown'}")
+                                logger.info(f"🔷 V13 Mensagem recebida: '{message.text}'")
+                                logger.info(f"🔷 V13 Chat ID: {message.chat_id}")
+                                logger.info(f"🔷 V13 User: {message.from_user.username if message.from_user else 'Unknown'}")
+                                logger.info(f"🔷 V13 É comando: {message.text.startswith('/') if message.text else False}")
 
                             # Verificar se dispatcher tem handlers
                             current_total_handlers = sum(len(h_list) for g, h_list in dispatcher.handlers.items())
-                            logger.info(f"📨 Dispatcher v13 tem {current_total_handlers} handlers disponíveis")
+                            logger.info(f"🔷 Dispatcher v13 tem {current_total_handlers} handlers disponíveis")
+
+                            # Log handlers específicos de comando
+                            if 0 in dispatcher.handlers:  # CommandHandlers geralmente estão no grupo 0
+                                command_handlers = [h for h in dispatcher.handlers[0] if hasattr(h, 'command')]
+                                logger.info(f"🔷 Command handlers ativos: {[h.command for h in command_handlers if hasattr(h, 'command')]}")
 
                             # Processar update de forma thread-safe
+                            logger.info("🔷 V13 Iniciando processamento do update...")
                             dispatcher.process_update(update_obj)
-                            logger.info(f"📨 Update {update_obj.update_id} processado com sucesso")
+                            logger.info(f"🔷 V13 Update {update_obj.update_id} processado com SUCESSO!")
+                            
+                        else:
+                            logger.warning("🔷 V13 Webhook recebido mas sem dados de update")
 
                         return "OK", 200
                     except Exception as e:
-                        logger.error(f"❌ Erro no webhook v13: {e}")
+                        logger.error(f"❌ Erro CRÍTICO no webhook V13: {e}", exc_info=True) # Traceback completo
                         import traceback
-                        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+                        logger.error(f"❌ V13 Traceback detalhado: {traceback.format_exc()}")
                         return "Error", 500
 
                 # Configurar webhook
