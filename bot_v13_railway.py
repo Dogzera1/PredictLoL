@@ -56,29 +56,77 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 
 # Flask app para healthcheck
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False
 
 @app.route('/health')
 def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'service': 'bot_lol_v3_professional_units',
-        'version': TELEGRAM_VERSION,
-        'units_system': 'PROFESSIONAL_STANDARD'
-    })
+    """Health check para Railway"""
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'service': 'bot_lol_v3_professional_units',
+            'version': TELEGRAM_VERSION,
+            'units_system': 'PROFESSIONAL_STANDARD',
+            'port': PORT,
+            'environment': 'railway' if os.getenv('RAILWAY_ENVIRONMENT_NAME') else 'local'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 @app.route('/')
 def root():
-    return jsonify({
-        'message': 'BOT LOL V3 - Sistema de Unidades Profissional',
-        'status': 'online',
-        'units_system': 'Padrão de grupos profissionais'
-    })
+    """Rota raiz"""
+    try:
+        return jsonify({
+            'message': 'BOT LOL V3 - Sistema de Unidades Profissional',
+            'status': 'online',
+            'units_system': 'Padrão de grupos profissionais',
+            'health_check': '/health',
+            'webhook': '/webhook'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 # Rota webhook global (será sobrescrita se necessário)
 @app.route('/webhook', methods=['POST'])
 def webhook_default():
+    """Webhook padrão"""
     return jsonify({'status': 'webhook not configured yet'}), 200
+
+# Rota de teste adicional
+@app.route('/ping')
+def ping():
+    """Ping simples"""
+    return "pong", 200
+
+# Handler de erro global
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handler global de exceções"""
+    logger.error(f"❌ Erro no Flask: {e}")
+    return jsonify({
+        'status': 'error',
+        'error': str(e),
+        'timestamp': datetime.now().isoformat()
+    }), 500
+
+# Handler para 404
+@app.errorhandler(404)
+def not_found(e):
+    """Handler para 404"""
+    return jsonify({
+        'status': 'not_found',
+        'message': 'Endpoint não encontrado',
+        'available_endpoints': ['/health', '/ping', '/webhook', '/']
+    }), 404
 
 class ProfessionalUnitsSystem:
     """Sistema de Unidades Padrão de Grupos Profissionais"""
@@ -2468,8 +2516,19 @@ def main():
                 
                 logger.info("✅ Bot configurado (Railway webhook) - Iniciando Flask...")
                 
+                # Configurar Flask para produção
+                app.config['ENV'] = 'production'
+                app.config['DEBUG'] = False
+                
+                # Log detalhado para Railway
+                logger.info(f"🌐 Iniciando Flask na porta {PORT}")
+                logger.info(f"🔗 Health check disponível em: /health")
+                logger.info(f"🔗 Webhook disponível em: {webhook_url}")
+                logger.info(f"🔗 Root disponível em: /")
+                logger.info(f"🔗 Ping disponível em: /ping")
+                
                 # Iniciar Flask
-                app.run(host='0.0.0.0', port=PORT, debug=False)
+                app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
                 
             else:
                 # Modo Local - Polling
@@ -2537,7 +2596,19 @@ def main():
                     logger.error(f"❌ Erro ao configurar webhook v13: {e}")
                 
                 logger.info("✅ Bot configurado (Railway webhook v13) - Iniciando Flask...")
-                app.run(host='0.0.0.0', port=PORT, debug=False)
+                
+                # Configurar Flask para produção
+                app.config['ENV'] = 'production'
+                app.config['DEBUG'] = False
+                
+                # Log detalhado para Railway v13
+                logger.info(f"🌐 Iniciando Flask v13 na porta {PORT}")
+                logger.info(f"🔗 Health check disponível em: /health")
+                logger.info(f"🔗 Webhook disponível em: {webhook_url}")
+                logger.info(f"🔗 Root disponível em: /")
+                logger.info(f"🔗 Ping disponível em: /ping")
+                
+                app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
                 
             else:
                 # Modo Local - Polling v13
