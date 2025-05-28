@@ -49,7 +49,7 @@ import aiohttp
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
 OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
-PORT = int(os.getenv('PORT', 5000))
+PORT = int(os.getenv('PORT', 5800))
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -74,6 +74,11 @@ def root():
         'status': 'online',
         'units_system': 'Padrão de grupos profissionais'
     })
+
+# Rota webhook global (será sobrescrita se necessário)
+@app.route('/webhook', methods=['POST'])
+def webhook_default():
+    return jsonify({'status': 'webhook not configured yet'}), 200
 
 class ProfessionalUnitsSystem:
     """Sistema de Unidades Padrão de Grupos Profissionais"""
@@ -2377,17 +2382,11 @@ def main():
         logger.info("🎯 Critérios: 65%+ confiança, 5%+ EV mínimo")
         logger.info("=" * 60)
         
-        # Iniciar Flask
-        flask_thread = threading.Thread(target=run_flask_app, daemon=True)
-        flask_thread.start()
-        logger.info(f"🌐 Health check rodando na porta {PORT}")
-        
         # Inicializar bot
         bot = LoLBotV3UltraAdvanced()
         
-        # Verificar se está rodando no Railway (webhook) ou local (polling)
-        webhook_url = os.getenv('WEBHOOK_URL')
-        railway_url = os.getenv('RAILWAY_STATIC_URL')
+        # Verificar modo de execução
+        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
         
         if TELEGRAM_VERSION == "v20+":
             # Versão v20+
@@ -2407,53 +2406,81 @@ def main():
             # Definir aplicação para sistema de alertas
             bot.set_bot_application(application)
             
-            # Configurar webhook para Railway ou polling para local
-            if webhook_url or railway_url:
-                # Modo webhook (Railway)
-                webhook_path = f"/webhook/{TOKEN}"
-                webhook_full_url = f"{webhook_url or railway_url}{webhook_path}"
+            if is_railway:
+                # Modo Railway - Webhook
+                logger.info("🚀 Detectado ambiente Railway - Configurando webhook")
                 
-                logger.info(f"🌐 Configurando webhook: {webhook_full_url}")
+                # Configurar webhook path
+                webhook_path = f"/webhook"
+                
+                # Remover rota webhook padrão e adicionar a específica
+                app.url_map._rules = [rule for rule in app.url_map._rules if rule.rule != '/webhook']
+                app.url_map._rules_by_endpoint.pop('webhook_default', None)
                 
                 # Adicionar rota webhook ao Flask
                 @app.route(webhook_path, methods=['POST'])
                 def webhook():
                     try:
                         from flask import request
-                        import json
+                        update_data = request.get_json(force=True)
                         
-                        update_data = request.get_json()
                         if update_data:
                             from telegram import Update
                             update = Update.de_json(update_data, application.bot)
                             
-                            # Processar update de forma assíncrona
+                            # Processar update
                             import asyncio
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
+                            try:
+                                loop = asyncio.get_event_loop()
+                            except RuntimeError:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                            
                             loop.run_until_complete(application.process_update(update))
-                            loop.close()
                             
                         return "OK", 200
                     except Exception as e:
-                        logger.error(f"Erro no webhook: {e}")
+                        logger.error(f"❌ Erro no webhook: {e}")
                         return "Error", 500
                 
-                # Configurar webhook
+                # Configurar webhook URL
+                railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                webhook_url = f"{railway_url}{webhook_path}"
+                
+                # Definir webhook
+                async def setup_webhook():
+                    try:
+                        await application.bot.delete_webhook()
+                        await application.bot.set_webhook(webhook_url)
+                        logger.info(f"✅ Webhook configurado: {webhook_url}")
+                    except Exception as e:
+                        logger.error(f"❌ Erro ao configurar webhook: {e}")
+                
+                # Executar setup
                 import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(application.bot.set_webhook(webhook_full_url))
-                loop.close()
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
                 
-                logger.info("✅ Bot configurado (v20+ webhook) - Aguardando requisições...")
+                loop.run_until_complete(setup_webhook())
                 
-                # Manter Flask rodando
+                logger.info("✅ Bot configurado (Railway webhook) - Iniciando Flask...")
+                
+                # Iniciar Flask
                 app.run(host='0.0.0.0', port=PORT, debug=False)
                 
             else:
-                # Modo polling (local)
-                logger.info("✅ Bot configurado (v20+ polling) - Iniciando polling...")
+                # Modo Local - Polling
+                logger.info("🏠 Ambiente local detectado - Usando polling")
+                
+                # Iniciar Flask em thread separada
+                flask_thread = threading.Thread(target=run_flask_app, daemon=True)
+                flask_thread.start()
+                logger.info(f"🌐 Health check rodando na porta {PORT}")
+                
+                logger.info("✅ Bot configurado (polling) - Iniciando...")
                 application.run_polling()
             
         else:
@@ -2472,22 +2499,22 @@ def main():
             dispatcher.add_handler(CommandHandler("alerts", bot.alerts_command))
             dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler))
             
-            # Configurar webhook para Railway ou polling para local
-            if webhook_url or railway_url:
-                # Modo webhook (Railway)
-                webhook_path = f"/webhook/{TOKEN}"
-                webhook_full_url = f"{webhook_url or railway_url}{webhook_path}"
+            if is_railway:
+                # Modo Railway - Webhook v13
+                logger.info("🚀 Detectado ambiente Railway v13 - Configurando webhook")
                 
-                logger.info(f"🌐 Configurando webhook v13: {webhook_full_url}")
+                webhook_path = f"/webhook"
                 
-                # Adicionar rota webhook ao Flask
+                # Remover rota webhook padrão e adicionar a específica
+                app.url_map._rules = [rule for rule in app.url_map._rules if rule.rule != '/webhook']
+                app.url_map._rules_by_endpoint.pop('webhook_default', None)
+                
                 @app.route(webhook_path, methods=['POST'])
                 def webhook_v13():
                     try:
                         from flask import request
-                        import json
+                        update_data = request.get_json(force=True)
                         
-                        update_data = request.get_json()
                         if update_data:
                             from telegram import Update
                             update = Update.de_json(update_data, updater.bot)
@@ -2495,27 +2522,54 @@ def main():
                             
                         return "OK", 200
                     except Exception as e:
-                        logger.error(f"Erro no webhook v13: {e}")
+                        logger.error(f"❌ Erro no webhook v13: {e}")
                         return "Error", 500
                 
                 # Configurar webhook
-                updater.bot.set_webhook(webhook_full_url)
+                railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                webhook_url = f"{railway_url}{webhook_path}"
                 
-                logger.info("✅ Bot configurado (v13 webhook) - Aguardando requisições...")
+                try:
+                    updater.bot.delete_webhook()
+                    updater.bot.set_webhook(webhook_url)
+                    logger.info(f"✅ Webhook v13 configurado: {webhook_url}")
+                except Exception as e:
+                    logger.error(f"❌ Erro ao configurar webhook v13: {e}")
                 
-                # Manter Flask rodando
+                logger.info("✅ Bot configurado (Railway webhook v13) - Iniciando Flask...")
                 app.run(host='0.0.0.0', port=PORT, debug=False)
                 
             else:
-                # Modo polling (local)
-                logger.info("✅ Bot configurado (v13 polling) - Iniciando polling...")
+                # Modo Local - Polling v13
+                logger.info("🏠 Ambiente local v13 detectado - Usando polling")
+                
+                flask_thread = threading.Thread(target=run_flask_app, daemon=True)
+                flask_thread.start()
+                logger.info(f"🌐 Health check rodando na porta {PORT}")
+                
+                logger.info("✅ Bot configurado (polling v13) - Iniciando...")
                 updater.start_polling()
                 updater.idle()
                 
     except Exception as e:
-        logger.error(f"❌ Erro: {e}")
+        logger.error(f"❌ Erro crítico: {e}")
         import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Traceback completo: {traceback.format_exc()}")
+        
+        # Tentar modo de emergência
+        try:
+            logger.info("🆘 Tentando modo de emergência...")
+            if TELEGRAM_VERSION == "v20+":
+                application = Application.builder().token(TOKEN).build()
+                application.add_handler(CommandHandler("start", bot.start_command))
+                application.run_polling()
+            else:
+                updater = Updater(TOKEN)
+                updater.dispatcher.add_handler(CommandHandler("start", bot.start_command))
+                updater.start_polling()
+                updater.idle()
+        except Exception as emergency_error:
+            logger.error(f"❌ Modo de emergência falhou: {emergency_error}")
 
 if __name__ == "__main__":
     main() 
