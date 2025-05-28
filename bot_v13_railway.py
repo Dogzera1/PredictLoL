@@ -2594,6 +2594,7 @@ def main():
         # Verificar e limpar conflitos do Telegram ANTES de inicializar
         async def pre_check_telegram_conflicts():
             """Verifica conflitos do Telegram antes de iniciar"""
+            import time  # Importar time para usar sleep
             try:
                 logger.info("🔍 Verificando conflitos do Telegram...")
                 
