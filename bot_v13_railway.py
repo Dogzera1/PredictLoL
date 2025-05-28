@@ -1181,84 +1181,110 @@ class ProfessionalTipsSystem:
         logger.info("🎯 Sistema de Tips Profissional inicializado com MONITORAMENTO ATIVO")
     
     def start_monitoring(self):
-        """Inicia monitoramento contínuo de todas as partidas"""
+        """Inicia monitoramento contínuo de todas as partidas - OTIMIZADO"""
         if not self.monitoring:
             self.monitoring = True
             
             def monitor_loop():
+                # Criar loop asyncio uma única vez e reutilizar
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
                 while self.monitoring:
                     try:
-                        # Escanear por oportunidades de tips
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
+                        # Usar o mesmo loop em vez de criar novo a cada iteração
                         loop.run_until_complete(self._scan_all_matches_for_tips())
-                        loop.close()
-                        time.sleep(300)  # Verificar a cada 5 minutos
+                        
+                        # Limpar cache para evitar acúmulo de memória
+                        if hasattr(self, 'prediction_system'):
+                            self.prediction_system.clear_old_cache()
+                        
+                        # Aguardar 10 minutos em vez de 5 para reduzir carga
+                        time.sleep(600)  # 10 minutos
+                        
                     except Exception as e:
                         logger.error(f"Erro no monitoramento de tips: {e}")
-                        time.sleep(60)
+                        time.sleep(120)  # 2 minutos em caso de erro
+                
+                # Fechar loop quando monitoramento parar
+                loop.close()
             
             monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
             monitor_thread.start()
-            logger.info("🔍 Monitoramento contínuo de tips iniciado - Verificação a cada 5 minutos")
+            logger.info("🔍 Monitoramento contínuo de tips iniciado - Verificação a cada 10 minutos (otimizado)")
     
     async def _scan_all_matches_for_tips(self):
-        """Escaneia TODAS as partidas (ao vivo e agendadas) para encontrar oportunidades"""
+        """Escaneia TODAS as partidas (ao vivo e agendadas) para encontrar oportunidades - OTIMIZADO"""
         try:
-            logger.info("🔍 Escaneando TODAS as partidas para oportunidades de tips...")
+            logger.info("🔍 Escaneando partidas para oportunidades de tips...")
             
-            # Buscar partidas ao vivo
+            # OTIMIZAÇÃO: Limitar número de partidas para reduzir uso de memória
             live_matches = await self.riot_client.get_live_matches()
+            live_matches = live_matches[:5]  # Máximo 5 partidas ao vivo
             
-            # Buscar partidas agendadas (próximas 24h)
+            # OTIMIZAÇÃO: Reduzir período de busca de 24h para 6h
             schedule_manager = ScheduleManager(self.riot_client)
-            scheduled_matches = await schedule_manager.get_scheduled_matches(days_ahead=1)
+            scheduled_matches = await schedule_manager.get_scheduled_matches(days_ahead=0.25)  # 6 horas
+            scheduled_matches = scheduled_matches[:10]  # Máximo 10 partidas agendadas
             
             all_matches = live_matches + scheduled_matches
-            
             opportunities_found = 0
             
-            for match in all_matches:
-                tip_analysis = await self._analyze_match_for_tip(match)
-                
-                if tip_analysis and self._meets_professional_criteria(tip_analysis):
-                    tip_id = self._generate_tip_id(match)
+            # OTIMIZAÇÃO: Processar máximo 10 partidas por scan
+            for match in all_matches[:10]:
+                try:
+                    tip_analysis = await self._analyze_match_for_tip(match)
                     
-                    # Verificar se já foi dado este tip
-                    if tip_id not in self.given_tips:
-                        professional_tip = self._create_professional_tip(tip_analysis)
+                    if tip_analysis and self._meets_professional_criteria(tip_analysis):
+                        tip_id = self._generate_tip_id(match)
                         
-                        if professional_tip:
-                            self.tips_database.append(professional_tip)
-                            self.given_tips.add(tip_id)
-                            opportunities_found += 1
+                        # Verificar se já foi dado este tip
+                        if tip_id not in self.given_tips:
+                            professional_tip = self._create_professional_tip(tip_analysis)
                             
-                            logger.info(f"🎯 NOVA OPORTUNIDADE ENCONTRADA: {professional_tip['title']}")
-                            
-                            # ENVIAR ALERTA AUTOMÁTICO PARA GRUPOS
-                            try:
-                                # Verificar se há grupos cadastrados e bot disponível
-                                if hasattr(self, '_bot_instance') and self._bot_instance:
-                                    alerts_system = self._bot_instance.alerts_system
-                                    bot_app = self._bot_instance.bot_application
+                            if professional_tip:
+                                self.tips_database.append(professional_tip)
+                                self.given_tips.add(tip_id)
+                                opportunities_found += 1
+                                
+                                logger.info(f"🎯 NOVA OPORTUNIDADE: {professional_tip['title']}")
+                                
+                                # ENVIAR ALERTA AUTOMÁTICO (otimizado)
+                                try:
+                                    if hasattr(self, '_bot_instance') and self._bot_instance:
+                                        alerts_system = self._bot_instance.alerts_system
+                                        bot_app = self._bot_instance.bot_application
+                                        
+                                        if alerts_system.group_chat_ids and bot_app:
+                                            await alerts_system.send_tip_alert(professional_tip, bot_app)
+                                            logger.info(f"📢 Alerta enviado para {len(alerts_system.group_chat_ids)} grupos")
+                                        
+                                except Exception as alert_error:
+                                    logger.warning(f"❌ Erro no alerta: {alert_error}")
                                     
-                                    if alerts_system.group_chat_ids and bot_app:
-                                        await alerts_system.send_tip_alert(professional_tip, bot_app)
-                                        logger.info(f"📢 Alerta automático enviado para {len(alerts_system.group_chat_ids)} grupos")
-                                    
-                            except Exception as alert_error:
-                                logger.warning(f"❌ Erro ao enviar alerta automático: {alert_error}")
+                except Exception as match_error:
+                    logger.warning(f"❌ Erro ao analisar partida: {match_error}")
+                    continue
+            
+            # OTIMIZAÇÃO: Limitar histórico de tips para evitar acúmulo de memória
+            if len(self.tips_database) > 50:
+                self.tips_database = self.tips_database[-50:]  # Manter apenas últimos 50
+            
+            if len(self.given_tips) > 100:
+                # Remover tips antigos do cache
+                old_tips = list(self.given_tips)[:50]
+                for old_tip in old_tips:
+                    self.given_tips.discard(old_tip)
             
             self.last_scan = datetime.now()
             
             if opportunities_found > 0:
-                logger.info(f"✅ {opportunities_found} novas oportunidades de tips encontradas")
+                logger.info(f"✅ {opportunities_found} oportunidades encontradas")
             else:
-                logger.info("ℹ️ Nenhuma nova oportunidade encontrada neste scan")
+                logger.info("ℹ️ Nenhuma nova oportunidade (scan otimizado)")
                 
         except Exception as e:
-            logger.error(f"Erro no scan de partidas: {e}")
+            logger.error(f"Erro no scan otimizado: {e}")
     
     def set_bot_instance(self, bot_instance):
         """Define instância do bot para envio de alertas automáticos"""
@@ -1272,7 +1298,8 @@ class ProfessionalTipsSystem:
             'total_tips_found': len(self.tips_database),
             'tips_this_week': len([tip for tip in self.tips_database 
                                  if (datetime.now() - tip['timestamp']).days < 7]),
-            'scan_frequency': '5 minutos'
+            'scan_frequency': '10 minutos (otimizado)',
+            'memory_optimization': 'Ativo'
         }
     
     async def generate_professional_tip(self) -> Optional[Dict]:
@@ -1307,7 +1334,7 @@ class ProfessionalTipsSystem:
             return None
     
     async def _analyze_match_for_tip(self, match: Dict) -> Optional[Dict]:
-        """Analisa partida usando machine learning para gerar tip"""
+        """Analisa partida usando machine learning para gerar tip - OTIMIZADO"""
         try:
             teams = match.get('teams', [])
             if len(teams) < 2:
@@ -1317,11 +1344,12 @@ class ProfessionalTipsSystem:
             team2_name = teams[1].get('name', '')
             league = match.get('league', '')
             
-            # Usar sistema de predição ML (sem importação circular)
-            prediction_system = DynamicPredictionSystem()
+            # OTIMIZAÇÃO: Reutilizar instância existente em vez de criar nova
+            if not hasattr(self, 'prediction_system'):
+                self.prediction_system = DynamicPredictionSystem()
             
             # Obter predição ML
-            ml_prediction = await prediction_system.predict_live_match(match)
+            ml_prediction = await self.prediction_system.predict_live_match(match)
             
             if not ml_prediction or ml_prediction['confidence'] not in ['Alta', 'Muito Alta']:
                 return None
@@ -1353,7 +1381,7 @@ class ProfessionalTipsSystem:
             # Determinar tier da liga
             league_tier = self._determine_league_tier(league)
             
-            # Criar análise completa
+            # Criar análise completa (otimizada - menos dados)
             analysis = {
                 'team1': team1_name,
                 'team2': team2_name,
@@ -1367,15 +1395,14 @@ class ProfessionalTipsSystem:
                 'ev_percentage': ev_percentage,
                 'ml_odds': ml_odds,
                 'market_odds': market_odds,
-                'ml_analysis': ml_prediction['analysis'],
-                'prediction_factors': ml_prediction['prediction_factors'],
-                'match_data': match
+                'ml_analysis': ml_prediction['analysis'][:200],  # Limitar tamanho da análise
+                # Remover prediction_factors e match_data para economizar memória
             }
             
             return analysis
             
         except Exception as e:
-            logger.error(f"Erro na análise ML da partida: {e}")
+            logger.error(f"Erro na análise ML otimizada: {e}")
             return None
     
     def _meets_professional_criteria(self, analysis: Dict) -> bool:
@@ -1510,44 +1537,63 @@ class LoLBotV3UltraAdvanced:
         cleanup_thread.start()
     
     async def start_command(self, update: Update, context) -> None:
-        """Comando /start"""
-        user = update.effective_user
-        welcome_message = f"""
+        """Comando /start - OTIMIZADO para resposta rápida"""
+        try:
+            user = update.effective_user
+            logger.info(f"📨 Comando /start recebido de {user.first_name} (ID: {user.id})")
+            
+            # RESPOSTA IMEDIATA - sem processamento pesado
+            welcome_message = f"""
 🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
 
 Olá {user.first_name}! 👋
 
 🎲 **SISTEMA DE UNIDADES PROFISSIONAL**
 📊 Baseado em grupos de apostas profissionais
-⚡ Sem Kelly Criterion - Sistema simplificado
+⚡ Sistema otimizado para Railway
 🎯 Critérios: 65%+ confiança, 5%+ EV mínimo
 
 🔥 **FUNCIONALIDADES:**
-• 🎯 Tips profissionais com monitoramento ativo
-• 🔮 Predições IA com machine learning
-• 📅 Agenda de partidas (próximos 7 dias)
-• 🎮 Partidas ao vivo selecionáveis
-• 📢 Sistema de alertas para grupos
-• 📊 Sistema de unidades padrão
-• 📋 Estatísticas detalhadas
+• 🎯 Tips profissionais com IA
+• 🔮 Predições machine learning
+• 📅 Agenda de partidas
+• 🎮 Partidas ao vivo
+• 📢 Sistema de alertas
+• 📊 Unidades profissionais
 
 Use /menu para ver todas as opções!
-        """
-        
-        keyboard = [
-            [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
-            [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
-            [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
-            [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
-            [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
-            [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        if TELEGRAM_VERSION == "v20+":
-            await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-        else:
-            await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            """
+            
+            # Botões simples - sem processamento
+            keyboard = [
+                [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📢 Alertas", callback_data="alert_stats")],
+                [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Enviar resposta imediatamente
+            if TELEGRAM_VERSION == "v20+":
+                await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            else:
+                await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            
+            logger.info(f"✅ Resposta /start enviada para {user.first_name}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /start: {e}")
+            # Resposta de erro simples
+            try:
+                error_message = "❌ Erro temporário. Tente novamente em alguns segundos."
+                if TELEGRAM_VERSION == "v20+":
+                    await update.message.reply_text(error_message)
+                else:
+                    await update.message.reply_text(error_message)
+            except:
+                pass
     
     async def menu_command(self, update: Update, context) -> None:
         """Comando /menu"""
@@ -3045,9 +3091,31 @@ def main():
                             total_handlers = sum(len(handlers) for handlers in dispatcher.handlers.values())
                             logger.info(f"📨 Dispatcher tem {total_handlers} handlers disponíveis")
                             
-                            # Processar update de forma thread-safe
-                            dispatcher.process_update(update)
-                            logger.info(f"📨 Update {update.update_id} processado com sucesso")
+                            # CORREÇÃO CRÍTICA: Processar update async de forma correta no v13
+                            import threading
+                            import asyncio
+                            
+                            def process_update_async():
+                                """Processa update async em thread separada"""
+                                try:
+                                    # Criar novo loop para esta thread
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+                                    
+                                    # Processar update usando o dispatcher
+                                    dispatcher.process_update(update)
+                                    
+                                    loop.close()
+                                    logger.info(f"📨 Update {update.update_id} processado com sucesso (async)")
+                                    
+                                except Exception as e:
+                                    logger.error(f"❌ Erro ao processar update async: {e}")
+                                    import traceback
+                                    logger.error(f"❌ Traceback async: {traceback.format_exc()}")
+                            
+                            # Executar em thread separada para não bloquear o webhook
+                            thread = threading.Thread(target=process_update_async, daemon=True)
+                            thread.start()
                             
                         return "OK", 200
                     except Exception as e:
