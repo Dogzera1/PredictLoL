@@ -37,6 +37,21 @@ python bot_v13_railway.py
 
 ## 🔧 TROUBLESHOOTING
 
+### ⚠️ Se aparecer erro "Conflict: terminated by other getUpdates request":
+
+**CAUSA**: Múltiplas instâncias do bot rodando (local + Railway)
+
+**SOLUÇÃO RÁPIDA**:
+```bash
+python fix_bot_conflict.py
+```
+
+**SOLUÇÃO MANUAL**:
+1. Pare qualquer instância local do bot (Ctrl+C)
+2. Aguarde 30 segundos
+3. Faça redeploy no Railway
+4. Aguarde o bot inicializar completamente
+
 ### Se o comando /start não funcionar:
 
 1. **Verificar logs do Railway**:

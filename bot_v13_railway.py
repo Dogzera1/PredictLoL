@@ -2433,12 +2433,44 @@ def main():
         # Inicializar bot
         bot = LoLBotV3UltraAdvanced()
         
-        # Verificar modo de execução
+        # Verificar modo de execução com detecção mais robusta
         is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
+        
+        # Log detalhado do ambiente detectado
+        logger.info(f"🔍 Detecção de ambiente:")
+        logger.info(f"  • RAILWAY_ENVIRONMENT_NAME: {os.getenv('RAILWAY_ENVIRONMENT_NAME', 'Não definido')}")
+        logger.info(f"  • RAILWAY_STATIC_URL: {os.getenv('RAILWAY_STATIC_URL', 'Não definido')}")
+        logger.info(f"  • PORT: {PORT}")
+        logger.info(f"  • Modo detectado: {'🚀 RAILWAY (webhook)' if is_railway else '🏠 LOCAL (polling)'}")
+        
+        # Verificar se há conflito de instâncias
+        if is_railway:
+            logger.info("⚠️ MODO RAILWAY: Garantindo que não há polling ativo...")
+        else:
+            logger.info("⚠️ MODO LOCAL: Garantindo que não há webhook ativo...")
         
         if TELEGRAM_VERSION == "v20+":
             # Versão v20+
             application = Application.builder().token(TOKEN).build()
+            
+            # IMPORTANTE: Limpar webhook existente primeiro para evitar conflitos
+            async def clear_existing_webhook():
+                try:
+                    logger.info("🧹 Limpando webhook existente para evitar conflitos...")
+                    await application.bot.delete_webhook(drop_pending_updates=True)
+                    logger.info("✅ Webhook anterior removido")
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao limpar webhook (normal se não existir): {e}")
+            
+            # Executar limpeza
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            loop.run_until_complete(clear_existing_webhook())
             
             # Handlers
             application.add_handler(CommandHandler("start", bot.start_command))
@@ -2498,9 +2530,22 @@ def main():
                 # Definir webhook
                 async def setup_webhook():
                     try:
-                        await application.bot.delete_webhook()
+                        # IMPORTANTE: Deletar webhook existente primeiro para evitar conflitos
+                        logger.info("🔄 Removendo webhook anterior...")
+                        await application.bot.delete_webhook(drop_pending_updates=True)
+                        
+                        # Aguardar um pouco para garantir que foi removido
+                        import asyncio
+                        await asyncio.sleep(2)
+                        
+                        # Configurar novo webhook
                         await application.bot.set_webhook(webhook_url)
                         logger.info(f"✅ Webhook configurado: {webhook_url}")
+                        
+                        # Verificar se foi configurado corretamente
+                        webhook_info = await application.bot.get_webhook_info()
+                        logger.info(f"📋 Webhook ativo: {webhook_info.url}")
+                        
                     except Exception as e:
                         logger.error(f"❌ Erro ao configurar webhook: {e}")
                 
@@ -2540,12 +2585,31 @@ def main():
                 logger.info(f"🌐 Health check rodando na porta {PORT}")
                 
                 logger.info("✅ Bot configurado (polling) - Iniciando...")
+                
+                # Garantir que não há webhook ativo antes de iniciar polling
+                async def ensure_no_webhook():
+                    try:
+                        await application.bot.delete_webhook(drop_pending_updates=True)
+                        logger.info("🧹 Webhook removido antes de iniciar polling")
+                    except Exception as e:
+                        logger.debug(f"Webhook já estava removido: {e}")
+                
+                loop.run_until_complete(ensure_no_webhook())
+                
                 application.run_polling()
             
         else:
             # Versão v13
             updater = Updater(TOKEN)
             dispatcher = updater.dispatcher
+            
+            # IMPORTANTE: Limpar webhook existente primeiro para evitar conflitos
+            try:
+                logger.info("🧹 Limpando webhook existente v13 para evitar conflitos...")
+                updater.bot.delete_webhook(drop_pending_updates=True)
+                logger.info("✅ Webhook anterior v13 removido")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao limpar webhook v13 (normal se não existir): {e}")
             
             # Handlers
             dispatcher.add_handler(CommandHandler("start", bot.start_command))
@@ -2589,9 +2653,22 @@ def main():
                 webhook_url = f"{railway_url}{webhook_path}"
                 
                 try:
-                    updater.bot.delete_webhook()
+                    # IMPORTANTE: Deletar webhook existente primeiro para evitar conflitos
+                    logger.info("🔄 Removendo webhook anterior v13...")
+                    updater.bot.delete_webhook(drop_pending_updates=True)
+                    
+                    # Aguardar um pouco para garantir que foi removido
+                    import time
+                    time.sleep(2)
+                    
+                    # Configurar novo webhook
                     updater.bot.set_webhook(webhook_url)
                     logger.info(f"✅ Webhook v13 configurado: {webhook_url}")
+                    
+                    # Verificar se foi configurado corretamente
+                    webhook_info = updater.bot.get_webhook_info()
+                    logger.info(f"📋 Webhook v13 ativo: {webhook_info.url}")
+                    
                 except Exception as e:
                     logger.error(f"❌ Erro ao configurar webhook v13: {e}")
                 
@@ -2619,6 +2696,14 @@ def main():
                 logger.info(f"🌐 Health check rodando na porta {PORT}")
                 
                 logger.info("✅ Bot configurado (polling v13) - Iniciando...")
+                
+                # Garantir que não há webhook ativo antes de iniciar polling
+                try:
+                    updater.bot.delete_webhook(drop_pending_updates=True)
+                    logger.info("🧹 Webhook removido antes de iniciar polling v13")
+                except Exception as e:
+                    logger.debug(f"Webhook já estava removido v13: {e}")
+                
                 updater.start_polling()
                 updater.idle()
                 
