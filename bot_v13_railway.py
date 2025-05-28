@@ -18,6 +18,58 @@ from dataclasses import dataclass
 import json
 import pytz
 
+# VERIFICAÇÃO CRÍTICA DE CONFLITOS NO INÍCIO
+def early_conflict_check():
+    """Verificação precoce de conflitos antes de importar bibliotecas pesadas"""
+    
+    # Verificar se é Railway
+    is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
+    
+    if not is_railway:
+        print("⚠️ EXECUTANDO EM MODO LOCAL - VERIFICANDO CONFLITOS...")
+        
+        # Verificar arquivo de lock existente
+        import tempfile
+        lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
+        
+        if os.path.exists(lock_file):
+            try:
+                with open(lock_file, 'r') as f:
+                    old_pid = int(f.read().strip())
+                
+                # Verificar se processo ainda existe
+                try:
+                    if os.name == 'nt':  # Windows
+                        import subprocess
+                        result = subprocess.run(['tasklist', '/FI', f'PID eq {old_pid}'], 
+                                              capture_output=True, text=True)
+                        if str(old_pid) in result.stdout:
+                            print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
+                            print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
+                            print("💡 Execute: python stop_all_conflicts.py")
+                            sys.exit(1)
+                    else:  # Unix/Linux
+                        os.kill(old_pid, 0)  # Não mata, só verifica
+                        print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
+                        print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
+                        print("💡 Execute: python stop_all_conflicts.py")
+                        sys.exit(1)
+                except OSError:
+                    # Processo não existe mais, remover lock
+                    os.remove(lock_file)
+                    print("🧹 Lock antigo removido (processo morto)")
+            except:
+                # Arquivo corrompido, remover
+                try:
+                    os.remove(lock_file)
+                except:
+                    pass
+        
+        print("✅ Verificação precoce de conflitos OK")
+
+# Executar verificação precoce
+early_conflict_check()
+
 # Flask para health check
 from flask import Flask, jsonify
 import requests
@@ -2593,6 +2645,54 @@ def main():
         logger.info(f"  • RAILWAY_STATIC_URL: {os.getenv('RAILWAY_STATIC_URL', 'Não definido')}")
         logger.info(f"  • PORT: {PORT}")
         logger.info(f"  • Modo detectado: {'🚀 RAILWAY (webhook)' if is_railway else '🏠 LOCAL (polling)'}")
+        
+        # VERIFICAÇÃO CRÍTICA: Evitar execução local se Railway estiver ativo
+        if not is_railway:
+            logger.warning("⚠️ EXECUTANDO EM MODO LOCAL!")
+            logger.warning("🚨 ATENÇÃO: Se o Railway estiver ativo, isso causará conflitos!")
+            
+            # Verificar se há webhook ativo (indicando Railway ativo)
+            async def check_railway_active():
+                try:
+                    if TELEGRAM_VERSION == "v20+":
+                        from telegram.ext import Application
+                        temp_app = Application.builder().token(TOKEN).build()
+                        webhook_info = await temp_app.bot.get_webhook_info()
+                    else:
+                        from telegram.ext import Updater
+                        temp_updater = Updater(TOKEN)
+                        webhook_info = temp_updater.bot.get_webhook_info()
+                    
+                    if webhook_info.url:
+                        logger.error("🚨 WEBHOOK ATIVO DETECTADO!")
+                        logger.error(f"🔗 URL: {webhook_info.url}")
+                        logger.error("🛑 ISSO INDICA QUE O RAILWAY ESTÁ ATIVO!")
+                        logger.error("💥 EXECUTAR LOCALMENTE CAUSARÁ CONFLITOS!")
+                        return True
+                    return False
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao verificar webhook: {e}")
+                    return False
+            
+            # Executar verificação
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            railway_active = loop.run_until_complete(check_railway_active())
+            
+            if railway_active:
+                logger.error("🛑 ABORTANDO EXECUÇÃO LOCAL!")
+                logger.error("💡 SOLUÇÃO:")
+                logger.error("  1. Pare o Railway primeiro")
+                logger.error("  2. OU execute APENAS no Railway")
+                logger.error("  3. NUNCA execute ambos simultaneamente!")
+                sys.exit(1)
+            else:
+                logger.info("✅ Nenhum webhook ativo - seguro para execução local")
         
         # Verificar se há conflito de instâncias
         if is_railway:

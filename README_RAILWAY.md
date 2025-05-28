@@ -41,25 +41,29 @@ python bot_v13_railway.py
 
 **CAUSA**: Múltiplas instâncias do bot rodando (local + Railway)
 
-**SOLUÇÃO RÁPIDA**:
+**SOLUÇÃO DEFINITIVA**:
 ```bash
-python clear_bot_conflicts.py
+# Crie o arquivo stop_all_conflicts.py (veja COMO_EVITAR_CONFLITOS.md)
+python stop_all_conflicts.py
 ```
 
 **SOLUÇÃO MANUAL**:
 1. **Pare TODAS as instâncias locais** (Ctrl+C em todos os terminais)
 2. **Aguarde 30 segundos**
-3. **Execute o script de limpeza**: `python clear_bot_conflicts.py`
+3. **Mate processos Python**: Gerenciador de Tarefas (Windows) ou `pkill python` (Linux)
 4. **Faça redeploy no Railway**
-5. **Aguarde 2-3 minutos** para inicialização completa
+5. **Aguarde 3-5 minutos** para inicialização completa
 6. **NÃO execute o bot localmente** enquanto Railway estiver ativo
 
-**PREVENÇÃO AUTOMÁTICA**:
-O bot agora tem sistema de prevenção de conflitos:
-- ✅ Verificação de instância única
-- ✅ Limpeza automática de webhook
-- ✅ Handler de erro para conflitos
-- ✅ Detecção robusta de ambiente
+**SISTEMA DE PREVENÇÃO ROBUSTO**:
+O bot agora tem múltiplas camadas de proteção:
+- ✅ **Verificação precoce** - Detecta conflitos antes de importar
+- ✅ **Verificação de webhook** - Impede execução local se Railway ativo
+- ✅ **Sistema de lock** - Arquivo de lock para instância única
+- ✅ **Handlers de erro** - Captura conflitos durante execução
+- ✅ **Logs detalhados** - Diagnóstico completo de conflitos
+
+**REGRA DE OURO**: 🔴 **NUNCA execute localmente enquanto Railway estiver ativo!**
 
 ### Se o comando /start não funcionar:
 
