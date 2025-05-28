@@ -1254,9 +1254,9 @@ class ProfessionalTipsSystem:
             
             if opportunities_found > 0:
                 logger.info(f"✅ {opportunities_found} novas oportunidades de tips encontradas")
+            else:
+                logger.info("ℹ️ Nenhuma nova oportunidade encontrada neste scan")
                 
-        except Exception as e:
-        except Exception as e:
         except Exception as e:
             logger.error(f"Erro no scan de partidas: {e}")
     
@@ -1308,8 +1308,8 @@ class ProfessionalTipsSystem:
     
     async def _analyze_match_for_tip(self, match: Dict) -> Optional[Dict]:
         """Analisa partida usando machine learning para gerar tip"""
-                try:
-                    teams = match.get('teams', [])
+        try:
+            teams = match.get('teams', [])
             if len(teams) < 2:
                 return None
             
@@ -1460,7 +1460,7 @@ class ProfessionalTipsSystem:
             return 'tier1'
         elif any(tier2 in league_lower for tier2 in ['cblol', 'lla', 'pcs', 'vcs']):
             return 'tier2'
-                            else:
+        else:
             return 'tier3'
     
     def _generate_tip_id(self, match: Dict) -> str:
@@ -1503,7 +1503,7 @@ class LoLBotV3UltraAdvanced:
                 try:
                     self.alerts_system.clear_old_tips()
                     time.sleep(3600)  # 1 hora
-                        except:
+                except:
                     time.sleep(3600)
         
         cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
@@ -1545,8 +1545,8 @@ Use /menu para ver todas as opções!
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if TELEGRAM_VERSION == "v20+":
-            await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-        else:
+        
+        keyboard = [
             await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
     
     async def menu_command(self, update: Update, context) -> None:
