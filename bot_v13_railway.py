@@ -2787,9 +2787,18 @@ def main():
                 # Configurar webhook path
                 webhook_path = f"/webhook"
                 
-                # Remover rota webhook padrão e adicionar a específica
-                app.url_map._rules = [rule for rule in app.url_map._rules if rule.rule != '/webhook']
-                app.url_map._rules_by_endpoint.pop('webhook_default', None)
+                # Remover rota webhook padrão de forma segura
+                try:
+                    # Método seguro para remover rota existente
+                    for rule in list(app.url_map.iter_rules()):
+                        if rule.rule == '/webhook' and rule.endpoint == 'webhook_default':
+                            app.url_map._rules.remove(rule)
+                            if 'webhook_default' in app.url_map._rules_by_endpoint:
+                                del app.url_map._rules_by_endpoint['webhook_default']
+                            break
+                except Exception as e:
+                    logger.warning(f"⚠️ Não foi possível remover rota webhook padrão: {e}")
+                    # Continuar mesmo se não conseguir remover - Flask vai sobrescrever
                 
                 # Adicionar rota webhook ao Flask
                 @app.route(webhook_path, methods=['POST'])
@@ -2970,9 +2979,18 @@ def main():
                 
                 webhook_path = f"/webhook"
                 
-                # Remover rota webhook padrão e adicionar a específica
-                app.url_map._rules = [rule for rule in app.url_map._rules if rule.rule != '/webhook']
-                app.url_map._rules_by_endpoint.pop('webhook_default', None)
+                # Remover rota webhook padrão de forma segura
+                try:
+                    # Método seguro para remover rota existente
+                    for rule in list(app.url_map.iter_rules()):
+                        if rule.rule == '/webhook' and rule.endpoint == 'webhook_default':
+                            app.url_map._rules.remove(rule)
+                            if 'webhook_default' in app.url_map._rules_by_endpoint:
+                                del app.url_map._rules_by_endpoint['webhook_default']
+                            break
+                except Exception as e:
+                    logger.warning(f"⚠️ Não foi possível remover rota webhook padrão: {e}")
+                    # Continuar mesmo se não conseguir remover - Flask vai sobrescrever
                 
                 @app.route(webhook_path, methods=['POST'])
                 def webhook_v13():
@@ -3059,18 +3077,31 @@ def main():
         import traceback
         logger.error(f"❌ Traceback completo: {traceback.format_exc()}")
         
-        # Tentar modo de emergência
+        # Tentar modo de emergência (apenas se não for Railway)
         try:
-            logger.info("🆘 Tentando modo de emergência...")
-            if TELEGRAM_VERSION == "v20+":
-                application = Application.builder().token(TOKEN).build()
-                application.add_handler(CommandHandler("start", bot.start_command))
-                application.run_polling()
+            is_railway_emergency = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
+            
+            if is_railway_emergency:
+                logger.error("🚨 ERRO NO RAILWAY - NÃO USAR POLLING EM MODO DE EMERGÊNCIA!")
+                logger.error("💡 Solução: Verifique logs do Railway e redeploy se necessário")
+                logger.error("🔗 Health check ainda disponível em /health")
+                
+                # Manter Flask rodando para health check
+                try:
+                    app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
+                except Exception as flask_error:
+                    logger.error(f"❌ Erro no Flask de emergência: {flask_error}")
             else:
-                updater = Updater(TOKEN)
-                updater.dispatcher.add_handler(CommandHandler("start", bot.start_command))
-                updater.start_polling()
-                updater.idle()
+                logger.info("🆘 Tentando modo de emergência local...")
+                if TELEGRAM_VERSION == "v20+":
+                    application = Application.builder().token(TOKEN).build()
+                    application.add_handler(CommandHandler("start", bot.start_command))
+                    application.run_polling(drop_pending_updates=True)
+                else:
+                    updater = Updater(TOKEN)
+                    updater.dispatcher.add_handler(CommandHandler("start", bot.start_command))
+                    updater.start_polling(drop_pending_updates=True)
+                    updater.idle()
         except Exception as emergency_error:
             logger.error(f"❌ Modo de emergência falhou: {emergency_error}")
 
