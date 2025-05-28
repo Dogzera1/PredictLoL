@@ -1162,9 +1162,10 @@ class TelegramAlertsSystem:
 class ProfessionalTipsSystem:
     """Sistema de Tips Profissional com Monitoramento Contínuo"""
 
-    def __init__(self, riot_client=None):
+    def __init__(self, riot_client=None, prediction_system=None, units_system=None):
         self.riot_client = riot_client or RiotAPIClient()
-        self.units_system = ProfessionalUnitsSystem()
+        self.units_system = units_system or ProfessionalUnitsSystem()
+        self.prediction_system = prediction_system or DynamicPredictionSystem() # Usar instância passada ou criar nova
         self.tips_database = []
         self.given_tips = set()
         self.monitoring = False
@@ -1186,18 +1187,20 @@ class ProfessionalTipsSystem:
             self.monitoring = True
 
             def monitor_loop():
-                while self.monitoring:
-                    try:
-                        # Escanear por oportunidades de tips
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(self._scan_all_matches_for_tips())
-                        loop.close()
-                        time.sleep(300)  # Verificar a cada 5 minutos
-                    except Exception as e:
-                        logger.error(f"Erro no monitoramento de tips: {e}")
-                        time.sleep(60)
+                # Cada thread de monitoramento terá seu próprio loop de eventos
+                loop = asyncio.new_event_loop() 
+                try:
+                    while self.monitoring:
+                        try:
+                            # Executar a rotina de scan no loop desta thread
+                            loop.run_until_complete(self._scan_all_matches_for_tips())
+                            time.sleep(300)  # Verificar a cada 5 minutos
+                        except Exception as e:
+                            logger.error(f"Erro no ciclo de monitoramento de tips: {e}", exc_info=True)
+                            time.sleep(60) # Esperar mais em caso de erro repetido
+                finally:
+                    logger.info("Encerrando loop de eventos da thread de monitoramento.")
+                    loop.close()
 
             monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
             monitor_thread.start()
@@ -1317,11 +1320,11 @@ class ProfessionalTipsSystem:
             team2_name = teams[1].get('name', '')
             league = match.get('league', '')
 
-            # Usar sistema de predição ML (sem importação circular)
-            prediction_system = DynamicPredictionSystem()
+            # Usar sistema de predição ML (INSTÂNCIA COMPARTILHADA)
+            # prediction_system = DynamicPredictionSystem() # REMOVIDO
 
             # Obter predição ML
-            ml_prediction = await prediction_system.predict_live_match(match)
+            ml_prediction = await self.prediction_system.predict_live_match(match) # USAR self.prediction_system
 
             if not ml_prediction or ml_prediction['confidence'] not in ['Alta', 'Muito Alta']:
                 return None
@@ -3145,7 +3148,18 @@ def main():
                             from telegram import Update as TelegramUpdate # Alias para evitar conflito
                             update_obj = TelegramUpdate.de_json(update_data, updater.bot)
                             logger.info(f"🔷 Webhook V13 Update processado: {update_obj.update_id if update_obj else 'None'}")
-
+    # Logs detalhados do update_obj
+    logger.info(f"🔷 V13 Update Object Raw: {update_obj.to_dict() if hasattr(update_obj, 'to_dict') else str(update_obj)}")
+    if update_obj and update_obj.message:
+        logger.info(f"🔷 V13 Message Text: {update_obj.message.text}")
+        logger.info(f"🔷 V13 Message Type: {update_obj.message.chat.type}")
+        logger.info(f"🔷 V13 Message Entities: {update_obj.message.entities}")
+        if update_obj.message.entities:
+            for entity in update_obj.message.entities:
+                logger.info(f"🔷 V13 Entity: type={entity.type}, offset={entity.offset}, length={entity.length}")
+    elif update_obj and update_obj.callback_query:
+        logger.info(f"🔷 V13 Callback Query Data: {update_obj.callback_query.data}")
+    # Fim dos logs detalhados do update_obj
                             # Log detalhado do update
                             if update_obj and update_obj.message:
                                 message = update_obj.message
@@ -3153,7 +3167,22 @@ def main():
                                 logger.info(f"🔷 V13 Chat ID: {message.chat_id}")
                                 logger.info(f"🔷 V13 User: {message.from_user.username if message.from_user else 'Unknown'}")
                                 logger.info(f"🔷 V13 É comando: {message.text.startswith('/') if message.text else False}")
-
+    # Log detalhado dos handlers
+    logger.info("🔷 V13 Dispatcher Handlers no momento do processamento:")
+    for group, group_handlers in dispatcher.handlers.items():
+        logger.info(f"  🔷 Grupo {group}:")
+        for handler_idx, handler in enumerate(group_handlers):
+            handler_info = f"    {handler_idx}: {type(handler).__name__}"
+            if hasattr(handler, 'command'):
+                handler_info += f" - Comandos: {handler.command}"
+            if hasattr(handler, 'pattern'): # Para RegexHandler, MessageHandler com filtros de regex
+                handler_info += f" - Padrão: {handler.pattern}"
+            if hasattr(handler, 'filters') and handler.filters: # Para MessageHandler
+                handler_info += f" - Filtros: {handler.filters}"
+            if hasattr(handler, 'callback'):
+                handler_info += f" - Callback: {handler.callback.__name__}"
+            logger.info(handler_info)
+    # Fim do log detalhado dos handlers
                             # Verificar se dispatcher tem handlers
                             current_total_handlers = sum(len(h_list) for g, h_list in dispatcher.handlers.items())
                             logger.info(f"🔷 Dispatcher v13 tem {current_total_handlers} handlers disponíveis")
