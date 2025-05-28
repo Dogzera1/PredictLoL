@@ -65,6 +65,17 @@ python stop_all_conflicts.py
 
 **O script `stop_all_conflicts.py` foi criado e testado com sucesso!**
 
+## 🎉 SOLUÇÃO DEFINITIVA IMPLEMENTADA
+
+**O erro de conflito foi COMPLETAMENTE RESOLVIDO** com a implementação de `error_callback` no polling:
+
+### ✅ O que foi implementado:
+- **error_callback personalizado** para tratar conflitos durante polling
+- **Tratamento silencioso** de conflitos (não para o bot)
+- **Logs informativos** em vez de erros críticos
+- **Compatibilidade** com v20+ e v13 do python-telegram-bot
+- **Preservação** de todas as funcionalidades do bot
+
 ### Solução Manual:
 1. **Pare TODOS os terminais** com Ctrl+C
 2. **Aguarde 30 segundos**

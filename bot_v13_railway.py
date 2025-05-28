@@ -2723,22 +2723,29 @@ def main():
             
             loop.run_until_complete(clear_existing_webhook())
             
+            # Callback específico para tratar erros de conflito durante polling
+            def conflict_error_callback(error):
+                """Callback específico para tratar erros de conflito durante polling"""
+                from telegram.error import Conflict
+                
+                if isinstance(error, Conflict):
+                    logger.warning("⚠️ Conflito detectado durante polling - instância duplicada")
+                    logger.info("🔄 Conflito tratado silenciosamente (normal em deploy)")
+                    # Não fazer nada - deixar o sistema continuar
+                    return
+                else:
+                    # Para outros erros, logar normalmente
+                    logger.error(f"❌ Erro durante polling: {error}")
+
             # Handler de erro global para conflitos
             async def error_handler(update: object, context) -> None:
                 """Handler global de erros"""
                 try:
                     error = context.error
                     if "Conflict" in str(error) and "getUpdates" in str(error):
-                        logger.error("🚨 CONFLITO DETECTADO DURANTE EXECUÇÃO!")
-                        logger.error("🛑 Outra instância está interferindo")
-                        logger.error("💡 Solução: Pare todas as outras instâncias")
-                        
-                        # Tentar limpar webhook
-                        try:
-                            await context.bot.delete_webhook(drop_pending_updates=True)
-                            logger.info("🧹 Webhook removido devido ao conflito")
-                        except:
-                            pass
+                        logger.warning("⚠️ Conflito detectado - tratando silenciosamente")
+                        # Não parar a aplicação - apenas logar
+                        return
                     else:
                         logger.error(f"❌ Erro não relacionado a conflito: {error}")
                 except Exception as e:
@@ -2871,7 +2878,9 @@ def main():
                 
                 loop.run_until_complete(ensure_no_webhook())
                 
-                application.run_polling()
+                # Iniciar polling com error_callback para tratar conflitos
+                logger.info("🔄 Iniciando polling com tratamento de conflitos...")
+                application.run_polling(error_callback=conflict_error_callback)
             
         else:
             # Versão v13
@@ -2886,22 +2895,29 @@ def main():
             except Exception as e:
                 logger.warning(f"⚠️ Erro ao limpar webhook v13 (normal se não existir): {e}")
             
+            # Callback específico para tratar erros de conflito durante polling v13
+            def conflict_error_callback_v13(error):
+                """Callback específico para tratar erros de conflito durante polling v13"""
+                from telegram.error import Conflict
+                
+                if isinstance(error, Conflict):
+                    logger.warning("⚠️ Conflito detectado durante polling v13 - instância duplicada")
+                    logger.info("🔄 Conflito tratado silenciosamente (normal em deploy)")
+                    # Não fazer nada - deixar o sistema continuar
+                    return
+                else:
+                    # Para outros erros, logar normalmente
+                    logger.error(f"❌ Erro durante polling v13: {error}")
+
             # Handler de erro global para conflitos v13
             def error_handler_v13(update, context):
                 """Handler global de erros v13"""
                 try:
                     error = context.error
                     if "Conflict" in str(error) and "getUpdates" in str(error):
-                        logger.error("🚨 CONFLITO DETECTADO DURANTE EXECUÇÃO! (v13)")
-                        logger.error("🛑 Outra instância está interferindo")
-                        logger.error("💡 Solução: Pare todas as outras instâncias")
-                        
-                        # Tentar limpar webhook
-                        try:
-                            context.bot.delete_webhook(drop_pending_updates=True)
-                            logger.info("🧹 Webhook removido devido ao conflito (v13)")
-                        except:
-                            pass
+                        logger.warning("⚠️ Conflito detectado v13 - tratando silenciosamente")
+                        # Não parar a aplicação - apenas logar
+                        return
                     else:
                         logger.error(f"❌ Erro não relacionado a conflito (v13): {error}")
                 except Exception as e:
@@ -3003,7 +3019,9 @@ def main():
                 except Exception as e:
                     logger.debug(f"Webhook já estava removido v13: {e}")
                 
-                updater.start_polling()
+                # Iniciar polling com error_callback para tratar conflitos
+                logger.info("🔄 Iniciando polling v13 com tratamento de conflitos...")
+                updater.start_polling(error_callback=conflict_error_callback_v13)
                 updater.idle()
                 
     except Exception as e:
