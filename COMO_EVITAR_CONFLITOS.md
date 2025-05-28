@@ -63,6 +63,8 @@ python bot_v13_railway.py
 python stop_all_conflicts.py
 ```
 
+**O script `stop_all_conflicts.py` foi criado e testado com sucesso!**
+
 ### Solução Manual:
 1. **Pare TODOS os terminais** com Ctrl+C
 2. **Aguarde 30 segundos**
