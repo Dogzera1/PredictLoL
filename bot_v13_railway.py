@@ -159,6 +159,22 @@ def ping():
     """Ping simples"""
     return "pong", 200
 
+@app.route('/test_webhook')
+def test_webhook():
+    """Teste do webhook"""
+    try:
+        return jsonify({
+            'webhook_configured': True,
+            'telegram_version': TELEGRAM_VERSION,
+            'timestamp': datetime.now().isoformat(),
+            'message': 'Webhook test endpoint'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'webhook_configured': False
+        }), 500
+
 # Handler de erro global
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -2828,6 +2844,9 @@ def main():
                 
                 # Configurar webhook URL
                 railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                # Garantir que a URL tenha https://
+                if not railway_url.startswith('http'):
+                    railway_url = f"https://{railway_url}"
                 webhook_url = f"{railway_url}{webhook_path}"
                 
                 # Definir webhook
@@ -2962,6 +2981,9 @@ def main():
             # Adicionar handler de erro
             dispatcher.add_error_handler(error_handler_v13)
             
+            # Definir aplicação para sistema de alertas
+            bot.set_bot_application(updater)
+            
             # Handlers
             dispatcher.add_handler(CommandHandler("start", bot.start_command))
             dispatcher.add_handler(CommandHandler("menu", bot.menu_command))
@@ -2972,6 +2994,8 @@ def main():
             dispatcher.add_handler(CommandHandler("predictions", bot.predictions_command))
             dispatcher.add_handler(CommandHandler("alerts", bot.alerts_command))
             dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler))
+            
+            logger.info(f"✅ {len(dispatcher.handlers)} handlers registrados no dispatcher v13")
             
             if is_railway:
                 # Modo Railway - Webhook v13
@@ -2996,20 +3020,31 @@ def main():
                 def webhook_v13():
                     try:
                         from flask import request
+                        logger.info(f"📨 Webhook v13 recebido: {request.method} {request.path}")
+                        
                         update_data = request.get_json(force=True)
+                        logger.info(f"📨 Dados recebidos: {bool(update_data)}")
                         
                         if update_data:
                             from telegram import Update
                             update = Update.de_json(update_data, updater.bot)
+                            logger.info(f"📨 Update processado: {update.update_id if update else 'None'}")
+                            
+                            # Processar update de forma thread-safe
                             dispatcher.process_update(update)
                             
                         return "OK", 200
                     except Exception as e:
                         logger.error(f"❌ Erro no webhook v13: {e}")
+                        import traceback
+                        logger.error(f"❌ Traceback: {traceback.format_exc()}")
                         return "Error", 500
                 
                 # Configurar webhook
                 railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                # Garantir que a URL tenha https://
+                if not railway_url.startswith('http'):
+                    railway_url = f"https://{railway_url}"
                 webhook_url = f"{railway_url}{webhook_path}"
                 
                 try:
@@ -3022,15 +3057,24 @@ def main():
                     time.sleep(2)
                     
                     # Configurar novo webhook
-                    updater.bot.set_webhook(webhook_url)
-                    logger.info(f"✅ Webhook v13 configurado: {webhook_url}")
+                    logger.info(f"🔗 Configurando webhook v13: {webhook_url}")
+                    result = updater.bot.set_webhook(webhook_url)
+                    logger.info(f"✅ Webhook v13 configurado: {webhook_url} (resultado: {result})")
                     
                     # Verificar se foi configurado corretamente
                     webhook_info = updater.bot.get_webhook_info()
                     logger.info(f"📋 Webhook v13 ativo: {webhook_info.url}")
+                    logger.info(f"📋 Webhook v13 pending_updates: {webhook_info.pending_update_count}")
+                    logger.info(f"📋 Webhook v13 max_connections: {webhook_info.max_connections}")
+                    
+                    # Verificar se bot responde
+                    me = updater.bot.get_me()
+                    logger.info(f"🤖 Bot v13 verificado: @{me.username} (ID: {me.id})")
                     
                 except Exception as e:
                     logger.error(f"❌ Erro ao configurar webhook v13: {e}")
+                    import traceback
+                    logger.error(f"❌ Traceback webhook v13: {traceback.format_exc()}")
                 
                 logger.info("✅ Bot configurado (Railway webhook v13) - Iniciando Flask...")
                 
