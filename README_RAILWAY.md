@@ -7,6 +7,7 @@
 - **Machine Learning**: ✅ INTEGRADO
 - **Alertas automáticos**: ✅ FUNCIONANDO
 - **API da Riot**: ✅ CONECTADA
+- **Health Check**: ✅ CORRIGIDO E FUNCIONANDO
 
 ## 🚀 CONFIGURAÇÃO NO RAILWAY
 
@@ -30,7 +31,9 @@ python bot_v13_railway.py
 ### 4. Health Check
 - **URL**: `/health`
 - **Timeout**: 300 segundos
+- **Interval**: 30 segundos
 - **Restart Policy**: ON_FAILURE
+- **Status**: ✅ CORRIGIDO E FUNCIONANDO
 
 ## 🔧 TROUBLESHOOTING
 
@@ -49,7 +52,15 @@ python bot_v13_railway.py
 
 3. **Verificar se o bot está online**:
    - Acesse: `https://SEU_DOMINIO.railway.app/health`
-   - Deve retornar status "healthy"
+   - Deve retornar:
+   ```json
+   {
+     "status": "healthy",
+     "service": "bot_lol_v3_professional_units",
+     "port": 5800,
+     "environment": "railway"
+   }
+   ```
 
 4. **Resetar webhook**:
    - No Railway, vá em Settings > Redeploy
