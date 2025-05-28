@@ -1545,9 +1545,10 @@ Use /menu para ver todas as opções!
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if TELEGRAM_VERSION == "v20+":
-        
-        keyboard = [
-            await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    # Linha em branco opcional aqui (removida para melhor clareza ou indentada como abaixo)
+    keyboard = [
+        await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+    ]
     
     async def menu_command(self, update: Update, context) -> None:
         """Comando /menu"""
