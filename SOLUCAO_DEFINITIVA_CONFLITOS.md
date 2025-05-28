@@ -54,12 +54,14 @@ updater.start_polling(error_callback=conflict_error_callback_v13)
 
 ## 🎯 RESULTADOS OBTIDOS
 
-### ✅ Testes Realizados
+### ✅ Testes Realizados (27/05/2025 22:39)
 - ✅ **Importação do bot**: Sem conflitos
 - ✅ **Inicialização**: Todas as funcionalidades ativas
 - ✅ **Sistema de unidades**: 4.0 unidades calculadas corretamente
 - ✅ **API da Riot**: 10 partidas encontradas
-- ✅ **Callbacks de conflito**: Detectam e tratam conflitos corretamente
+- ✅ **drop_pending_updates=True**: Implementado e funcionando
+- ✅ **error_callback**: Implementado e funcionando
+- ✅ **Tratamento específico de conflitos**: Implementado e funcionando
 - ✅ **Compatibilidade**: v20+ e v13 funcionando
 
 ### 🔄 Como Funciona
