@@ -43,14 +43,23 @@ python bot_v13_railway.py
 
 **SOLUÇÃO RÁPIDA**:
 ```bash
-python fix_bot_conflict.py
+python clear_bot_conflicts.py
 ```
 
 **SOLUÇÃO MANUAL**:
-1. Pare qualquer instância local do bot (Ctrl+C)
-2. Aguarde 30 segundos
-3. Faça redeploy no Railway
-4. Aguarde o bot inicializar completamente
+1. **Pare TODAS as instâncias locais** (Ctrl+C em todos os terminais)
+2. **Aguarde 30 segundos**
+3. **Execute o script de limpeza**: `python clear_bot_conflicts.py`
+4. **Faça redeploy no Railway**
+5. **Aguarde 2-3 minutos** para inicialização completa
+6. **NÃO execute o bot localmente** enquanto Railway estiver ativo
+
+**PREVENÇÃO AUTOMÁTICA**:
+O bot agora tem sistema de prevenção de conflitos:
+- ✅ Verificação de instância única
+- ✅ Limpeza automática de webhook
+- ✅ Handler de erro para conflitos
+- ✅ Detecção robusta de ambiente
 
 ### Se o comando /start não funcionar:
 

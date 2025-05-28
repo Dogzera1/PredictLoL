@@ -2419,6 +2419,93 @@ def run_flask_app():
     if not (webhook_url or railway_url):
         app.run(host='0.0.0.0', port=PORT, debug=False)
 
+def check_single_instance():
+    """Verifica se é a única instância rodando"""
+    import tempfile
+    
+    try:
+        # Tentar importar fcntl (Unix/Linux)
+        import fcntl
+        
+        # Criar arquivo de lock
+        lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
+        
+        # Tentar abrir arquivo de lock
+        lock_fd = open(lock_file, 'w')
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        
+        # Escrever PID no arquivo
+        lock_fd.write(str(os.getpid()))
+        lock_fd.flush()
+        
+        logger.info("🔒 Lock de instância única adquirido (Unix)")
+        return lock_fd
+        
+    except ImportError:
+        # Windows - usar método alternativo
+        try:
+            import msvcrt
+            lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
+            
+            # Verificar se arquivo existe e está em uso
+            if os.path.exists(lock_file):
+                try:
+                    # Tentar abrir em modo exclusivo
+                    lock_fd = open(lock_file, 'r+')
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+                    lock_fd.close()
+                    
+                    # Se chegou aqui, arquivo não estava em uso
+                    os.remove(lock_file)
+                except (IOError, OSError):
+                    logger.error("❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO! (Windows)")
+                    logger.error("🛑 Pare a outra instância antes de continuar")
+                    return None
+            
+            # Criar novo arquivo de lock
+            lock_fd = open(lock_file, 'w')
+            lock_fd.write(str(os.getpid()))
+            lock_fd.flush()
+            
+            logger.info("🔒 Lock de instância única adquirido (Windows)")
+            return lock_fd
+            
+        except ImportError:
+            # Fallback - verificação simples por arquivo
+            lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
+            
+            if os.path.exists(lock_file):
+                # Verificar se processo ainda existe
+                try:
+                    with open(lock_file, 'r') as f:
+                        old_pid = int(f.read().strip())
+                    
+                    # Verificar se PID ainda está ativo
+                    try:
+                        os.kill(old_pid, 0)  # Não mata, só verifica
+                        logger.error("❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO!")
+                        logger.error(f"🛑 PID {old_pid} ainda ativo")
+                        return None
+                    except OSError:
+                        # Processo não existe mais, remover lock
+                        os.remove(lock_file)
+                        logger.info("🧹 Lock antigo removido (processo morto)")
+                except:
+                    # Arquivo corrompido, remover
+                    os.remove(lock_file)
+            
+            # Criar novo lock
+            with open(lock_file, 'w') as f:
+                f.write(str(os.getpid()))
+            
+            logger.info("🔒 Lock de instância única adquirido (Fallback)")
+            return True
+    
+    except (IOError, OSError) as e:
+        logger.error(f"❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO! Erro: {e}")
+        logger.error("🛑 Pare a outra instância antes de continuar")
+        return None
+
 def main():
     """Função principal"""
     try:
@@ -2429,6 +2516,70 @@ def main():
         logger.info("⚡ Sem Kelly Criterion - Sistema simplificado")
         logger.info("🎯 Critérios: 65%+ confiança, 5%+ EV mínimo")
         logger.info("=" * 60)
+        
+        # Verificar instância única
+        lock_fd = check_single_instance()
+        if lock_fd is None:
+            logger.error("🛑 ABORTANDO: Outra instância já está rodando")
+            sys.exit(1)
+        
+        # Verificar e limpar conflitos do Telegram ANTES de inicializar
+        async def pre_check_telegram_conflicts():
+            """Verifica conflitos do Telegram antes de iniciar"""
+            try:
+                logger.info("🔍 Verificando conflitos do Telegram...")
+                
+                if TELEGRAM_VERSION == "v20+":
+                    from telegram.ext import Application
+                    temp_app = Application.builder().token(TOKEN).build()
+                    
+                    # Verificar webhook atual
+                    webhook_info = await temp_app.bot.get_webhook_info()
+                    if webhook_info.url:
+                        logger.warning(f"⚠️ Webhook ativo detectado: {webhook_info.url}")
+                        logger.info("🧹 Removendo webhook para evitar conflitos...")
+                        await temp_app.bot.delete_webhook(drop_pending_updates=True)
+                        await asyncio.sleep(2)
+                        logger.info("✅ Webhook removido")
+                    
+                    # Verificar se bot responde
+                    me = await temp_app.bot.get_me()
+                    logger.info(f"✅ Bot verificado: @{me.username}")
+                    
+                else:
+                    from telegram.ext import Updater
+                    temp_updater = Updater(TOKEN)
+                    
+                    # Verificar webhook atual
+                    webhook_info = temp_updater.bot.get_webhook_info()
+                    if webhook_info.url:
+                        logger.warning(f"⚠️ Webhook ativo detectado: {webhook_info.url}")
+                        logger.info("🧹 Removendo webhook para evitar conflitos...")
+                        temp_updater.bot.delete_webhook(drop_pending_updates=True)
+                        time.sleep(2)
+                        logger.info("✅ Webhook removido")
+                    
+                    # Verificar se bot responde
+                    me = temp_updater.bot.get_me()
+                    logger.info(f"✅ Bot verificado: @{me.username}")
+                
+                return True
+                
+            except Exception as e:
+                logger.error(f"❌ Erro na verificação do Telegram: {e}")
+                return False
+        
+        # Executar verificação
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        if not loop.run_until_complete(pre_check_telegram_conflicts()):
+            logger.error("🛑 ABORTANDO: Conflitos do Telegram não resolvidos")
+            sys.exit(1)
         
         # Inicializar bot
         bot = LoLBotV3UltraAdvanced()
@@ -2471,6 +2622,30 @@ def main():
                 asyncio.set_event_loop(loop)
             
             loop.run_until_complete(clear_existing_webhook())
+            
+            # Handler de erro global para conflitos
+            async def error_handler(update: object, context) -> None:
+                """Handler global de erros"""
+                try:
+                    error = context.error
+                    if "Conflict" in str(error) and "getUpdates" in str(error):
+                        logger.error("🚨 CONFLITO DETECTADO DURANTE EXECUÇÃO!")
+                        logger.error("🛑 Outra instância está interferindo")
+                        logger.error("💡 Solução: Pare todas as outras instâncias")
+                        
+                        # Tentar limpar webhook
+                        try:
+                            await context.bot.delete_webhook(drop_pending_updates=True)
+                            logger.info("🧹 Webhook removido devido ao conflito")
+                        except:
+                            pass
+                    else:
+                        logger.error(f"❌ Erro não relacionado a conflito: {error}")
+                except Exception as e:
+                    logger.error(f"❌ Erro no handler de erro: {e}")
+            
+            # Adicionar handler de erro
+            application.add_error_handler(error_handler)
             
             # Handlers
             application.add_handler(CommandHandler("start", bot.start_command))
@@ -2610,6 +2785,30 @@ def main():
                 logger.info("✅ Webhook anterior v13 removido")
             except Exception as e:
                 logger.warning(f"⚠️ Erro ao limpar webhook v13 (normal se não existir): {e}")
+            
+            # Handler de erro global para conflitos v13
+            def error_handler_v13(update, context):
+                """Handler global de erros v13"""
+                try:
+                    error = context.error
+                    if "Conflict" in str(error) and "getUpdates" in str(error):
+                        logger.error("🚨 CONFLITO DETECTADO DURANTE EXECUÇÃO! (v13)")
+                        logger.error("🛑 Outra instância está interferindo")
+                        logger.error("💡 Solução: Pare todas as outras instâncias")
+                        
+                        # Tentar limpar webhook
+                        try:
+                            context.bot.delete_webhook(drop_pending_updates=True)
+                            logger.info("🧹 Webhook removido devido ao conflito (v13)")
+                        except:
+                            pass
+                    else:
+                        logger.error(f"❌ Erro não relacionado a conflito (v13): {error}")
+                except Exception as e:
+                    logger.error(f"❌ Erro no handler de erro (v13): {e}")
+            
+            # Adicionar handler de erro
+            dispatcher.add_error_handler(error_handler_v13)
             
             # Handlers
             dispatcher.add_handler(CommandHandler("start", bot.start_command))
