@@ -416,12 +416,19 @@ def health_check():
         }), 500
 
 @app.route('/webhook', methods=['POST'])
-async def webhook():
+def webhook():
     """Webhook endpoint para receber updates do Telegram"""
     try:
         if bot_instance:
-            update = Update.de_json(request.get_json(), bot_instance.application.bot)
-            await bot_instance.application.process_update(update)
+            update_data = request.get_json()
+            update = Update.de_json(update_data, bot_instance.application.bot)
+            
+            # Processar update de forma assíncrona
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(bot_instance.application.process_update(update))
+            loop.close()
+            
         return jsonify({'status': 'ok'}), 200
     except Exception as e:
         logger.error(f"Erro no webhook: {e}")
