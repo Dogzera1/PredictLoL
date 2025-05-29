@@ -3050,42 +3050,18 @@ def main():
                 def webhook_v13():
                     try:
                         from flask import request
-                        
-                        logger.info("!!! DEBUG: FUNÇÃO WEBHOOK_V13 INICIADA !!!")
 
-                        logger.info(f"📨 Webhook v13 recebido: {request.method} {request.path}")
+                         logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
+        
+        # Teste 1: Apenas retornar OK sem processar nada
+        try:
+            logger.info("🔷 Teste 1: Retornando OK sem processamento")
+            return "OK", 200
+        except Exception as e:
+            logger.error(f"❌ Erro na função webhook debug: {e}", exc_info=True)
+            return "Error", 500
 
-                        update_data = request.get_json(force=True)
-                        logger.info(f"📨 Dados recebidos: {bool(update_data)}")
-
-                        if update_data:
-                            from telegram import Update as TelegramUpdate # Alias para evitar conflito
-                            update_obj = TelegramUpdate.de_json(update_data, updater.bot)
-                            logger.info(f"📨 Update processado: {update_obj.update_id if update_obj else 'None'}")
-
-                            # Log detalhado do update
-                            if update_obj and update_obj.message:
-                                message = update_obj.message
-                                logger.info(f"📨 Mensagem: {message.text}")
-                                logger.info(f"📨 Chat ID: {message.chat_id}")
-                                logger.info(f"📨 User: {message.from_user.username if message.from_user else 'Unknown'}")
-
-                            # Verificar se dispatcher tem handlers
-                            current_total_handlers = sum(len(h_list) for g, h_list in dispatcher.handlers.items())
-                            logger.info(f"📨 Dispatcher v13 tem {current_total_handlers} handlers disponíveis")
-
-                            # Processar update de forma thread-safe
-                            dispatcher.process_update(update_obj)
-                            logger.info(f"📨 Update {update_obj.update_id} processado com sucesso")
-
-                        return "OK", 200
-                    except Exception as e:
-                        logger.error(f"❌ Erro no webhook v13: {e}")
-                        import traceback
-                        logger.error(f"❌ Traceback: {traceback.format_exc()}")
-                        return "Error", 500
-
-                # Configurar webhook
+        # Configurar webhook
                 railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
                 # Garantir que a URL tenha https://
                 if not railway_url.startswith('http'):
