@@ -2944,72 +2944,113 @@ def main():
                     # Continuar mesmo se não conseguir remover - Flask vai sobrescrever
 
                 # Adicionar rota webhook ao Flask
-                @app.route(webhook_path, methods=['POST'])
-                def webhook():
-                    logger.info("🔷 Webhook V20+ RECEBIDO!") # Log de entrada
+                                @app.route(webhook_path, methods=['POST'])
+                def webhook_v13():
+                    logger.info("🔷 Webhook V13 RECEBIDO!") # Log de entrada aprimorado
                     try:
                         from flask import request
-                        logger.info(f"🔷 Request method: {request.method}, path: {request.path}")
+                        logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
                         
                         update_data = request.get_json(force=True)
-                        logger.info(f"🔷 Webhook V20+ Data recebido: {bool(update_data)}")
+                        logger.info(f"🔷 Webhook V13 dados recebidos: {bool(update_data)}")
                         
                         if update_data:
-                            logger.info(f"🔷 Update data keys: {list(update_data.keys()) if isinstance(update_data, dict) else 'Not dict'}")
+                            logger.info(f"🔷 V13 Update data keys: {list(update_data.keys()) if isinstance(update_data, dict) else 'Not dict'}")
                             
-                            from telegram import Update
-                            update_obj = Update.de_json(update_data, application.bot) # Renomeado para evitar conflito com módulo
-                            logger.info(f"🔷 Webhook V20+ Update processado: {update_obj.update_id if update_obj else 'None'}")
-                            
-                            # Log detalhado do update
-                            if update_obj and update_obj.message:
-                                message = update_obj.message
-                                logger.info(f"🔷 Mensagem recebida: '{message.text}'")
-                                logger.info(f"🔷 Chat ID: {message.chat_id}")
-                                logger.info(f"🔷 User: {message.from_user.username if message.from_user else 'Unknown'}")
-                                logger.info(f"🔷 É comando: {message.text.startswith('/') if message.text else False}")
+                            from telegram import Update as TelegramUpdate # Alias para evitar conflito
+                            update_obj = TelegramUpdate.de_json(update_data, updater.bot)
+                            logger.info(f"🔷 Webhook V13 Update processado: {update_obj.update_id if update_obj else 'None'}")
 
-                            # Processar update
-                            logger.info("🔷 Iniciando processamento do update...")
-                            current_loop = asyncio.get_event_loop() # Usar o loop atual
-                            current_loop.run_until_complete(application.process_update(update_obj))
-                            logger.info(f"🔷 Webhook V20+ Update {update_obj.update_id if update_obj else 'N/A'} processado com SUCESSO!")
+                            # --- INÍCIO DOS NOVOS LOGS DETALHADOS ---
+                            # Logs detalhados do update_obj
+                            logger.info(f"🔷 V13 Update Object Raw: {update_obj.to_dict() if hasattr(update_obj, 'to_dict') else str(update_obj)}")
+                            if update_obj: # Verificação geral para update_obj
+                                if update_obj.message:
+                                    message = update_obj.message
+                                    logger.info(f"🔷 V13 Tipo de Update: Mensagem")
+                                    logger.info(f"🔷 V13 Chat ID: {message.chat_id} (Tipo: {message.chat.type})")
+                                    logger.info(f"🔷 V13 User ID: {message.from_user.id} (Username: {message.from_user.username or 'N/A'})")
+                                    logger.info(f"🔷 V13 Message Text: {message.text}")
+                                    logger.info(f"🔷 V13 Message Entities: {message.entities}")
+                                    if message.entities:
+                                        for entity_idx, entity in enumerate(message.entities):
+                                            logger.info(f"🔷 V13 Entity {entity_idx}: type={entity.type}, offset={entity.offset}, length={entity.length}")
+                                    is_command_by_entity = any(e.type == 'bot_command' and e.offset == 0 for e in message.entities or [])
+                                    logger.info(f"🔷 V13 É comando (verificado por entidade 'bot_command' no offset 0): {is_command_by_entity}")
+                                    logger.info(f"🔷 V13 É comando (verificado por startswith('/')): {message.text.startswith('/') if message.text else False}")
+
+
+                                elif update_obj.callback_query:
+                                    callback_query = update_obj.callback_query
+                                    logger.info(f"🔷 V13 Tipo de Update: Callback Query")
+                                    logger.info(f"🔷 V13 Callback Query ID: {callback_query.id}")
+                                    logger.info(f"🔷 V13 Callback Query User ID: {callback_query.from_user.id} (Username: {callback_query.from_user.username or 'N/A'})")
+                                    logger.info(f"🔷 V13 Callback Query Data: {callback_query.data}")
+                                    if callback_query.message: # Callback query pode ter uma mensagem associada
+                                        logger.info(f"🔷 V13 Callback Query Message ID: {callback_query.message.message_id}")
+                                        logger.info(f"🔷 V13 Callback Query Message Chat ID: {callback_query.message.chat_id}")
+                                else:
+                                    logger.info(f"🔷 V13 Tipo de Update: Desconhecido (nem mensagem, nem callback_query, nem outro tipo comum)")
+                                    logger.info(f"🔷 V13 Update (str): {str(update_obj)}")
+
+
+                            # Log detalhado dos handlers
+                            logger.info("🔷 V13 Dispatcher Handlers no momento do processamento:")
+                            if dispatcher and dispatcher.handlers:
+                                for group, group_handlers in dispatcher.handlers.items():
+                                    logger.info(f"  🔷 Grupo {group}: ({len(group_handlers)} handlers)")
+                                    for handler_idx, handler in enumerate(group_handlers):
+                                        handler_info = f"    {handler_idx}: {type(handler).__name__}"
+                                        if hasattr(handler, 'command'):
+                                            handler_info += f" - Comandos: {handler.command}"
+                                        if hasattr(handler, 'pattern') and handler.pattern: 
+                                            handler_info += f" - Padrão Regex: {handler.pattern.pattern if hasattr(handler.pattern, 'pattern') else handler.pattern}"
+                                        if hasattr(handler, 'filters') and handler.filters:
+                                            # Para MessageHandler, os filtros podem ser complexos
+                                            # Tentativa de logar os filtros de forma mais útil
+                                            try:
+                                                filters_str = str(handler.filters)
+                                                if hasattr(handler.filters, 'name'): # telegram.ext.filters.BaseFilter
+                                                    filters_str = handler.filters.name
+                                                elif isinstance(handler.filters, tuple): # Múltiplos filtros
+                                                    filters_str = ", ".join([f.name if hasattr(f, 'name') else str(f) for f in handler.filters])
+                                                logger.info(f"{handler_info} - Filtros: {filters_str}")
+                                            except Exception:
+                                                logger.info(f"{handler_info} - Filtros: (erro ao serializar)")
+                                        elif hasattr(handler, 'callback'): # Para CallbackQueryHandler ou outros sem 'filters' explícitos no log acima
+                                            handler_info += f" - Callback: {handler.callback.__name__}"
+                                            logger.info(handler_info)
+                                        else:
+                                            logger.info(handler_info)
+
+                            else:
+                                logger.warning("🔷 V13 Dispatcher não encontrado ou sem handlers registrados no momento do processamento do webhook.")
+                            # --- FIM DOS NOVOS LOGS DETALHADOS ---
+                            
+                            # Código original continua abaixo (alguns logs podem ser redundantes agora, mas não prejudicam)
+                            # Verificar se dispatcher tem handlers
+                            current_total_handlers = sum(len(h_list) for g, h_list in dispatcher.handlers.items())
+                            logger.info(f"🔷 Dispatcher v13 tem {current_total_handlers} handlers disponíveis (contagem pós-log detalhado)")
+
+                            # Log handlers específicos de comando
+                            if 0 in dispatcher.handlers:  # CommandHandlers geralmente estão no grupo 0
+                                command_handlers = [h for h in dispatcher.handlers[0] if hasattr(h, 'command')]
+                                logger.info(f"🔷 Command handlers ativos (grupo 0): {[h.command for h in command_handlers if hasattr(h, 'command')]}")
+
+                            # Processar update de forma thread-safe
+                            logger.info("🔷 V13 Iniciando processamento do update via dispatcher.process_update...")
+                            dispatcher.process_update(update_obj)
+                            logger.info(f"🔷 V13 Update {update_obj.update_id if update_obj else 'N/A'} processado (dispatcher.process_update chamado).")
                             
                         else:
-                            logger.warning("🔷 Webhook recebido mas sem dados de update")
+                            logger.warning("🔷 V13 Webhook recebido mas sem dados JSON (update_data é Falso)")
 
                         return "OK", 200
                     except Exception as e:
-                        logger.error(f"❌ Erro CRÍTICO no webhook V20+: {e}", exc_info=True) # Traceback completo
+                        logger.error(f"❌ Erro CRÍTICO no webhook V13: {e}", exc_info=True) # Traceback completo
+                        import traceback
+                        logger.error(f"❌ V13 Traceback detalhado do erro no webhook: {traceback.format_exc()}")
                         return "Error", 500
-
-                # Configurar webhook URL
-                railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
-                # Garantir que a URL tenha https://
-                if not railway_url.startswith('http'):
-                    railway_url = f"https://{railway_url}"
-                webhook_url = f"{railway_url}{webhook_path}"
-
-                # Definir webhook
-                async def setup_webhook():
-                    try:
-                        # IMPORTANTE: Deletar webhook existente primeiro para evitar conflitos
-                        logger.info("🔄 Removendo webhook anterior...")
-                        await application.bot.delete_webhook(drop_pending_updates=True)
-
-                        # Aguardar um pouco para garantir que foi removido
-                        await asyncio.sleep(2)
-
-                        # Configurar novo webhook
-                        await application.bot.set_webhook(webhook_url)
-                        logger.info(f"✅ Webhook configurado: {webhook_url}")
-
-                        # Verificar se foi configurado corretamente
-                        webhook_info = await application.bot.get_webhook_info()
-                        logger.info(f"📋 Webhook ativo: {webhook_info.url}")
-
-                    except Exception as e:
-                        logger.error(f"❌ Erro ao configurar webhook: {e}")
 
                 # Executar setup
                 # loop já foi definido
