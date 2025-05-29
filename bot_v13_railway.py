@@ -301,7 +301,7 @@ class RiotAPIClient:
         logger.info("🔗 RiotAPIClient inicializado - APENAS DADOS REAIS")
 
     async def get_live_matches(self) -> List[Dict]:
-        """Busca partidas ao vivo REAIS da API oficial"""
+        """Busca partidas ao vivo REAIS da API oficial - APENAS MATCHES EM ANDAMENTO"""
         logger.info("🔍 Buscando partidas ao vivo...")
         endpoints = [
             f"{self.base_urls['esports']}/getLive?hl=pt-BR",
@@ -315,13 +315,64 @@ class RiotAPIClient:
                     async with session.get(endpoint, headers=self.headers, timeout=10) as response:
                         if response.status == 200:
                             data = await response.json()
-                            matches = self._extract_matches(data)
+                            matches = self._extract_live_matches_only(data)
                             all_matches.extend(matches)
             except Exception as e:
                 logger.warning(f"❌ Erro no endpoint: {e}")
                 continue
-
+                    
         return all_matches[:10]
+
+    def _extract_live_matches_only(self, data: Dict) -> List[Dict]:
+        """Extrai APENAS partidas que estão acontecendo AGORA"""
+        matches = []
+        try:
+            events = None
+            if 'data' in data and 'schedule' in data['data'] and 'events' in data['data']['schedule']:
+                events = data['data']['schedule']['events']
+            elif 'data' in data and 'events' in data['data']:
+                events = data['data']['events']
+
+            if events:
+                now = datetime.now()
+                
+                for event in events:
+                    # Verificar status - APENAS partidas em andamento
+                    status = event.get('state', '').lower()
+                    if status not in ['inprogress', 'live', 'ongoing']:
+                        continue
+                    
+                    # Verificar se tem startTime e se está dentro da janela de jogo
+                    start_time_str = event.get('startTime', '')
+                    if start_time_str:
+                        try:
+                            from datetime import timezone
+                            start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                            start_time_local = start_time.astimezone()
+                            
+                            # Partida deve ter começado e não pode ter mais de 3 horas
+                            time_diff = now - start_time_local.replace(tzinfo=None)
+                            if time_diff.total_seconds() < 0 or time_diff.total_seconds() > 10800:  # 3 horas
+                                continue
+                        except:
+                            continue
+                    
+                    teams = self._extract_teams(event)
+                    if len(teams) >= 2:
+                        match = {
+                            'teams': teams,
+                            'league': self._extract_league(event),
+                            'status': 'live',  # Forçar status live
+                            'start_time': start_time_str,
+                            'tournament': event.get('tournament', {}).get('name', 'Tournament')
+                        }
+                        matches.append(match)
+                        logger.info(f"🎮 Partida ao vivo encontrada: {teams[0].get('name')} vs {teams[1].get('name')}")
+        except Exception as e:
+            logger.error(f"Erro ao extrair partidas ao vivo: {e}")
+        
+        logger.info(f"🎮 {len(matches)} partidas realmente ao vivo encontradas")
+        return matches
 
     def _extract_matches(self, data: Dict) -> List[Dict]:
         """Extrai partidas dos dados da API"""
@@ -1576,80 +1627,100 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
         try:
             chat_id = update.effective_chat.id
             chat_type = update.effective_chat.type
+            user = update.effective_user
 
             # Verificar se é grupo
             if chat_type in ['group', 'supergroup']:
                 is_registered = chat_id in self.alerts_system.group_chat_ids
+                alert_stats = self.alerts_system.get_alert_stats()
 
                 if is_registered:
                     alerts_message = f"""
-📢 **SISTEMA DE ALERTAS** 📢
+📢 **SISTEMA DE ALERTAS ATIVO** 📢
 
 ✅ **GRUPO CADASTRADO**
-• ID do Grupo: {chat_id}
-• Status: Recebendo alertas
+• ID: {chat_id}
+• Status: 🟢 Recebendo alertas
+• Cadastrado por: {user.first_name}
 
-📊 **ESTATÍSTICAS:**
-"""
+🎯 **CRITÉRIOS DOS ALERTAS:**
+• Confiança mínima: 80%
+• EV mínimo: 10%
+• Unidades mínimas: 2.0
+• Análise ML: Alta/Muito Alta
+
+📊 **ESTATÍSTICAS GLOBAIS:**
+• Grupos cadastrados: {alert_stats['total_groups']}
+• Alertas enviados: {alert_stats['total_tips_sent']}
+• Tips esta semana: {alert_stats['tips_this_week']}
+
+⚡ **STATUS:** Sistema monitora 24/7 automaticamente!
+
+⏰ Último alerta: {alert_stats['last_tip_alert'].strftime('%d/%m %H:%M') if alert_stats['last_tip_alert'] else 'Nunca'}
+                    """
+
+                    keyboard = [
+                        [InlineKeyboardButton("❌ Desativar Alertas", callback_data=f"unregister_alerts_{chat_id}")],
+                        [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="alert_stats")],
+                        [InlineKeyboardButton("🎯 Gerar Tip Agora", callback_data="tips")],
+                        [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+                    ]
                 else:
                     alerts_message = f"""
 📢 **SISTEMA DE ALERTAS** 📢
 
 ❌ **GRUPO NÃO CADASTRADO**
-• ID do Grupo: {chat_id}
-• Status: Não recebe alertas
+• ID: {chat_id}
+• Status: 🔴 Não recebe alertas
+• Solicitado por: {user.first_name}
 
-📊 **PARA RECEBER ALERTAS:**
-Use o botão "Cadastrar Grupo" abaixo
-"""
+🎯 **O QUE VOCÊ VAI RECEBER:**
+• Tips profissionais em tempo real
+• Análises de Machine Learning
+• Oportunidades com 80%+ confiança
+• Valor esperado de 10%+ garantido
 
-                # Adicionar estatísticas
-                alert_stats = self.alerts_system.get_alert_stats()
-                alerts_message += f"""
-• Grupos cadastrados: {alert_stats['total_groups']}
-• Alertas enviados: {alert_stats['total_tips_sent']}
-• Alertas esta semana: {alert_stats['tips_this_week']}
-• Tips únicos: {alert_stats['unique_tips_sent']}
+📊 **COMO FUNCIONA:**
+• Sistema monitora API da Riot 24/7
+• Análise automática de todas as partidas
+• Alertas enviados apenas para tips de qualidade
+• Sem spam - apenas oportunidades reais
 
-🚨 **TIPOS DE ALERTAS:**
-• 🎯 Tips profissionais (80%+ confiança, 10%+ EV)
-• 🤖 Análise baseada em Machine Learning
-• ⚡ Oportunidades em tempo real
-• 🎲 Mínimo 2 unidades para alerta
+🚀 **CLIQUE PARA ATIVAR AGORA!**
+                    """
 
-⏰ Último alerta: {alert_stats['last_tip_alert'].strftime('%H:%M:%S') if alert_stats['last_tip_alert'] else 'Nunca'}
-                """
-
-                if is_registered:
                     keyboard = [
-                        [InlineKeyboardButton("❌ Descadastrar Grupo", callback_data=f"unregister_alerts_{chat_id}")],
-                        [InlineKeyboardButton("📊 Estatísticas", callback_data="alert_stats")],
-                        [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
-                    ]
-                else:
-                    keyboard = [
-                        [InlineKeyboardButton("✅ Cadastrar Grupo", callback_data=f"register_alerts_{chat_id}")],
-                        [InlineKeyboardButton("📊 Estatísticas", callback_data="alert_stats")],
+                        [InlineKeyboardButton("✅ ATIVAR ALERTAS", callback_data=f"register_alerts_{chat_id}")],
+                        [InlineKeyboardButton("📊 Ver Exemplo", callback_data="alert_stats")],
+                        [InlineKeyboardButton("🎯 Testar Tip", callback_data="tips")],
                         [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
                     ]
             else:
-                alerts_message = """
+                alerts_message = f"""
 📢 **SISTEMA DE ALERTAS** 📢
 
-ℹ️ **COMANDO APENAS PARA GRUPOS**
+ℹ️ **COMANDO PARA GRUPOS**
+
+{user.first_name}, este comando funciona apenas em grupos!
 
 🔍 **Para usar alertas:**
-1. Adicione o bot a um grupo
-2. Use /alerts no grupo
-3. Cadastre o grupo para receber alertas
+1. ➕ Adicione o bot a um grupo
+2. 📢 Use /alerts no grupo  
+3. ✅ Clique em "Ativar Alertas"
+4. 🎯 Receba tips automáticos!
 
-📊 **Tipos de alertas disponíveis:**
-• 🎯 Tips profissionais
-• 🔮 Predições IA
-• ⚡ Oportunidades em tempo real
+📊 **Benefícios dos alertas:**
+• Tips profissionais 24/7
+• Confiança 80%+ garantida
+• EV 10%+ mínimo
+• Zero spam, apenas qualidade
+
+💡 **Dica:** Crie um grupo privado só para os tips!
                 """
 
                 keyboard = [
+                    [InlineKeyboardButton("📖 Como Usar", callback_data="alert_help")],
+                    [InlineKeyboardButton("🎯 Testar Tip", callback_data="tips")],
                     [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
                 ]
 
@@ -1693,6 +1764,8 @@ Use o botão "Cadastrar Grupo" abaixo
             elif data.startswith("unregister_alerts_"):
                 chat_id = int(data.split("_")[2])
                 self._handle_unregister_alerts_callback(query, chat_id)
+            elif data == "alert_help":
+                self._handle_alert_help_callback(query)
             else:
                 query.edit_message_text("❌ Opção não reconhecida.")
 
@@ -1809,13 +1882,103 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
 
     def _handle_register_alerts_callback(self, query, chat_id):
         """Cadastra grupo para alertas"""
-        self.alerts_system.add_group(chat_id)
-        query.answer("✅ Grupo cadastrado com sucesso!")
+        try:
+            self.alerts_system.add_group(chat_id)
+            
+            # Atualizar mensagem para mostrar sucesso
+            success_message = f"""
+📢 **GRUPO CADASTRADO COM SUCESSO!** 📢
+
+✅ **Status:** Grupo ativo para alertas
+• ID do Grupo: {chat_id}
+• Cadastrado em: {datetime.now().strftime('%H:%M:%S')}
+
+🎯 **Você receberá alertas quando:**
+• Confiança ≥ 80%
+• EV ≥ 10%
+• Unidades ≥ 2.0
+• Análise ML: Alta/Muito Alta
+
+📊 **Estatísticas atuais:**
+• Total de grupos: {len(self.alerts_system.group_chat_ids)}
+• Sistema ativo 24/7
+
+⚡ **Próximo tip será enviado automaticamente!**
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("❌ Descadastrar", callback_data=f"unregister_alerts_{chat_id}")],
+                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="alert_stats")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            query.edit_message_text(success_message, reply_markup=reply_markup, parse_mode="Markdown")
+            query.answer("✅ Grupo cadastrado! Alertas ativados.")
+            
+            logger.info(f"✅ Grupo {chat_id} cadastrado para alertas - Total: {len(self.alerts_system.group_chat_ids)}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao cadastrar grupo: {e}")
+            query.answer("❌ Erro ao cadastrar. Tente novamente.")
 
     def _handle_unregister_alerts_callback(self, query, chat_id):
         """Remove grupo dos alertas"""
-        self.alerts_system.remove_group(chat_id)
-        query.answer("❌ Grupo removido dos alertas.")
+        try:
+            self.alerts_system.remove_group(chat_id)
+            
+            # Atualizar mensagem para mostrar remoção
+            removed_message = f"""
+📢 **GRUPO REMOVIDO DOS ALERTAS** 📢
+
+❌ **Status:** Grupo desativado
+• ID do Grupo: {chat_id}
+• Removido em: {datetime.now().strftime('%H:%M:%S')}
+
+ℹ️ **Você não receberá mais:**
+• Alertas automáticos de tips
+• Notificações de oportunidades
+
+📊 **Para reativar:**
+Use o botão "Cadastrar Novamente" abaixo
+
+📊 **Grupos ativos:** {len(self.alerts_system.group_chat_ids)}
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("✅ Cadastrar Novamente", callback_data=f"register_alerts_{chat_id}")],
+                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="alert_stats")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            query.edit_message_text(removed_message, reply_markup=reply_markup, parse_mode="Markdown")
+            query.answer("❌ Alertas desativados para este grupo.")
+            
+            logger.info(f"❌ Grupo {chat_id} removido dos alertas - Total: {len(self.alerts_system.group_chat_ids)}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao remover grupo: {e}")
+            query.answer("❌ Erro ao remover. Tente novamente.")
+
+    def _handle_alert_help_callback(self, query):
+        """Handle callback para ajuda de alertas"""
+        help_message = """
+📖 **Como usar alertas:**
+1. Adicione o bot a um grupo
+2. Use /alerts no grupo
+3. Clique em "Ativar Alertas"
+4. Receba tips automáticos!
+
+🎯 **Benefícios dos alertas:**
+• Tips profissionais 24/7
+• Confiança 80%+ garantida
+• EV 10%+ mínimo
+• Zero spam, apenas qualidade
+
+💡 **Dica:** Crie um grupo privado só para os tips!
+        """
+        query.edit_message_text(help_message, parse_mode="Markdown")
 
     # Implementar outros handlers callback necessários...
     def _handle_schedule_callback(self, query): 
@@ -2226,7 +2389,7 @@ def check_single_instance():
         logger.error(f"❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO! Erro: {e}")
         return None
 
-def main():
+async def main():
     """Função principal"""
     global bot_instance
     
@@ -2253,77 +2416,55 @@ def main():
 
         logger.info(f"🔍 Modo detectado: {'🚀 RAILWAY (webhook)' if is_railway else '🏠 LOCAL (polling)'}")
 
-        # Configuração mais simples possível
-        updater = Updater(TOKEN)
-        dispatcher = updater.dispatcher
+        # Versão v20+ - usar Application em vez de Updater
+        from telegram.ext import Application
+        
+        application = Application.builder().token(TOKEN).build()
 
         # Limpar webhook existente
         try:
             logger.info("🧹 Limpando webhook existente...")
-            updater.bot.delete_webhook(drop_pending_updates=True)
+            await application.bot.delete_webhook(drop_pending_updates=True)
             logger.info("✅ Webhook anterior removido")
         except Exception as e:
             logger.warning(f"⚠️ Erro ao limpar webhook: {e}")
 
-        # Handler de erro global
-        def error_handler_v13(update, context):
-            """Handler global de erros v13"""
-            from telegram.error import TelegramError, Conflict
-
-            try:
-                error = context.error
-                logger.error('Update "%s" caused error "%s"', update, error)
-
-                if isinstance(error, Conflict) or ("Conflict" in str(error) and "getUpdates" in str(error)):
-                    logger.critical("⚠️ Conflict error detected - bot continua funcionando")
-                    return
-                elif isinstance(error, TelegramError):
-                    logger.error(f"❌ Telegram API error (v13): {error}")
-                else:
-                    logger.error(f"❌ Erro não relacionado ao Telegram (v13): {error}")
-
-            except Exception as e:
-                logger.error(f"❌ Erro no handler de erro (v13): {e}")
-
-        # Adicionar handler de erro
-        dispatcher.add_error_handler(error_handler_v13)
-
         # Definir aplicação para sistema de alertas
-        bot_instance.set_bot_application(updater)
+        bot_instance.set_bot_application(application)
 
-        # Handlers
-        dispatcher.add_handler(CommandHandler("start", bot_instance.start_command))
-        dispatcher.add_handler(CommandHandler("menu", bot_instance.menu_command))
-        dispatcher.add_handler(CommandHandler("tips", bot_instance.tips_command))
-        dispatcher.add_handler(CommandHandler("live", bot_instance.live_matches_command))
-        dispatcher.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
-        dispatcher.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
-        dispatcher.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
-        dispatcher.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
-        dispatcher.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
+        # Handlers para v20+
+        application.add_handler(CommandHandler("start", bot_instance.start_command))
+        application.add_handler(CommandHandler("menu", bot_instance.menu_command))
+        application.add_handler(CommandHandler("tips", bot_instance.tips_command))
+        application.add_handler(CommandHandler("live", bot_instance.live_matches_command))
+        application.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
+        application.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
+        application.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
+        application.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
+        application.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
 
         # Contar handlers
-        total_handlers = sum(len(handlers_list) for group, handlers_list in dispatcher.handlers.items())
-        logger.info(f"✅ {total_handlers} handlers registrados no dispatcher v13")
+        total_handlers = len(application.handlers[0])
+        logger.info(f"✅ {total_handlers} handlers registrados no application v20+")
 
         if is_railway:
-            # Modo Railway - Webhook v13
-            logger.info("🚀 Detectado ambiente Railway v13 - Configurando webhook")
+            # Modo Railway - Webhook v20+
+            logger.info("🚀 Detectado ambiente Railway v20+ - Configurando webhook")
 
             webhook_path = f"/webhook"
 
             @app.route(webhook_path, methods=['POST'])
-            def webhook_v13():
+            async def webhook_v20():
                 try:
                     update_data = request.get_json(force=True)
                     if update_data:
                         from telegram import Update
-                        update_obj = Update.de_json(update_data, updater.bot)
-                        dispatcher.process_update(update_obj)
-                        logger.info(f"🔄 Webhook v13 processou atualização: {update_obj.update_id if update_obj else 'None'}")
+                        update_obj = Update.de_json(update_data, application.bot)
+                        await application.process_update(update_obj)
+                        logger.info(f"🔄 Webhook v20+ processou atualização: {update_obj.update_id if update_obj else 'None'}")
                     return "OK", 200
                 except Exception as e:
-                    logger.error(f"❌ Erro no webhook v13: {e}")
+                    logger.error(f"❌ Erro no webhook v20+: {e}")
                     return "ERROR", 500
 
             # Configurar webhook
@@ -2333,48 +2474,47 @@ def main():
             webhook_url = f"{railway_url}{webhook_path}"
 
             try:
-                logger.info("🔄 Removendo webhook anterior v13...")
-                updater.bot.delete_webhook(drop_pending_updates=True)
-                time.sleep(2)
+                logger.info("🔄 Removendo webhook anterior v20+...")
+                await application.bot.delete_webhook(drop_pending_updates=True)
+                
+                logger.info(f"🔗 Configurando webhook v20+: {webhook_url}")
+                await application.bot.set_webhook(webhook_url)
+                logger.info(f"✅ Webhook v20+ configurado")
 
-                logger.info(f"🔗 Configurando webhook v13: {webhook_url}")
-                result = updater.bot.set_webhook(webhook_url)
-                logger.info(f"✅ Webhook v13 configurado: {result}")
+                webhook_info = await application.bot.get_webhook_info()
+                logger.info(f"📋 Webhook v20+ ativo: {webhook_info.url}")
 
-                webhook_info = updater.bot.get_webhook_info()
-                logger.info(f"📋 Webhook v13 ativo: {webhook_info.url}")
-
-                me = updater.bot.get_me()
-                logger.info(f"🤖 Bot v13 verificado: @{me.username}")
-
+                me = await application.bot.get_me()
+                logger.info(f"🤖 Bot v20+ verificado: @{me.username}")
+                    
             except Exception as e:
-                logger.error(f"❌ Erro ao configurar webhook v13: {e}")
+                logger.error(f"❌ Erro ao configurar webhook v20+: {e}")
 
-            logger.info("✅ Bot configurado (Railway webhook v13) - Iniciando Flask...")
+            logger.info("✅ Bot configurado (Railway webhook v20+) - Iniciando Flask...")
 
             app.config['ENV'] = 'production'
             app.config['DEBUG'] = False
 
-            logger.info(f"🌐 Iniciando Flask v13 na porta {PORT}")
+            logger.info(f"🌐 Iniciando Flask v20+ na porta {PORT}")
             logger.info(f"🔗 Webhook disponível em: {webhook_url}")
 
             app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False, threaded=True)
 
         else:
-            # Modo Local - Polling v13
-            logger.info("🏠 Ambiente local v13 detectado - Usando polling")
+            # Modo Local - Polling v20+
+            logger.info("🏠 Ambiente local v20+ detectado - Usando polling")
 
-            logger.info("✅ Bot configurado (polling v13) - Iniciando...")
+            logger.info("✅ Bot configurado (polling v20+) - Iniciando...")
 
             try:
-                updater.bot.delete_webhook(drop_pending_updates=True)
-                logger.info("🧹 Webhook removido antes de iniciar polling v13")
+                await application.bot.delete_webhook(drop_pending_updates=True)
+                logger.info("🧹 Webhook removido antes de iniciar polling v20+")
             except Exception as e:
-                logger.debug(f"Webhook já estava removido v13: {e}")
+                logger.debug(f"Webhook já estava removido v20+: {e}")
 
-            logger.info("🔄 Iniciando polling v13...")
-            updater.start_polling(drop_pending_updates=True)
-            updater.idle()
+            logger.info("🔄 Iniciando polling v20+...")
+            # Usar método síncrono para evitar loop conflict
+            application.run_polling(drop_pending_updates=True)
 
     except Exception as e:
         logger.error(f"❌ Erro crítico: {e}")
@@ -2406,4 +2546,5 @@ def main():
                     logger.warning(f"⚠️ Não foi possível remover arquivo de lock: {e}")
 
 if __name__ == "__main__":
-    main() 
+    import asyncio
+    asyncio.run(main()) 
