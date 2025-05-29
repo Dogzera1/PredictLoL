@@ -3074,6 +3074,31 @@ def main():
                         logger.error(f"🔷 DEBUG: Traceback: {traceback.format_exc()}")
                         return "ERROR", 500
 
+                logger.info("🔷 DEBUG: Rota webhook_v13 definida com sucesso!")
+                
+                # Adicionar rota de teste para comparação
+                @app.route('/test_webhook_debug', methods=['POST', 'GET'])
+                def test_webhook_debug():
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info("🔷 DEBUG: Rota de teste chamada!")
+                    from flask import request
+                    logger.info(f"🔷 DEBUG: Teste - method={request.method}")
+                    return "TEST_OK", 200
+                
+                logger.info("🔷 DEBUG: Rota de teste definida!")
+                
+                # Verificar se a rota foi registrada
+                try:
+                    logger.info("🔷 DEBUG: Verificando rotas registradas no Flask...")
+                    for rule in app.url_map.iter_rules():
+                        if rule.rule == webhook_path:
+                            logger.info(f"🔷 DEBUG: Rota encontrada: {rule.rule} -> {rule.endpoint} (métodos: {rule.methods})")
+                        elif rule.rule == '/test_webhook_debug':
+                            logger.info(f"🔷 DEBUG: Rota teste encontrada: {rule.rule} -> {rule.endpoint} (métodos: {rule.methods})")
+                except Exception as route_error:
+                    logger.error(f"🔷 DEBUG: Erro ao verificar rotas: {route_error}")
+
                 # Configurar webhook
                 railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
                 # Garantir que a URL tenha https://
