@@ -175,26 +175,26 @@ def test_webhook():
             'webhook_configured': False
         }), 500
 
-# Handler de erro global
-@app.errorhandler(Exception)
-def handle_exception(e):
-    """Handler global de exceções"""
-    logger.error(f"❌ Erro no Flask: {e}")
-    return jsonify({
-        'status': 'error',
-        'error': str(e),
-        'timestamp': datetime.now().isoformat()
-    }), 500
+# Handler de erro global - TEMPORARIAMENTE DESABILITADO
+# @app.errorhandler(Exception)
+# def handle_exception(e):
+#     """Handler global de exceções"""
+#     logger.error(f"❌ Erro no Flask: {e}")
+#     return jsonify({
+#         'status': 'error',
+#         'error': str(e),
+#         'timestamp': datetime.now().isoformat()
+#     }), 500
 
-# Handler para 404
-@app.errorhandler(404)
-def not_found(e):
-    """Handler para 404"""
-    return jsonify({
-        'status': 'not_found',
-        'message': 'Endpoint não encontrado',
-        'available_endpoints': ['/health', '/ping', '/webhook', '/']
-    }), 404
+# Handler para 404 - TEMPORARIAMENTE DESABILITADO
+# @app.errorhandler(404)
+# def not_found(e):
+#     """Handler para 404"""
+#     return jsonify({
+#         'status': 'not_found',
+#         'message': 'Endpoint não encontrado',
+#         'available_endpoints': ['/health', '/ping', '/webhook', '/']
+#     }), 404
 
 class ProfessionalUnitsSystem:
     """Sistema de Unidades Padrão de Grupos Profissionais"""
@@ -3048,17 +3048,7 @@ def main():
 
                 @app.route(webhook_path, methods=['POST'])
                 def webhook_v13():
-                    try:
-                        from flask import request
-                        logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
-                        
-                        # Teste 1: Apenas retornar OK sem processar nada
-                        logger.info("🔷 Teste 1: Retornando OK sem processamento")
-                        return "OK", 200
-                        
-                    except Exception as e:
-                        logger.error(f"❌ Erro na função webhook debug: {e}", exc_info=True)
-                        return "Error", 500
+                    return "OK", 200
 
                 # Configurar webhook
                 railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
