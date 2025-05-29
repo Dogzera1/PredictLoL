@@ -85,9 +85,9 @@ try:
     logger.info("🔍 Detectada versão python-telegram-bot v20+")
 except ImportError:
     try:
-        from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
         from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
-        from telegram.error import TelegramError
+from telegram.error import TelegramError
         TELEGRAM_VERSION = "v13"
         logger = logging.getLogger(__name__)
         logger.info("🔍 Detectada versão python-telegram-bot v13")
@@ -111,10 +111,10 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 
 @app.route('/health')
-def health_check():
+        def health_check():
     """Health check para Railway"""
     try:
-        return jsonify({
+            return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
             'service': 'bot_lol_v3_professional_units',
@@ -127,7 +127,7 @@ def health_check():
         return jsonify({
             'status': 'error',
             'error': str(e),
-            'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat()
         }), 500
 
 @app.route('/')
@@ -261,7 +261,7 @@ class ProfessionalUnitsSystem:
         elif confidence >= 65 and ev_percentage >= 5:
             base_units = self.unit_scale['low_confidence']
             risk_level = "Baixo"
-        else:
+                    else:
             # Não apostar se não atender critérios mínimos
             return {
                 'units': 0,
@@ -314,7 +314,7 @@ class ProfessionalUnitsSystem:
             reasoning_parts.append("⭐ Boa confiança + Bom valor")
         elif confidence >= 75 and ev_percentage >= 8:
             reasoning_parts.append("✅ Confiança adequada + Valor positivo")
-        else:
+                else:
             reasoning_parts.append("⚠️ Critérios mínimos atendidos")
 
         # Explicar ajuste por liga
@@ -557,7 +557,7 @@ class ScheduleManager:
                                 data = await response.json()
                                 matches = self._extract_scheduled_matches(data, days_ahead)
                                 all_matches.extend(matches)
-                except Exception as e:
+        except Exception as e:
                     logger.warning(f"❌ Erro no endpoint de agenda: {e}")
                     continue
 
@@ -687,7 +687,7 @@ class ScheduleManager:
 
 class DynamicPredictionSystem:
     """Sistema de predição dinâmica baseado em dados reais da API da Riot"""
-
+    
     def __init__(self):
         # Base de dados de times com ratings atualizados (dados reais)
         self.teams_database = {
@@ -697,28 +697,28 @@ class DynamicPredictionSystem:
             'DRX': {'rating': 85, 'region': 'LCK', 'recent_form': 0.75, 'consistency': 0.76},
             'KT': {'rating': 80, 'region': 'LCK', 'recent_form': 0.70, 'consistency': 0.71},
             'HLE': {'rating': 75, 'region': 'LCK', 'recent_form': 0.68, 'consistency': 0.67},
-
+            
             # LPL
             'JDG': {'rating': 95, 'region': 'LPL', 'recent_form': 0.88, 'consistency': 0.86},
             'BLG': {'rating': 90, 'region': 'LPL', 'recent_form': 0.82, 'consistency': 0.81},
             'WBG': {'rating': 85, 'region': 'LPL', 'recent_form': 0.78, 'consistency': 0.77},
             'LNG': {'rating': 80, 'region': 'LPL', 'recent_form': 0.74, 'consistency': 0.73},
             'TES': {'rating': 87, 'region': 'LPL', 'recent_form': 0.79, 'consistency': 0.78},
-
+            
             # LEC
             'G2': {'rating': 90, 'region': 'LEC', 'recent_form': 0.84, 'consistency': 0.83},
             'Fnatic': {'rating': 85, 'region': 'LEC', 'recent_form': 0.79, 'consistency': 0.78},
             'MAD': {'rating': 80, 'region': 'LEC', 'recent_form': 0.73, 'consistency': 0.72},
             'Rogue': {'rating': 75, 'region': 'LEC', 'recent_form': 0.70, 'consistency': 0.69},
             'VIT': {'rating': 78, 'region': 'LEC', 'recent_form': 0.72, 'consistency': 0.71},
-
+            
             # LCS
             'C9': {'rating': 80, 'region': 'LCS', 'recent_form': 0.76, 'consistency': 0.75},
             'TL': {'rating': 78, 'region': 'LCS', 'recent_form': 0.74, 'consistency': 0.73},
             'TSM': {'rating': 70, 'region': 'LCS', 'recent_form': 0.62, 'consistency': 0.61},
             '100T': {'rating': 75, 'region': 'LCS', 'recent_form': 0.71, 'consistency': 0.70},
             'FLY': {'rating': 73, 'region': 'LCS', 'recent_form': 0.69, 'consistency': 0.68},
-
+            
             # CBLOL
             'LOUD': {'rating': 85, 'region': 'CBLOL', 'recent_form': 0.81, 'consistency': 0.80},
             'paiN': {'rating': 80, 'region': 'CBLOL', 'recent_form': 0.77, 'consistency': 0.76},
@@ -731,18 +731,18 @@ class DynamicPredictionSystem:
         self.cache_duration = 300  # 5 minutos
 
         logger.info("🔮 Sistema de Predição Dinâmica inicializado com dados reais")
-
+    
     async def predict_live_match(self, match: Dict) -> Dict:
         """Predição dinâmica para partida ao vivo usando dados reais"""
         try:
             teams = match.get('teams', [])
             if len(teams) < 2:
                 return self._get_fallback_prediction()
-
+            
             team1_name = teams[0].get('name', 'Team 1')
             team2_name = teams[1].get('name', 'Team 2')
             league = match.get('league', 'Unknown')
-
+            
             # Verificar cache
             cache_key = f"{team1_name}_{team2_name}_{league}"
             if cache_key in self.prediction_cache:
@@ -759,18 +759,18 @@ class DynamicPredictionSystem:
             base_prob = self._calculate_base_probability(team1_data, team2_data)
             region_adj = self._calculate_region_adjustment(team1_data, team2_data)
             form_adj = self._calculate_form_adjustment(team1_data, team2_data)
-
+            
             # Probabilidade final do team1
             team1_prob = max(0.15, min(0.85, base_prob + region_adj + form_adj))
             team2_prob = 1 - team1_prob
-
+            
             # Calcular odds realistas
             team1_odds = 1 / team1_prob if team1_prob > 0 else 2.0
             team2_odds = 1 / team2_prob if team2_prob > 0 else 2.0
-
+            
             # Determinar confiança baseada em dados reais
             confidence = self._calculate_confidence(team1_data, team2_data)
-
+            
             # Determinar favorito
             if team1_prob > team2_prob:
                 favored_team = team1_name
@@ -783,7 +783,7 @@ class DynamicPredictionSystem:
             analysis = self._generate_match_analysis(
                 team1_name, team2_name, team1_data, team2_data, team1_prob
             )
-
+            
             prediction = {
                 'team1': team1_name,
                 'team2': team2_name,
@@ -816,7 +816,7 @@ class DynamicPredictionSystem:
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             return self._get_fallback_prediction()
-
+    
     def _get_team_data(self, team_name: str, league: str) -> Dict:
         """Busca dados reais do time na base de dados"""
         # Busca exata primeiro
@@ -848,13 +848,13 @@ class DynamicPredictionSystem:
         """Calcula probabilidade base baseada em ratings reais"""
         rating1 = team1_data.get('rating', 70)
         rating2 = team2_data.get('rating', 70)
-
+        
         # Fórmula logística para converter diferença de rating em probabilidade
         rating_diff = rating1 - rating2
         base_prob = 1 / (1 + np.exp(-rating_diff / 20))
-
+        
         return base_prob
-
+    
     def _calculate_region_adjustment(self, team1_data: Dict, team2_data: Dict) -> float:
         """Ajuste baseado na força real das regiões"""
         region_strength = {
@@ -864,31 +864,31 @@ class DynamicPredictionSystem:
             'LCS': -0.01,   # Mais fraca
             'CBLOL': -0.015 # Região emergente
         }
-
+        
         region1 = team1_data.get('region', 'Unknown')
         region2 = team2_data.get('region', 'Unknown')
-
+        
         adj1 = region_strength.get(region1, 0)
         adj2 = region_strength.get(region2, 0)
-
+        
         return adj1 - adj2
-
+    
     def _calculate_form_adjustment(self, team1_data: Dict, team2_data: Dict) -> float:
         """Ajuste baseado na forma recente real"""
         form1 = team1_data.get('recent_form', 0.6)
         form2 = team2_data.get('recent_form', 0.6)
-
+        
         # Converter diferença de forma em ajuste de probabilidade
         form_diff = (form1 - form2) * 0.15  # Máximo 15% de ajuste
-
+        
         return form_diff
-
+    
     def _calculate_confidence(self, team1_data: Dict, team2_data: Dict) -> str:
         """Calcula nível de confiança da predição baseado em dados reais"""
         consistency1 = team1_data.get('consistency', 0.6)
         consistency2 = team2_data.get('consistency', 0.6)
         avg_consistency = (consistency1 + consistency2) / 2
-
+        
         # Verificar se são times conhecidos (dados reais)
         known_teams_bonus = 0
         if team1_data.get('rating', 70) > 70 and team2_data.get('rating', 70) > 70:
@@ -904,11 +904,11 @@ class DynamicPredictionSystem:
             return 'Média'
         else:
             return 'Baixa'
-
-    def _generate_match_analysis(self, team1: str, team2: str, team1_data: Dict,
+    
+    def _generate_match_analysis(self, team1: str, team2: str, team1_data: Dict, 
                                team2_data: Dict, win_prob: float) -> str:
         """Gera análise textual da predição baseada em dados reais"""
-
+        
         # Determinar favorito
         if win_prob > 0.55:
             favorite = team1
@@ -922,9 +922,9 @@ class DynamicPredictionSystem:
             fav_data = team2_data
             under_data = team1_data
             fav_prob = 1 - win_prob
-
+        
         analysis_parts = []
-
+        
         # Análise de rating (dados reais)
         rating_diff = abs(fav_data['rating'] - under_data['rating'])
         if rating_diff > 15:
@@ -933,23 +933,23 @@ class DynamicPredictionSystem:
             analysis_parts.append(f"{favorite} é ligeiramente favorito no ranking")
         else:
             analysis_parts.append("Times com força similar no ranking")
-
+        
         # Análise de forma recente (dados reais)
         fav_form = fav_data.get('recent_form', 0.6)
         under_form = under_data.get('recent_form', 0.6)
-
+        
         if fav_form > 0.8:
             analysis_parts.append(f"{favorite} em excelente forma recente ({fav_form:.1%})")
         elif under_form > fav_form + 0.05:
             analysis_parts.append(f"{underdog} com momentum positivo ({under_form:.1%})")
-
+        
         # Análise de região
         fav_region = fav_data.get('region', 'Unknown')
         under_region = under_data.get('region', 'Unknown')
-
+        
         if fav_region != under_region:
             analysis_parts.append(f"Confronto inter-regional: {fav_region} vs {under_region}")
-
+        
         # Análise de probabilidade
         if fav_prob > 0.7:
             analysis_parts.append(f"{favorite} é forte favorito ({fav_prob:.1%} de chance)")
@@ -959,12 +959,12 @@ class DynamicPredictionSystem:
             analysis_parts.append("Partida equilibrada")
 
         return " • ".join(analysis_parts)
-
+    
     def _get_fallback_prediction(self) -> Dict:
         """Predição padrão em caso de erro"""
         return {
             'team1': 'Team 1',
-            'team2': 'Team 2',
+            'team2': 'Team 2', 
             'team1_win_probability': 0.5,
             'team2_win_probability': 0.5,
             'team1_odds': 2.0,
@@ -1080,7 +1080,7 @@ class TelegramAlertsSystem:
                             parse_mode=ParseMode.MARKDOWN
                         )
                     sent_count += 1
-                except Exception as e:
+        except Exception as e:
                     logger.warning(f"❌ Erro ao enviar alerta para grupo {chat_id}: {e}")
                     # Remove grupo inválido
                     self.group_chat_ids.discard(chat_id)
@@ -1189,13 +1189,13 @@ class ProfessionalTipsSystem:
                 while self.monitoring:
                     try:
                         # Escanear por oportunidades de tips
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
                         loop.run_until_complete(self._scan_all_matches_for_tips())
-                        loop.close()
+            loop.close()
                         time.sleep(300)  # Verificar a cada 5 minutos
-                    except Exception as e:
+        except Exception as e:
                         logger.error(f"Erro no monitoramento de tips: {e}")
                         time.sleep(60)
 
@@ -1254,7 +1254,7 @@ class ProfessionalTipsSystem:
 
             if opportunities_found > 0:
                 logger.info(f"✅ {opportunities_found} novas oportunidades de tips encontradas")
-            else:
+        else:
                 logger.info("ℹ️ Nenhuma nova oportunidade encontrada neste scan")
 
         except Exception as e:
@@ -1308,8 +1308,8 @@ class ProfessionalTipsSystem:
 
     async def _analyze_match_for_tip(self, match: Dict) -> Optional[Dict]:
         """Analisa partida usando machine learning para gerar tip"""
-        try:
-            teams = match.get('teams', [])
+                try:
+                    teams = match.get('teams', [])
             if len(teams) < 2:
                 return None
 
@@ -1460,7 +1460,7 @@ class ProfessionalTipsSystem:
             return 'tier1'
         elif any(tier2 in league_lower for tier2 in ['cblol', 'lla', 'pcs', 'vcs']):
             return 'tier2'
-        else:
+                            else:
             return 'tier3'
 
     def _generate_tip_id(self, match: Dict) -> str:
@@ -1503,7 +1503,7 @@ class LoLBotV3UltraAdvanced:
                 try:
                     self.alerts_system.clear_old_tips()
                     time.sleep(3600)  # 1 hora
-                except:
+                        except:
                     time.sleep(3600)
 
         cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
@@ -1573,8 +1573,8 @@ Use /menu para ver todas as opções!
 
 Clique nos botões abaixo para navegação rápida:
         """
-
-        keyboard = [
+            
+            keyboard = [
             [InlineKeyboardButton("🎯 Tips", callback_data="tips"),
              InlineKeyboardButton("🔮 Predições", callback_data="predictions")],
             [InlineKeyboardButton("📅 Agenda", callback_data="schedule"),
@@ -1632,7 +1632,7 @@ Clique nos botões abaixo para navegação rápida:
 
 🔄 Tente novamente em alguns minutos
                 """
-
+            
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="schedule")],
                 [InlineKeyboardButton("📅 Hoje", callback_data="schedule_today")],
@@ -1743,7 +1743,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 
 🔄 Tente novamente em alguns minutos.
                 """
-
+            
             keyboard = [
                 [InlineKeyboardButton("🔄 Novo Tip", callback_data="tips")],
                 [InlineKeyboardButton("📊 Sistema Unidades", callback_data="units_info")],
@@ -1920,7 +1920,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await query.edit_message_text(tip_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-
+            
         except Exception as e:
             logger.error(f"Erro no callback tips: {e}")
             await query.edit_message_text("❌ Erro ao gerar tip. Tente novamente.")
@@ -1966,7 +1966,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 
 🔄 Tente novamente em alguns minutos
                 """
-
+            
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="schedule")],
                 [InlineKeyboardButton("📅 Hoje", callback_data="schedule_today")],
@@ -2073,7 +2073,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 
 🔄 Tente novamente em alguns minutos.
                 """
-                keyboard = [
+            keyboard = [
                     [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
                     [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
                 ]
@@ -2088,8 +2088,8 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
     async def _handle_units_info_callback(self, query) -> None:
         """Mostra informações do sistema de unidades"""
         units_info = self.tips_system.units_system.get_units_explanation()
-
-        keyboard = [
+            
+            keyboard = [
             [InlineKeyboardButton("🎯 Gerar Tip", callback_data="tips")],
             [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
         ]
@@ -2123,7 +2123,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 ⚡ **PROCESSO AUTOMÁTICO:**
 O sistema escaneia continuamente todas as partidas disponíveis na API da Riot Games, analisando cada uma para encontrar oportunidades que atendam aos critérios profissionais de grupos de apostas.
             """
-
+            
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="monitoring")],
                 [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
@@ -2178,9 +2178,9 @@ Clique nos botões abaixo para navegação rápida:
         try:
             if match_index in self.live_matches_cache:
                 match = self.live_matches_cache[match_index]
-                teams = match.get('teams', [])
+                    teams = match.get('teams', [])
 
-                if len(teams) >= 2:
+                    if len(teams) >= 2:
                     team1 = teams[0].get('name', 'Team1')
                     team2 = teams[1].get('name', 'Team2')
                     league = match.get('league', 'League')
@@ -2242,7 +2242,7 @@ Clique nos botões abaixo para navegação rápida:
                     match_message = "❌ Dados da partida não disponíveis."
             else:
                 match_message = "❌ Partida não encontrada no cache."
-
+            
             keyboard = [
                 [InlineKeyboardButton("🔙 Voltar", callback_data="live_matches")],
                 [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
@@ -2316,8 +2316,8 @@ Clique nos botões abaixo para navegação rápida:
 
 🔄 Tente novamente quando houver partidas
                 """
-
-            keyboard = [
+                
+                keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="predictions")],
                 [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
                 [InlineKeyboardButton("📊 Cache Status", callback_data="prediction_cache")],
@@ -2329,8 +2329,8 @@ Clique nos botões abaixo para navegação rápida:
                 await update.message.reply_text(predictions_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
             else:
                 await update.message.reply_text(predictions_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-
-        except Exception as e:
+                
+            except Exception as e:
             logger.error(f"Erro no comando predictions: {e}")
             error_message = "❌ Erro ao gerar predições. Tente novamente."
             if TELEGRAM_VERSION == "v20+":
@@ -2394,7 +2394,7 @@ Use o botão "Cadastrar Grupo" abaixo
                 """
 
                 if is_registered:
-                    keyboard = [
+                keyboard = [
                         [InlineKeyboardButton("❌ Descadastrar Grupo", callback_data=f"unregister_alerts_{chat_id}")],
                         [InlineKeyboardButton("📊 Estatísticas", callback_data="alert_stats")],
                         [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
@@ -2432,8 +2432,8 @@ Use o botão "Cadastrar Grupo" abaixo
                 await update.message.reply_text(alerts_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
             else:
                 await update.message.reply_text(alerts_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
-
-        except Exception as e:
+                
+            except Exception as e:
             logger.error(f"Erro no comando alerts: {e}")
             error_message = "❌ Erro no sistema de alertas. Tente novamente."
             if TELEGRAM_VERSION == "v20+":
@@ -2706,12 +2706,12 @@ def main():
                 return False
 
         # Executar verificação
-        import asyncio
+                    import asyncio
         try:
             loop = asyncio.get_event_loop()
             if loop.is_closed(): # Adicionado para reabrir se necessário (comum em alguns cenários)
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -2835,8 +2835,8 @@ def main():
                         logger.error(f"❌ Telegram API error: {error}")
                     else:
                         logger.error(f"❌ Erro não relacionado ao Telegram: {error}")
-
-                except Exception as e:
+                    
+            except Exception as e:
                     logger.error(f"❌ Erro no handler de erro: {e}")
 
             # Adicionar handler de erro
@@ -3237,4 +3237,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main() 

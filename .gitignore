@@ -39,9 +39,31 @@ Thumbs.db
 *.log
 logs/
 
+# Environment variables
+.env
+.env.local
+
 # Temporary files
 *.tmp
 *.temp
+temp/
+
+# Cache
+.cache/
+*.cache
+
+# Lock files
+*.lock
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Documentation
+docs/
+*.md
+!README.md
 
 # Railway
 .railway/
