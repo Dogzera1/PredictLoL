@@ -6,14 +6,6 @@ Sistema de unidades padrão de grupos de apostas profissionais
 APENAS DADOS REAIS DA API DA RIOT GAMES
 """
 
-# 🔧 FLAGS DE CONTROLE PARA VERSÃO MÍNIMA DE TESTE
-ENABLE_MONITORING_SYSTEM = False      # Desabilitar monitoramento automático
-ENABLE_RIOT_API_CALLS = False         # Desabilitar chamadas da API Riot
-ENABLE_PREDICTION_SYSTEM = False      # Desabilitar sistema de predição
-ENABLE_ALERTS_SYSTEM = False          # Desabilitar sistema de alertas
-ENABLE_COMPLEX_FEATURES = False       # Desabilitar funcionalidades complexas
-MINIMAL_MODE = True                    # Modo mínimo ativo
-
 import os
 import sys
 import time
@@ -26,57 +18,8 @@ from dataclasses import dataclass
 import json
 import pytz
 
-# VERIFICAÇÃO CRÍTICA DE CONFLITOS NO INÍCIO
-def early_conflict_check():
-    """Verificação precoce de conflitos antes de importar bibliotecas pesadas"""
-
-    # Verificar se é Railway
-    is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
-
-    if not is_railway:
-        print("⚠️ EXECUTANDO EM MODO LOCAL - VERIFICANDO CONFLITOS...")
-
-        # Verificar arquivo de lock existente
-        import tempfile
-        lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
-
-        if os.path.exists(lock_file):
-            try:
-                with open(lock_file, 'r') as f:
-                    old_pid = int(f.read().strip())
-
-                # Verificar se processo ainda existe
-                try:
-                    if os.name == 'nt':  # Windows
-                        import subprocess
-                        result = subprocess.run(['tasklist', '/FI', f'PID eq {old_pid}'],
-                                              capture_output=True, text=True)
-                        if str(old_pid) in result.stdout:
-                            print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
-                            print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
-                            print("💡 Execute: python stop_all_conflicts.py")
-                            sys.exit(1)
-                    else:  # Unix/Linux
-                        os.kill(old_pid, 0)  # Não mata, só verifica
-                        print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
-                        print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
-                        print("💡 Execute: python stop_all_conflicts.py")
-                        sys.exit(1)
-                except OSError:
-                    # Processo não existe mais, remover lock
-                    os.remove(lock_file)
-                    print("🧹 Lock antigo removido (processo morto)")
-            except:
-                # Arquivo corrompido, remover
-                try:
-                    os.remove(lock_file)
-                except:
-                    pass
-
-        print("✅ Verificação precoce de conflitos OK")
-
 # Executar verificação precoce
-early_conflict_check()
+# early_conflict_check()  # TEMPORARIAMENTE DESABILITADO PARA TESTE
 
 # Flask para health check
 from flask import Flask, jsonify
@@ -103,8 +46,9 @@ except ImportError:
         print(f"❌ Erro ao importar python-telegram-bot: {e}")
         exit(1)
 
-import numpy as np
-import aiohttp
+# IMPORTS PROBLEMÁTICOS TEMPORARIAMENTE DESABILITADOS
+# import numpy as np      # PODE CAUSAR 502 - DESABILITADO PARA TESTE  
+# import aiohttp          # PODE CAUSAR 502 - DESABILITADO PARA TESTE
 
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
@@ -456,41 +400,42 @@ class RiotAPIClient:
 
     async def get_live_matches(self) -> List[Dict]:
         """Busca partidas ao vivo REAIS da API oficial"""
-        if not ENABLE_RIOT_API_CALLS:
-            logger.info("🔧 API Riot DESABILITADA (modo mínimo)")
-            return [{
-                'teams': [
-                    {'name': 'Test Team 1', 'code': 'T1'},
-                    {'name': 'Test Team 2', 'code': 'T2'}
-                ],
-                'league': 'Test League',
-                'status': 'scheduled',
-                'start_time': datetime.now().isoformat(),
-                'tournament': 'Test Tournament'
-            }]
-            
         logger.info("🔍 Buscando partidas ao vivo...")
 
-        endpoints = [
-            f"{self.base_urls['esports']}/getLive?hl=pt-BR",
-            f"{self.base_urls['esports']}/getSchedule?hl=pt-BR"
-        ]
+        # AIOHTTP TEMPORARIAMENTE DESABILITADO PARA TESTE 502
+        logger.info("🔧 API calls desabilitadas para teste - retornando dados mockados")
+        return [{
+            'teams': [
+                {'name': 'Test Team A', 'code': 'TTA'},
+                {'name': 'Test Team B', 'code': 'TTB'}
+            ],
+            'league': 'Test League',
+            'status': 'live',
+            'start_time': '2024-01-01T10:00:00Z',
+            'tournament': 'Test Tournament'
+        }]
 
-        all_matches = []
+        # CÓDIGO ORIGINAL COMENTADO PARA TESTE
+        # endpoints = [
+        #     f"{self.base_urls['esports']}/getLive?hl=pt-BR",
+        #     f"{self.base_urls['esports']}/getSchedule?hl=pt-BR"
+        # ]
 
-        for endpoint in endpoints:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(endpoint, headers=self.headers, timeout=10) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            matches = self._extract_matches(data)
-                            all_matches.extend(matches)
-            except Exception as e:
-                logger.warning(f"❌ Erro no endpoint: {e}")
-                continue
+        # all_matches = []
 
-        return all_matches[:10]  # Máximo 10 partidas
+        # for endpoint in endpoints:
+        #     try:
+        #         async with aiohttp.ClientSession() as session:
+        #             async with session.get(endpoint, headers=self.headers, timeout=10) as response:
+        #                 if response.status == 200:
+        #                     data = await response.json()
+        #                     matches = self._extract_matches(data)
+        #                     all_matches.extend(matches)
+        #     except Exception as e:
+        #         logger.warning(f"❌ Erro no endpoint: {e}")
+        #         continue
+
+        # return all_matches[:10]  # Máximo 10 partidas
 
     def _extract_matches(self, data: Dict) -> List[Dict]:
         """Extrai partidas dos dados da API"""
@@ -562,35 +507,54 @@ class ScheduleManager:
     async def get_scheduled_matches(self, days_ahead: int = 7) -> List[Dict]:
         """Busca partidas agendadas para os próximos dias"""
         try:
-            # Buscar dados da API
-            endpoints = [
-                f"{self.riot_client.base_urls['esports']}/getSchedule?hl=pt-BR",
-                f"{self.riot_client.base_urls['esports']}/getSchedule?hl=en-US"
-            ]
-
-            all_matches = []
-
-            for endpoint in endpoints:
-                try:
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(endpoint, headers=self.riot_client.headers, timeout=10) as response:
-                            if response.status == 200:
-                                data = await response.json()
-                                matches = self._extract_scheduled_matches(data, days_ahead)
-                                all_matches.extend(matches)
-                except Exception as e:
-                    logger.warning(f"❌ Erro no endpoint de agenda: {e}")
-                    continue
-
-            # Remover duplicatas e ordenar por data
-            unique_matches = self._remove_duplicates(all_matches)
-            sorted_matches = sorted(unique_matches, key=lambda x: x.get('start_time', ''))
-
-            self.scheduled_matches = sorted_matches[:20]  # Máximo 20 partidas
+            # AIOHTTP TEMPORARIAMENTE DESABILITADO PARA TESTE 502
+            logger.info("🔧 API calls desabilitadas para teste - retornando dados mockados")
+            self.scheduled_matches = [{
+                'teams': [
+                    {'name': 'Scheduled Team A', 'code': 'STA'},
+                    {'name': 'Scheduled Team B', 'code': 'STB'}
+                ],
+                'league': 'Scheduled League',
+                'tournament': 'Scheduled Tournament',
+                'start_time': '2024-01-01T15:00:00Z',
+                'start_time_formatted': '01/01 15:00',
+                'status': 'scheduled',
+                'match_id': 'test_match_1'
+            }]
             self.last_update = datetime.now()
-
-            logger.info(f"📅 {len(self.scheduled_matches)} partidas agendadas encontradas")
+            logger.info(f"📅 {len(self.scheduled_matches)} partidas agendadas encontradas (teste)")
             return self.scheduled_matches
+
+            # CÓDIGO ORIGINAL COMENTADO PARA TESTE
+            # # Buscar dados da API
+            # endpoints = [
+            #     f"{self.riot_client.base_urls['esports']}/getSchedule?hl=pt-BR",
+            #     f"{self.riot_client.base_urls['esports']}/getSchedule?hl=en-US"
+            # ]
+
+            # all_matches = []
+
+            # for endpoint in endpoints:
+            #     try:
+            #         async with aiohttp.ClientSession() as session:
+            #             async with session.get(endpoint, headers=self.riot_client.headers, timeout=10) as response:
+            #                 if response.status == 200:
+            #                     data = await response.json()
+            #                     matches = self._extract_scheduled_matches(data, days_ahead)
+            #                     all_matches.extend(matches)
+            #     except Exception as e:
+            #         logger.warning(f"❌ Erro no endpoint de agenda: {e}")
+            #         continue
+
+            # # Remover duplicatas e ordenar por data
+            # unique_matches = self._remove_duplicates(all_matches)
+            # sorted_matches = sorted(unique_matches, key=lambda x: x.get('start_time', ''))
+
+            # self.scheduled_matches = sorted_matches[:20]  # Máximo 20 partidas
+            # self.last_update = datetime.now()
+
+            # logger.info(f"📅 {len(self.scheduled_matches)} partidas agendadas encontradas")
+            # return self.scheduled_matches
 
         except Exception as e:
             logger.error(f"Erro ao buscar agenda: {e}")
@@ -869,11 +833,15 @@ class DynamicPredictionSystem:
         """Calcula probabilidade base baseada em ratings reais"""
         rating1 = team1_data.get('rating', 70)
         rating2 = team2_data.get('rating', 70)
-
+        
         # Fórmula logística para converter diferença de rating em probabilidade
         rating_diff = rating1 - rating2
-        base_prob = 1 / (1 + np.exp(-rating_diff / 20))
-
+        # base_prob = 1 / (1 + np.exp(-rating_diff / 20))  # NUMPY DESABILITADO PARA TESTE
+        
+        # Versão simplificada sem numpy para teste
+        import math
+        base_prob = 1 / (1 + math.exp(-rating_diff / 20))
+        
         return base_prob
 
     def _calculate_region_adjustment(self, team1_data: Dict, team2_data: Dict) -> float:
@@ -1203,10 +1171,6 @@ class ProfessionalTipsSystem:
 
     def start_monitoring(self):
         """Inicia monitoramento contínuo de todas as partidas"""
-        if not ENABLE_MONITORING_SYSTEM:
-            logger.info("🔧 Monitoramento DESABILITADO (modo mínimo)")
-            return
-            
         if not self.monitoring:
             self.monitoring = True
 
@@ -1537,34 +1501,7 @@ class LoLBotV3UltraAdvanced:
     async def start_command(self, update: Update, context) -> None:
         """Comando /start"""
         user = update.effective_user
-        
-        if MINIMAL_MODE:
-            welcome_message = f"""
-🎮 **BOT LOL V3 - MODO MÍNIMO** 🎮
-
-Olá {user.first_name}! 👋
-
-🔧 **MODO DE TESTE ATIVO**
-• Sistema simplificado para diagnóstico
-• Funcionalidades principais: Desabilitadas temporariamente
-• Health check: Funcionando
-• Webhook: Teste básico
-
-✅ **Comandos disponíveis no modo mínimo:**
-• /start - Iniciar bot
-• /menu - Menu básico
-• /help - Ajuda
-
-🔄 **Para funcionalidades completas:**
-Configure flags no código e redeploy
-            """
-            
-            keyboard = [
-                [InlineKeyboardButton("📋 Menu Básico", callback_data="main_menu")],
-                [InlineKeyboardButton("❓ Ajuda", callback_data="help")]
-            ]
-        else:
-            welcome_message = f"""
+        welcome_message = f"""
 🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
 
 Olá {user.first_name}! 👋
@@ -1584,17 +1521,16 @@ Olá {user.first_name}! 👋
 • 📋 Estatísticas detalhadas
 
 Use /menu para ver todas as opções!
-            """
+        """
 
-            keyboard = [
-                [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
-                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
-                [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
-                [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
-                [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
-                [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
-            ]
-            
+        keyboard = [
+            [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+            [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
+            [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
+            [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+            [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
+            [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if TELEGRAM_VERSION == "v20+":
@@ -1758,26 +1694,10 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
     async def tips_command(self, update: Update, context) -> None:
         """Comando /tips"""
         try:
-            if not ENABLE_COMPLEX_FEATURES:
-                tip_message = """
-🎯 **MODO MÍNIMO ATIVO** 🎯
+            tip = await self.tips_system.generate_professional_tip()
 
-🔧 **Sistema em Modo de Teste**
-• Funcionalidades complexas temporariamente desabilitadas
-• Tips profissionais: Em manutenção
-• Sistema de unidades: Disponível
-• API Riot: Desabilitada
-
-🔄 **Para ativar funcionalidades completas:**
-Configure ENABLE_COMPLEX_FEATURES = True
-
-📊 **Status atual:** Modo mínimo de teste ativo
-                """
-            else:
-                tip = await self.tips_system.generate_professional_tip()
-
-                if tip:
-                    tip_message = f"""
+            if tip:
+                tip_message = f"""
 🎯 **TIP PROFISSIONAL** 🎯
 
 🏆 **{tip['title']}**
@@ -1797,9 +1717,9 @@ Configure ENABLE_COMPLEX_FEATURES = True
 {tip['reasoning']}
 
 ⭐ **Recomendação:** {tip['recommended_team']}
-                    """
-                else:
-                    tip_message = """
+                """
+            else:
+                tip_message = """
 🎯 **NENHUM TIP DISPONÍVEL** 🎯
 
 ❌ Nenhuma partida atende aos critérios profissionais no momento.
@@ -1811,8 +1731,8 @@ Configure ENABLE_COMPLEX_FEATURES = True
 • Liga tier 1 ou 2
 
 🔄 Tente novamente em alguns minutos.
-                    """
-            
+                """
+
             keyboard = [
                 [InlineKeyboardButton("🔄 Novo Tip", callback_data="tips")],
                 [InlineKeyboardButton("📊 Sistema Unidades", callback_data="units_info")],
@@ -3121,30 +3041,26 @@ def main():
                     logger = logging.getLogger(__name__)
                     
                     try:
-                        logger.info("🔷 WEBHOOK SIMPLES: Recebido")
-                        
-                        if MINIMAL_MODE:
-                            logger.info("🔷 MODO MÍNIMO: Retornando OK direto")
-                            return "OK", 200
-                        
-                        # Código completo só executa se não for modo mínimo
+                        logger.info("🔷 DEBUG: Webhook_v13 iniciado")
                         from flask import request
-                        logger.info(f"🔷 Request method={request.method}")
+                        logger.info(f"🔷 DEBUG: Request method={request.method}, path={request.path}")
+                        logger.info(f"🔷 DEBUG: Request headers={dict(request.headers)}")
+                        logger.info(f"🔷 DEBUG: Request content_type={request.content_type}")
                         
-                        data = request.get_json(force=True)
-                        if data:
-                            logger.info(f"🔷 Dados recebidos: {len(str(data))} chars")
-                            from telegram import Update
-                            update_obj = Update.de_json(data, updater.bot)
-                            
-                            # Processar update de forma simples
-                            if update_obj.message and update_obj.message.text:
-                                logger.info(f"🔷 Mensagem: {update_obj.message.text}")
+                        # Tentar obter dados
+                        try:
+                            data = request.get_data()
+                            logger.info(f"🔷 DEBUG: Raw data length={len(data) if data else 0}")
+                        except Exception as data_error:
+                            logger.error(f"🔷 DEBUG: Erro ao obter raw data: {data_error}")
                         
+                        logger.info("🔷 DEBUG: Retornando OK")
                         return "OK", 200
                         
                     except Exception as e:
-                        logger.error(f"🔷 Erro no webhook: {e}")
+                        logger.error(f"🔷 DEBUG: Erro na função webhook: {e}")
+                        import traceback
+                        logger.error(f"🔷 DEBUG: Traceback: {traceback.format_exc()}")
                         return "ERROR", 500
 
                 logger.info("🔷 DEBUG: Rota webhook_v13 definida com sucesso!")
