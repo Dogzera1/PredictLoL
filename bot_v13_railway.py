@@ -3050,18 +3050,17 @@ def main():
                 def webhook_v13():
                     try:
                         from flask import request
+                        logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
+                        
+                        # Teste 1: Apenas retornar OK sem processar nada
+                        logger.info("🔷 Teste 1: Retornando OK sem processamento")
+                        return "OK", 200
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Erro na função webhook debug: {e}", exc_info=True)
+                        return "Error", 500
 
-                         logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
-        
-        # Teste 1: Apenas retornar OK sem processar nada
-        try:
-            logger.info("🔷 Teste 1: Retornando OK sem processamento")
-            return "OK", 200
-        except Exception as e:
-            logger.error(f"❌ Erro na função webhook debug: {e}", exc_info=True)
-            return "Error", 500
-
-        # Configurar webhook
+                # Configurar webhook
                 railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
                 # Garantir que a URL tenha https://
                 if not railway_url.startswith('http'):
