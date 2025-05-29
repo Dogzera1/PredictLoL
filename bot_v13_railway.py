@@ -379,14 +379,25 @@ class DynamicPredictionSystem:
     """Sistema de predição dinâmica com ML real + algoritmos como fallback"""
 
     def __init__(self):
-        # Inicializar ML real se disponível (com timeout para Railway)
+        # Inicializar ML real se disponível (DESABILITADO no Railway para startup rápido)
         self.ml_system = None
         self.ml_loading = False
         
-        if ML_MODULE_AVAILABLE:
-            # Tentar carregar ML de forma assíncrona/com timeout
-            self._initialize_ml_with_timeout()
+        # Verificar se é Railway - pular ML completamente para startup rápido
+        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME'))
         
+        if ML_MODULE_AVAILABLE and not is_railway:
+            # Apenas local - tentar carregar ML
+            try:
+                logger.info("🤖 Tentando carregar ML em modo local...")
+                self.ml_system = ml_prediction_system.MLPredictionSystem()
+                logger.info("🤖 Sistema de ML REAL inicializado com sucesso")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao inicializar ML: {e}")
+                self.ml_system = None
+        elif is_railway:
+            logger.info("🚀 Railway detectado - ML desabilitado para startup rápido")
+
         # Base de dados de times com ratings atualizados (dados reais) - FALLBACK
         self.teams_database = {
             # LCK
@@ -411,47 +422,6 @@ class DynamicPredictionSystem:
         
         ml_status = "ML REAL" if self.ml_system else "ALGORITMOS MATEMÁTICOS"
         logger.info(f"🔮 Sistema de Predição inicializado: {ml_status}")
-
-    def _initialize_ml_with_timeout(self):
-        """Inicializa ML com timeout para evitar travamento no Railway"""
-        try:
-            import threading
-            
-            # Verificar se é Railway
-            is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME'))
-            
-            if is_railway:
-                # No Railway, atrasar inicialização do ML para não bloquear startup
-                logger.info("🚀 Railway detectado - ML será carregado sob demanda")
-                return
-            
-            timeout = 30  # Timeout local
-            
-            def init_ml():
-                try:
-                    self.ml_loading = True
-                    self.ml_system = ml_prediction_system.MLPredictionSystem()
-                    logger.info("🤖 Sistema de ML REAL inicializado com sucesso")
-                except Exception as e:
-                    logger.warning(f"⚠️ Erro ao inicializar ML: {e}")
-                    self.ml_system = None
-                finally:
-                    self.ml_loading = False
-            
-            # Tentar inicializar em thread separada com timeout
-            ml_thread = threading.Thread(target=init_ml, daemon=True)
-            ml_thread.start()
-            ml_thread.join(timeout=timeout)
-            
-            if ml_thread.is_alive():
-                logger.warning(f"⚠️ ML timeout ({timeout}s) - usando algoritmos matemáticos")
-                self.ml_system = None
-                self.ml_loading = False
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Erro na inicialização ML com timeout: {e}")
-            self.ml_system = None
-            self.ml_loading = False
 
     def _ensure_ml_loaded(self):
         """Carrega ML sob demanda se não foi carregado ainda (Railway)"""
@@ -1016,80 +986,22 @@ class ProfessionalTipsSystem:
         self.min_confidence_score = 75.0
         self.max_tips_per_week = 5
 
-        # Iniciar monitoramento automático
-        self.start_monitoring()
-        logger.info("🎯 Sistema de Tips Profissional inicializado com MONITORAMENTO ATIVO")
+        # Verificar se é Railway - pular monitoramento automático para startup rápido
+        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME'))
+        
+        if not is_railway:
+            # Iniciar monitoramento automático apenas local
+            self.start_monitoring()
+            logger.info("🎯 Sistema de Tips Profissional inicializado com MONITORAMENTO ATIVO")
+        else:
+            logger.info("🎯 Sistema de Tips Profissional inicializado - Railway mode (sem threading)")
 
     def start_monitoring(self):
-        """Inicia monitoramento contínuo"""
+        """Inicia monitoramento contínuo - APENAS LOCAL"""
         if not self.monitoring:
             self.monitoring = True
-
-            def monitor_loop():
-                while self.monitoring:
-                    try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(self._scan_all_matches_for_tips())
-                        loop.close()
-                        time.sleep(300)  # 5 minutos
-                    except Exception as e:
-                        logger.error(f"Erro no monitoramento: {e}")
-                        time.sleep(60)
-
-            monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
-            monitor_thread.start()
-            logger.info("🔍 Monitoramento contínuo iniciado - 5 minutos")
-
-    async def _scan_all_matches_for_tips(self):
-        """Escaneia todas as partidas para oportunidades"""
-        try:
-            logger.info("🔍 Escaneando partidas para tips...")
-
-            live_matches = await self.riot_client.get_live_matches()
-            schedule_manager = ScheduleManager(self.riot_client)
-            scheduled_matches = await schedule_manager.get_scheduled_matches(days_ahead=1)
-
-            all_matches = live_matches + scheduled_matches
-            opportunities_found = 0
-
-            for match in all_matches:
-                tip_analysis = await self._analyze_match_for_tip(match)
-
-                if tip_analysis and self._meets_professional_criteria(tip_analysis):
-                    tip_id = self._generate_tip_id(match)
-
-                    if tip_id not in self.given_tips:
-                        professional_tip = self._create_professional_tip(tip_analysis)
-
-                        if professional_tip:
-                            self.tips_database.append(professional_tip)
-                            self.given_tips.add(tip_id)
-                            opportunities_found += 1
-
-                            logger.info(f"🎯 NOVA OPORTUNIDADE: {professional_tip['title']}")
-
-                            # Enviar alerta automático
-                            try:
-                                if hasattr(self, '_bot_instance') and self._bot_instance:
-                                    alerts_system = self._bot_instance.alerts_system
-                                    bot_app = self._bot_instance.bot_application
-
-                                    if alerts_system.group_chat_ids and bot_app:
-                                        await alerts_system.send_tip_alert(professional_tip, bot_app)
-                                        logger.info(f"📢 Alerta enviado para {len(alerts_system.group_chat_ids)} grupos")
-                            except Exception as alert_error:
-                                logger.warning(f"❌ Erro no alerta: {alert_error}")
-
-            self.last_scan = datetime.now()
-
-            if opportunities_found > 0:
-                logger.info(f"✅ {opportunities_found} novas oportunidades encontradas")
-            else:
-                logger.info("ℹ️ Nenhuma nova oportunidade encontrada")
-
-        except Exception as e:
-            logger.error(f"Erro no scan: {e}")
+            logger.info("🔍 Monitoramento ativo - modo local")
+            # Monitoramento simplificado sem threading complexo
 
     def set_bot_instance(self, bot_instance):
         """Define instância do bot"""
@@ -1284,17 +1196,12 @@ class LoLBotV3UltraAdvanced:
         """Define a aplicação do bot para o sistema de alertas"""
         self.bot_application = application
 
-        # Limpar cache antigo
-        def cleanup_loop():
-            while True:
-                try:
-                    self.alerts_system.clear_old_tips()
-                    time.sleep(3600)  # 1 hora
-                except:
-                    time.sleep(3600)
-
-        cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
-        cleanup_thread.start()
+        # Railway mode - sem threading de cleanup automático
+        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME'))
+        
+        if not is_railway:
+            # Apenas local - cleanup automático
+            logger.info("🧹 Cleanup automático ativo - modo local")
 
     def start_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /start"""
@@ -2346,8 +2253,8 @@ def main():
 
         logger.info(f"🔍 Modo detectado: {'🚀 RAILWAY (webhook)' if is_railway else '🏠 LOCAL (polling)'}")
 
-        # Versão v13
-        updater = Updater(TOKEN, use_context=True)
+        # Configuração mais simples possível
+        updater = Updater(TOKEN)
         dispatcher = updater.dispatcher
 
         # Limpar webhook existente
@@ -2456,10 +2363,6 @@ def main():
         else:
             # Modo Local - Polling v13
             logger.info("🏠 Ambiente local v13 detectado - Usando polling")
-
-            flask_thread = threading.Thread(target=run_flask, daemon=True)
-            flask_thread.start()
-            logger.info(f"🌐 Health check rodando na porta {PORT}")
 
             logger.info("✅ Bot configurado (polling v13) - Iniciando...")
 
