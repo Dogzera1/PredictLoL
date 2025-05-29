@@ -10,5 +10,5 @@ cmds = ["echo 'Build phase completed'"]
 [start]
 cmd = "python bot_v13_railway.py"
 
-[variables]
-PORT = "5800" 
+# [variables]
+# PORT = "5800"  # REMOVIDO: Deixando Railway definir dinamicamente 

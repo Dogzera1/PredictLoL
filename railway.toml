@@ -1,11 +1,11 @@
 [build]
-builder = "dockerFile"
+builder = "nixpacks"
 
 [deploy]
 startCommand = "python bot_v13_railway.py"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
-restartPolicyType = "never"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
 
 [env]
 TELEGRAM_TOKEN = "${{ secrets.TELEGRAM_TOKEN }}"
