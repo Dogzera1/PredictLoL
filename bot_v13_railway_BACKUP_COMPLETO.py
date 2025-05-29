@@ -6,14 +6,6 @@ Sistema de unidades padrão de grupos de apostas profissionais
 APENAS DADOS REAIS DA API DA RIOT GAMES
 """
 
-# 🔧 FLAGS DE CONTROLE PARA VERSÃO MÍNIMA DE TESTE
-ENABLE_MONITORING_SYSTEM = False      # Desabilitar monitoramento automático
-ENABLE_RIOT_API_CALLS = False         # Desabilitar chamadas da API Riot
-ENABLE_PREDICTION_SYSTEM = False      # Desabilitar sistema de predição
-ENABLE_ALERTS_SYSTEM = False          # Desabilitar sistema de alertas
-ENABLE_COMPLEX_FEATURES = False       # Desabilitar funcionalidades complexas
-MINIMAL_MODE = True                    # Modo mínimo ativo
-
 import os
 import sys
 import time
@@ -456,19 +448,6 @@ class RiotAPIClient:
 
     async def get_live_matches(self) -> List[Dict]:
         """Busca partidas ao vivo REAIS da API oficial"""
-        if not ENABLE_RIOT_API_CALLS:
-            logger.info("🔧 API Riot DESABILITADA (modo mínimo)")
-            return [{
-                'teams': [
-                    {'name': 'Test Team 1', 'code': 'T1'},
-                    {'name': 'Test Team 2', 'code': 'T2'}
-                ],
-                'league': 'Test League',
-                'status': 'scheduled',
-                'start_time': datetime.now().isoformat(),
-                'tournament': 'Test Tournament'
-            }]
-            
         logger.info("🔍 Buscando partidas ao vivo...")
 
         endpoints = [
@@ -1203,10 +1182,6 @@ class ProfessionalTipsSystem:
 
     def start_monitoring(self):
         """Inicia monitoramento contínuo de todas as partidas"""
-        if not ENABLE_MONITORING_SYSTEM:
-            logger.info("🔧 Monitoramento DESABILITADO (modo mínimo)")
-            return
-            
         if not self.monitoring:
             self.monitoring = True
 
@@ -1537,34 +1512,7 @@ class LoLBotV3UltraAdvanced:
     async def start_command(self, update: Update, context) -> None:
         """Comando /start"""
         user = update.effective_user
-        
-        if MINIMAL_MODE:
-            welcome_message = f"""
-🎮 **BOT LOL V3 - MODO MÍNIMO** 🎮
-
-Olá {user.first_name}! 👋
-
-🔧 **MODO DE TESTE ATIVO**
-• Sistema simplificado para diagnóstico
-• Funcionalidades principais: Desabilitadas temporariamente
-• Health check: Funcionando
-• Webhook: Teste básico
-
-✅ **Comandos disponíveis no modo mínimo:**
-• /start - Iniciar bot
-• /menu - Menu básico
-• /help - Ajuda
-
-🔄 **Para funcionalidades completas:**
-Configure flags no código e redeploy
-            """
-            
-            keyboard = [
-                [InlineKeyboardButton("📋 Menu Básico", callback_data="main_menu")],
-                [InlineKeyboardButton("❓ Ajuda", callback_data="help")]
-            ]
-        else:
-            welcome_message = f"""
+        welcome_message = f"""
 🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
 
 Olá {user.first_name}! 👋
@@ -1584,17 +1532,16 @@ Olá {user.first_name}! 👋
 • 📋 Estatísticas detalhadas
 
 Use /menu para ver todas as opções!
-            """
+        """
 
-            keyboard = [
-                [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
-                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
-                [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
-                [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
-                [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
-                [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
-            ]
-            
+        keyboard = [
+            [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+            [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
+            [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
+            [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+            [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
+            [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if TELEGRAM_VERSION == "v20+":
@@ -1758,26 +1705,10 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
     async def tips_command(self, update: Update, context) -> None:
         """Comando /tips"""
         try:
-            if not ENABLE_COMPLEX_FEATURES:
-                tip_message = """
-🎯 **MODO MÍNIMO ATIVO** 🎯
+            tip = await self.tips_system.generate_professional_tip()
 
-🔧 **Sistema em Modo de Teste**
-• Funcionalidades complexas temporariamente desabilitadas
-• Tips profissionais: Em manutenção
-• Sistema de unidades: Disponível
-• API Riot: Desabilitada
-
-🔄 **Para ativar funcionalidades completas:**
-Configure ENABLE_COMPLEX_FEATURES = True
-
-📊 **Status atual:** Modo mínimo de teste ativo
-                """
-            else:
-                tip = await self.tips_system.generate_professional_tip()
-
-                if tip:
-                    tip_message = f"""
+            if tip:
+                tip_message = f"""
 🎯 **TIP PROFISSIONAL** 🎯
 
 🏆 **{tip['title']}**
@@ -1797,9 +1728,9 @@ Configure ENABLE_COMPLEX_FEATURES = True
 {tip['reasoning']}
 
 ⭐ **Recomendação:** {tip['recommended_team']}
-                    """
-                else:
-                    tip_message = """
+                """
+            else:
+                tip_message = """
 🎯 **NENHUM TIP DISPONÍVEL** 🎯
 
 ❌ Nenhuma partida atende aos critérios profissionais no momento.
@@ -1811,8 +1742,8 @@ Configure ENABLE_COMPLEX_FEATURES = True
 • Liga tier 1 ou 2
 
 🔄 Tente novamente em alguns minutos.
-                    """
-            
+                """
+
             keyboard = [
                 [InlineKeyboardButton("🔄 Novo Tip", callback_data="tips")],
                 [InlineKeyboardButton("📊 Sistema Unidades", callback_data="units_info")],
@@ -3121,30 +3052,26 @@ def main():
                     logger = logging.getLogger(__name__)
                     
                     try:
-                        logger.info("🔷 WEBHOOK SIMPLES: Recebido")
-                        
-                        if MINIMAL_MODE:
-                            logger.info("🔷 MODO MÍNIMO: Retornando OK direto")
-                            return "OK", 200
-                        
-                        # Código completo só executa se não for modo mínimo
+                        logger.info("🔷 DEBUG: Webhook_v13 iniciado")
                         from flask import request
-                        logger.info(f"🔷 Request method={request.method}")
+                        logger.info(f"🔷 DEBUG: Request method={request.method}, path={request.path}")
+                        logger.info(f"🔷 DEBUG: Request headers={dict(request.headers)}")
+                        logger.info(f"🔷 DEBUG: Request content_type={request.content_type}")
                         
-                        data = request.get_json(force=True)
-                        if data:
-                            logger.info(f"🔷 Dados recebidos: {len(str(data))} chars")
-                            from telegram import Update
-                            update_obj = Update.de_json(data, updater.bot)
-                            
-                            # Processar update de forma simples
-                            if update_obj.message and update_obj.message.text:
-                                logger.info(f"🔷 Mensagem: {update_obj.message.text}")
+                        # Tentar obter dados
+                        try:
+                            data = request.get_data()
+                            logger.info(f"🔷 DEBUG: Raw data length={len(data) if data else 0}")
+                        except Exception as data_error:
+                            logger.error(f"🔷 DEBUG: Erro ao obter raw data: {data_error}")
                         
+                        logger.info("🔷 DEBUG: Retornando OK")
                         return "OK", 200
                         
                     except Exception as e:
-                        logger.error(f"🔷 Erro no webhook: {e}")
+                        logger.error(f"🔷 DEBUG: Erro na função webhook: {e}")
+                        import traceback
+                        logger.error(f"🔷 DEBUG: Traceback: {traceback.format_exc()}")
                         return "ERROR", 500
 
                 logger.info("🔷 DEBUG: Rota webhook_v13 definida com sucesso!")
