@@ -2256,9 +2256,10 @@ def main():
                         from telegram import Update
                         update_obj = Update.de_json(update_data, updater.bot)
                         dispatcher.process_update(update_obj)
+                        logger.info(f"🔄 Webhook v13 processou atualização: {update_obj.update_id if update_obj else 'None'}")
                     return "OK", 200
                 except Exception as e:
-                    logger.error(f"❌ Erro no webhook: {e}")
+                    logger.error(f"❌ Erro no webhook v13: {e}")
                     return "ERROR", 500
 
             # Configurar webhook
