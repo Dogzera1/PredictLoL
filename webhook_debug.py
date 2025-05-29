@@ -43,6 +43,70 @@ def webhook_v13_debug():
         logger.error(f"❌ Erro na função webhook debug: {e}", exc_info=True)
         return "Error", 500
 
+def webhook_v13_teste2():
+    """TESTE 2: Adicionar processamento de dados JSON"""
+    try:
+        from flask import request
+        logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
+        
+        # Teste 2: Obter dados JSON
+        update_data = request.get_json(force=True)
+        logger.info(f"🔷 Teste 2: Dados JSON obtidos: {bool(update_data)}")
+        logger.info(f"🔷 Teste 2: Keys: {list(update_data.keys()) if update_data else 'None'}")
+        
+        return "OK", 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro no Teste 2: {e}", exc_info=True)
+        return "Error", 500
+
+def webhook_v13_teste3():
+    """TESTE 3: Criar objeto Update do Telegram"""
+    try:
+        from flask import request
+        logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
+        
+        update_data = request.get_json(force=True)
+        logger.info(f"🔷 Teste 3: Dados JSON obtidos: {bool(update_data)}")
+        
+        if update_data:
+            from telegram import Update as TelegramUpdate
+            # Assumindo que 'updater' está disponível no escopo
+            update_obj = TelegramUpdate.de_json(update_data, updater.bot)
+            logger.info(f"🔷 Teste 3: Update object criado: {update_obj.update_id if update_obj else 'None'}")
+            logger.info(f"🔷 Teste 3: Tipo de update: {type(update_obj).__name__}")
+        
+        return "OK", 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro no Teste 3: {e}", exc_info=True)
+        return "Error", 500
+
+def webhook_v13_teste4():
+    """TESTE 4: Processar update completo (versão final)"""
+    try:
+        from flask import request
+        logger.info(f"🔷 Request V13 method: {request.method}, path: {request.path}")
+        
+        update_data = request.get_json(force=True)
+        logger.info(f"🔷 Teste 4: Dados JSON obtidos: {bool(update_data)}")
+        
+        if update_data:
+            from telegram import Update as TelegramUpdate
+            update_obj = TelegramUpdate.de_json(update_data, updater.bot)
+            logger.info(f"🔷 Teste 4: Update object criado: {update_obj.update_id if update_obj else 'None'}")
+            
+            if update_obj:
+                logger.info("🔷 Teste 4: Processando update...")
+                dispatcher.process_update(update_obj)
+                logger.info("🔷 Teste 4: Update processado com sucesso!")
+        
+        return "OK", 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro no Teste 4: {e}", exc_info=True)
+        return "Error", 500
+
 print("""
 📋 INSTRUÇÕES PARA CORRIGIR O PROBLEMA DE TIMEOUT:
 
@@ -53,4 +117,21 @@ print("""
 5. Se funcionar, vá descomentando gradualmente os testes 2, 3, 4 para identificar onde trava
 
 OBJETIVO: Identificar exatamente qual linha está causando o timeout/deadlock
+
+🎉 TESTE 1 DEVE ESTAR FUNCIONANDO AGORA!
+
+📋 PRÓXIMAS ETAPAS:
+
+1. ✅ Verifique se não há mais erro 502 nos logs
+2. ✅ Teste se /start funciona no bot
+3. 🔄 Se funcionar, aplique gradualmente os testes 2, 3, 4
+
+📝 INSTRUÇÕES PARA CADA TESTE:
+- Teste 2: Adiciona processamento JSON (deve funcionar)
+- Teste 3: Cria objeto Update do Telegram (possível problema aqui)
+- Teste 4: Processamento completo (provável causa do deadlock original)
+
+🚨 SE ALGUM TESTE CAUSAR 502 NOVAMENTE:
+- Volte para o teste anterior que funcionava
+- Investigue a linha específica que causa o problema
 """) 
