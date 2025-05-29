@@ -2943,7 +2943,7 @@ def main():
                 logger.info(f"🔗 Ping disponível em: /ping")
 
                 # Iniciar Flask
-                app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
+                app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False, threaded=True)
 
             else:
                 # Modo Local - Polling
@@ -3123,7 +3123,7 @@ def main():
                 logger.info(f"🔗 Root disponível em: /")
                 logger.info(f"🔗 Ping disponível em: /ping")
 
-                app.run(host='0.0.0.0', port=PORT, debug=True, threaded=True)
+                app.run(host='0.0.0.0', port=PORT, debug=True, use_reloader=False, threaded=True)
 
             else:
                 # Modo Local - Polling v13
@@ -3201,6 +3201,7 @@ def main():
                         pass
                 lock_fd_or_status.close()
             # Remover o arquivo de lock na saída
+            import tempfile  # Adicionado import necessário
             lock_file_path = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
             if os.path.exists(lock_file_path):
                 try:
