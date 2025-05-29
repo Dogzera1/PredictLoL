@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Bot LoL V13 Railway - Versão Limpa sem Dados Fictícios
+Bot LoL V13 Railway - Versão Webhook v20+ SEM CONFLITOS
 Sistema de apostas esportivas para League of Legends
 Integração com API oficial da Riot Games
 """
@@ -14,12 +14,14 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import pytz
 
-# Telegram imports
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+# Telegram imports v20+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.error import TelegramError
+from telegram.constants import ParseMode
 
-# Flask para health check
-from flask import Flask, jsonify
+# Flask para webhook
+from flask import Flask, request, jsonify
 import threading
 
 # Scientific computing
@@ -28,101 +30,89 @@ import numpy as np
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
 OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
+PORT = int(os.getenv('PORT', 5800))
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Flask app para webhook
+app = Flask(__name__)
+
 class RiotAPIClient:
-    """Cliente para API oficial da Riot Games baseado na documentação OpenAPI"""
+    """Cliente para API oficial da Riot Games"""
     
     def __init__(self):
-        self.api_key = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"  # Chave oficial da documentação
+        self.api_key = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
         self.base_urls = {
             'esports': 'https://esports-api.lolesports.com/persisted/gw',
             'prod': 'https://prod-relapi.ewp.gg/persisted/gw'
         }
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'application/json',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'cross-site',
             'x-api-key': self.api_key
         }
     
     async def get_live_matches(self):
-        """Buscar partidas ao vivo da API oficial"""
+        """Buscar partidas ao vivo"""
         try:
             async with aiohttp.ClientSession() as session:
                 url = f"{self.base_urls['esports']}/getLive"
                 params = {'hl': 'pt-BR'}
                 
-                async with session.get(url, headers=self.headers, params=params) as response:
+                async with session.get(url, headers=self.headers, params=params, timeout=10) as response:
                     if response.status == 200:
                         data = await response.json()
                         return data.get('data', {}).get('schedule', {}).get('events', [])
-                    else:
-                        logger.warning(f"API Riot getLive retornou status {response.status}")
-                        return []
+                    return []
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
             return []
     
-    async def get_scheduled_matches(self, league_ids=None):
-        """Buscar partidas agendadas da API oficial"""
+    async def get_scheduled_matches(self):
+        """Buscar partidas agendadas"""
         try:
             async with aiohttp.ClientSession() as session:
                 url = f"{self.base_urls['esports']}/getSchedule"
                 params = {'hl': 'pt-BR'}
-                if league_ids:
-                    params['leagueId'] = ','.join(league_ids)
                 
-                async with session.get(url, headers=self.headers, params=params) as response:
+                async with session.get(url, headers=self.headers, params=params, timeout=10) as response:
                     if response.status == 200:
                         data = await response.json()
                         return data.get('data', {}).get('schedule', {}).get('events', [])
-                    else:
-                        logger.warning(f"API Riot getSchedule retornou status {response.status}")
-                        return []
+                    return []
         except Exception as e:
             logger.error(f"Erro ao buscar agenda: {e}")
             return []
 
 class BotLoLV3Railway:
-    """Bot principal do Telegram para League of Legends"""
+    """Bot principal do Telegram para League of Legends - WEBHOOK v20+"""
     
     def __init__(self):
-        """Inicializar o bot com todas as funcionalidades"""
-        self.updater = Updater(TOKEN, use_context=True)
-        self.bot_instance = self.updater
+        """Inicializar o bot com webhook v20+"""
+        self.application = Application.builder().token(TOKEN).build()
         self.riot_client = RiotAPIClient()
         
         self.setup_commands()
-        logger.info("🤖 Bot V13 Railway inicializado - APENAS API OFICIAL DA RIOT")
+        logger.info("🤖 Bot V13 Railway inicializado - WEBHOOK v20+ SEM CONFLITOS")
     
     def setup_commands(self):
         """Configurar comandos do bot"""
-        dp = self.updater.dispatcher
-        
         # Comandos básicos
-        dp.add_handler(CommandHandler("start", self.start))
-        dp.add_handler(CommandHandler("help", self.help))
-        dp.add_handler(CommandHandler("agenda", self.agenda))
-        dp.add_handler(CommandHandler("proximas", self.agenda))
-        dp.add_handler(CommandHandler("partidas", self.partidas_ao_vivo))
+        self.application.add_handler(CommandHandler("start", self.start))
+        self.application.add_handler(CommandHandler("help", self.help))
+        self.application.add_handler(CommandHandler("agenda", self.agenda))
+        self.application.add_handler(CommandHandler("partidas", self.partidas_ao_vivo))
         
         # Callback handlers
-        dp.add_handler(CallbackQueryHandler(self.handle_callback))
+        self.application.add_handler(CallbackQueryHandler(self.handle_callback))
     
-    def start(self, update: Update, context):
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Comando /start"""
-        return self.show_main_menu(update, context)
+        return await self.show_main_menu(update, context)
     
-    def show_main_menu(self, update, context, edit_message=False):
+    async def show_main_menu(self, update, context, edit_message=False):
         """Mostrar menu principal"""
         keyboard = [
             [InlineKeyboardButton("📅 Próximas Partidas", callback_data="agenda"),
@@ -133,9 +123,9 @@ class BotLoLV3Railway:
         ]
         
         message_text = (
-            "🤖 **BOT LOL V13 RAILWAY - API OFICIAL RIOT**\n\n"
+            "🤖 **BOT LOL V13 RAILWAY - WEBHOOK v20+**\n\n"
             "🔗 **CONECTADO À API OFICIAL DA RIOT GAMES**\n"
-            "✅ **SEM DADOS FICTÍCIOS - APENAS DADOS REAIS**\n\n"
+            "✅ **SEM CONFLITOS - WEBHOOK ATIVO**\n\n"
             "🎯 **FUNCIONALIDADES DISPONÍVEIS:**\n"
             "• 📅 **Próximas Partidas** - Agenda oficial da Riot\n"
             "• 🎮 **Partidas ao Vivo** - Monitoramento em tempo real\n"
@@ -148,22 +138,22 @@ class BotLoLV3Railway:
         )
         
         if edit_message and hasattr(update, 'callback_query'):
-            return update.callback_query.edit_message_text(
+            return await update.callback_query.edit_message_text(
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
-            return update.message.reply_text(
+            return await update.message.reply_text(
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
     
-    def help(self, update: Update, context):
+    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Comando /help"""
         message_text = (
-            "📚 **GUIA DO BOT - APENAS API OFICIAL**\n\n"
+            "📚 **GUIA DO BOT - WEBHOOK v20+**\n\n"
             "🎯 **COMANDOS:**\n"
             "• `/start` - Menu principal\n"
             "• `/agenda` - Próximas partidas (API Riot)\n"
@@ -181,11 +171,11 @@ class BotLoLV3Railway:
             "🔄 **Sistema 100% baseado em dados reais!**"
         )
         
-        return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+        return await update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
     
-    def agenda(self, update: Update, context):
+    async def agenda(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Comando /agenda - Buscar próximas partidas"""
-        agenda_data = self._get_scheduled_matches()
+        agenda_data = await self._get_scheduled_matches()
         
         if agenda_data['matches']:
             message_text = (
@@ -223,15 +213,12 @@ class BotLoLV3Railway:
                 "💡 **Tente novamente em alguns minutos**"
             )
         
-        return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+        return await update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
     
-    def partidas_ao_vivo(self, update: Update, context):
+    async def partidas_ao_vivo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Comando /partidas - Buscar partidas ao vivo"""
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
-            loop.close()
+            live_matches = await self.riot_client.get_live_matches()
             
             if live_matches:
                 message_text = (
@@ -269,17 +256,17 @@ class BotLoLV3Railway:
                     "💡 **Tente novamente em alguns minutos**"
                 )
             
-            return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+            return await update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
             
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
-            return update.message.reply_text(
+            return await update.message.reply_text(
                 "❌ **Erro ao buscar partidas ao vivo**\n\n"
                 "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
             )
     
-    def _get_scheduled_matches(self):
+    async def _get_scheduled_matches(self):
         """Buscar partidas agendadas APENAS da API oficial da Riot Games"""
         try:
             brazil_tz = pytz.timezone('America/Sao_Paulo')
@@ -290,10 +277,7 @@ class BotLoLV3Railway:
             all_matches = []
             
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-                riot_matches = loop.run_until_complete(self.riot_client.get_scheduled_matches())
+                riot_matches = await self.riot_client.get_scheduled_matches()
                 
                 if riot_matches:
                     logger.info(f"✅ API Riot: {len(riot_matches)} partidas encontradas")
@@ -332,8 +316,6 @@ class BotLoLV3Railway:
                         except Exception as e:
                             logger.error(f"Erro ao processar partida da API Riot: {e}")
                             continue
-                
-                loop.close()
                 
                 all_matches.sort(key=lambda x: x['scheduled_time'])
                 
@@ -389,40 +371,98 @@ class BotLoLV3Railway:
             else:
                 return f"AGORA ({scheduled_time.strftime('%H:%M')})"
     
-    def handle_callback(self, update: Update, context):
+    async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle callback queries"""
         query = update.callback_query
-        query.answer()
+        await query.answer()
         
         if query.data == "menu_principal":
-            return self.show_main_menu(update, context, edit_message=True)
+            return await self.show_main_menu(update, context, edit_message=True)
         elif query.data == "agenda":
-            return self.agenda(update, context)
+            return await self.agenda(update, context)
         elif query.data == "partidas":
-            return self.partidas_ao_vivo(update, context)
+            return await self.partidas_ao_vivo(update, context)
         elif query.data == "help":
-            return self.help(update, context)
+            return await self.help(update, context)
         else:
-            return query.edit_message_text(
+            return await query.edit_message_text(
                 "🚧 **Funcionalidade em desenvolvimento**\n\n"
                 "Esta funcionalidade será implementada em breve.\n"
                 "Por enquanto, use apenas dados da API oficial da Riot.",
                 parse_mode=ParseMode.MARKDOWN
             )
-    
-    def run(self):
-        """Executar o bot"""
-        logger.info("🚀 Iniciando Bot LoL V13 Railway - APENAS API OFICIAL")
-        self.updater.start_polling()
-        self.updater.idle()
 
-def main():
-    """Função principal"""
+# Instância global do bot
+bot_instance = None
+
+@app.route('/health')
+def health_check():
+    """Health check para Railway"""
     try:
-        bot = BotLoLV3Railway()
-        bot.run()
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'service': 'bot_lol_v3_webhook_v20',
+            'version': 'v20+',
+            'mode': 'webhook',
+            'port': PORT,
+            'environment': 'railway' if os.getenv('RAILWAY_ENVIRONMENT_NAME') else 'local'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@app.route('/webhook', methods=['POST'])
+async def webhook():
+    """Webhook endpoint para receber updates do Telegram"""
+    try:
+        if bot_instance:
+            update = Update.de_json(request.get_json(), bot_instance.application.bot)
+            await bot_instance.application.process_update(update)
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        logger.error(f"Erro no webhook: {e}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+def run_flask():
+    """Executar Flask em thread separada"""
+    app.run(host='0.0.0.0', port=PORT, debug=False)
+
+async def main():
+    """Função principal"""
+    global bot_instance
+    
+    try:
+        # Inicializar bot
+        bot_instance = BotLoLV3Railway()
+        
+        # Inicializar aplicação
+        await bot_instance.application.initialize()
+        
+        # Configurar webhook
+        webhook_url = f"https://web-production-aa4e.up.railway.app/webhook"
+        await bot_instance.application.bot.set_webhook(webhook_url)
+        
+        logger.info(f"🚀 Bot iniciado com webhook: {webhook_url}")
+        
+        # Iniciar Flask em thread separada
+        flask_thread = threading.Thread(target=run_flask, daemon=True)
+        flask_thread.start()
+        
+        logger.info(f"🌐 Flask rodando na porta {PORT}")
+        
+        # Manter aplicação rodando
+        await bot_instance.application.start()
+        
+        # Loop infinito para manter o bot ativo
+        while True:
+            await asyncio.sleep(1)
+            
     except Exception as e:
         logger.error(f"❌ Erro crítico: {e}")
 
 if __name__ == "__main__":
-    main() 
+    asyncio.run(main()) 
