@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Bot LoL V13 Railway - Versão Webhook v20+ SEM CONFLITOS
+Bot LoL V13 Railway - Versão WEBHOOK v13 SEM CONFLITOS
 Sistema de apostas esportivas para League of Legends
 Integração com API oficial da Riot Games
 """
@@ -14,15 +14,15 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import pytz
 
-# Telegram imports v20+
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+# Telegram imports v13
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, Dispatcher
 from telegram.error import TelegramError
-from telegram.constants import ParseMode
 
 # Flask para webhook
 from flask import Flask, request, jsonify
 import threading
+import queue
 
 # Scientific computing
 import numpy as np
@@ -87,32 +87,34 @@ class RiotAPIClient:
             return []
 
 class BotLoLV3Railway:
-    """Bot principal do Telegram para League of Legends - WEBHOOK v20+"""
+    """Bot principal do Telegram para League of Legends - WEBHOOK v13"""
     
     def __init__(self):
-        """Inicializar o bot com webhook v20+"""
-        self.application = Application.builder().token(TOKEN).build()
+        """Inicializar o bot com webhook v13"""
+        self.updater = Updater(TOKEN, use_context=True)
+        self.dispatcher = self.updater.dispatcher
         self.riot_client = RiotAPIClient()
+        self.update_queue = queue.Queue()
         
         self.setup_commands()
-        logger.info("🤖 Bot V13 Railway inicializado - WEBHOOK v20+ SEM CONFLITOS")
+        logger.info("🤖 Bot V13 Railway inicializado - WEBHOOK v13 SEM CONFLITOS")
     
     def setup_commands(self):
         """Configurar comandos do bot"""
         # Comandos básicos
-        self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("help", self.help))
-        self.application.add_handler(CommandHandler("agenda", self.agenda))
-        self.application.add_handler(CommandHandler("partidas", self.partidas_ao_vivo))
+        self.dispatcher.add_handler(CommandHandler("start", self.start))
+        self.dispatcher.add_handler(CommandHandler("help", self.help))
+        self.dispatcher.add_handler(CommandHandler("agenda", self.agenda))
+        self.dispatcher.add_handler(CommandHandler("partidas", self.partidas_ao_vivo))
         
         # Callback handlers
-        self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        self.dispatcher.add_handler(CallbackQueryHandler(self.handle_callback))
     
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def start(self, update: Update, context: CallbackContext):
         """Comando /start"""
-        return await self.show_main_menu(update, context)
+        return self.show_main_menu(update, context)
     
-    async def show_main_menu(self, update, context, edit_message=False):
+    def show_main_menu(self, update, context, edit_message=False):
         """Mostrar menu principal"""
         keyboard = [
             [InlineKeyboardButton("📅 Próximas Partidas", callback_data="agenda"),
@@ -123,7 +125,7 @@ class BotLoLV3Railway:
         ]
         
         message_text = (
-            "🤖 **BOT LOL V13 RAILWAY - WEBHOOK v20+**\n\n"
+            "🤖 **BOT LOL V13 RAILWAY - WEBHOOK v13**\n\n"
             "🔗 **CONECTADO À API OFICIAL DA RIOT GAMES**\n"
             "✅ **SEM CONFLITOS - WEBHOOK ATIVO**\n\n"
             "🎯 **FUNCIONALIDADES DISPONÍVEIS:**\n"
@@ -138,22 +140,22 @@ class BotLoLV3Railway:
         )
         
         if edit_message and hasattr(update, 'callback_query'):
-            return await update.callback_query.edit_message_text(
+            return update.callback_query.edit_message_text(
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
-            return await update.message.reply_text(
+            return update.message.reply_text(
                 message_text,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
     
-    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def help(self, update: Update, context: CallbackContext):
         """Comando /help"""
         message_text = (
-            "📚 **GUIA DO BOT - WEBHOOK v20+**\n\n"
+            "📚 **GUIA DO BOT - WEBHOOK v13**\n\n"
             "🎯 **COMANDOS:**\n"
             "• `/start` - Menu principal\n"
             "• `/agenda` - Próximas partidas (API Riot)\n"
@@ -171,11 +173,15 @@ class BotLoLV3Railway:
             "🔄 **Sistema 100% baseado em dados reais!**"
         )
         
-        return await update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+        return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
     
-    async def agenda(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def agenda(self, update: Update, context: CallbackContext):
         """Comando /agenda - Buscar próximas partidas"""
-        agenda_data = await self._get_scheduled_matches()
+        # Usar asyncio para buscar dados
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        agenda_data = loop.run_until_complete(self._get_scheduled_matches())
+        loop.close()
         
         if agenda_data['matches']:
             message_text = (
@@ -213,12 +219,16 @@ class BotLoLV3Railway:
                 "💡 **Tente novamente em alguns minutos**"
             )
         
-        return await update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+        return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
     
-    async def partidas_ao_vivo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def partidas_ao_vivo(self, update: Update, context: CallbackContext):
         """Comando /partidas - Buscar partidas ao vivo"""
         try:
-            live_matches = await self.riot_client.get_live_matches()
+            # Usar asyncio para buscar dados
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+            loop.close()
             
             if live_matches:
                 message_text = (
@@ -256,11 +266,11 @@ class BotLoLV3Railway:
                     "💡 **Tente novamente em alguns minutos**"
                 )
             
-            return await update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
+            return update.message.reply_text(message_text, parse_mode=ParseMode.MARKDOWN)
             
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
-            return await update.message.reply_text(
+            return update.message.reply_text(
                 "❌ **Erro ao buscar partidas ao vivo**\n\n"
                 "Tente novamente em alguns minutos.",
                 parse_mode=ParseMode.MARKDOWN
@@ -371,26 +381,34 @@ class BotLoLV3Railway:
             else:
                 return f"AGORA ({scheduled_time.strftime('%H:%M')})"
     
-    async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    def handle_callback(self, update: Update, context: CallbackContext):
         """Handle callback queries"""
         query = update.callback_query
-        await query.answer()
+        query.answer()
         
         if query.data == "menu_principal":
-            return await self.show_main_menu(update, context, edit_message=True)
+            return self.show_main_menu(update, context, edit_message=True)
         elif query.data == "agenda":
-            return await self.agenda(update, context)
+            return self.agenda(update, context)
         elif query.data == "partidas":
-            return await self.partidas_ao_vivo(update, context)
+            return self.partidas_ao_vivo(update, context)
         elif query.data == "help":
-            return await self.help(update, context)
+            return self.help(update, context)
         else:
-            return await query.edit_message_text(
+            return query.edit_message_text(
                 "🚧 **Funcionalidade em desenvolvimento**\n\n"
                 "Esta funcionalidade será implementada em breve.\n"
                 "Por enquanto, use apenas dados da API oficial da Riot.",
                 parse_mode=ParseMode.MARKDOWN
             )
+    
+    def process_webhook_update(self, update_data):
+        """Processar update do webhook"""
+        try:
+            update = Update.de_json(update_data, self.updater.bot)
+            self.dispatcher.process_update(update)
+        except Exception as e:
+            logger.error(f"Erro ao processar update: {e}")
 
 # Instância global do bot
 bot_instance = None
@@ -402,8 +420,8 @@ def health_check():
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
-            'service': 'bot_lol_v3_webhook_v20',
-            'version': 'v20+',
+            'service': 'bot_lol_v3_webhook_v13',
+            'version': 'v13_webhook',
             'mode': 'webhook',
             'port': PORT,
             'environment': 'railway' if os.getenv('RAILWAY_ENVIRONMENT_NAME') else 'local'
@@ -421,14 +439,7 @@ def webhook():
     try:
         if bot_instance:
             update_data = request.get_json()
-            update = Update.de_json(update_data, bot_instance.application.bot)
-            
-            # Processar update de forma assíncrona
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(bot_instance.application.process_update(update))
-            loop.close()
-            
+            bot_instance.process_webhook_update(update_data)
         return jsonify({'status': 'ok'}), 200
     except Exception as e:
         logger.error(f"Erro no webhook: {e}")
@@ -438,7 +449,7 @@ def run_flask():
     """Executar Flask em thread separada"""
     app.run(host='0.0.0.0', port=PORT, debug=False)
 
-async def main():
+def main():
     """Função principal"""
     global bot_instance
     
@@ -446,14 +457,11 @@ async def main():
         # Inicializar bot
         bot_instance = BotLoLV3Railway()
         
-        # Inicializar aplicação
-        await bot_instance.application.initialize()
-        
         # Configurar webhook
         webhook_url = f"https://web-production-aa4e.up.railway.app/webhook"
-        await bot_instance.application.bot.set_webhook(webhook_url)
+        bot_instance.updater.bot.set_webhook(webhook_url)
         
-        logger.info(f"🚀 Bot iniciado com webhook: {webhook_url}")
+        logger.info(f"🚀 Bot iniciado com webhook v13: {webhook_url}")
         
         # Iniciar Flask em thread separada
         flask_thread = threading.Thread(target=run_flask, daemon=True)
@@ -461,15 +469,13 @@ async def main():
         
         logger.info(f"🌐 Flask rodando na porta {PORT}")
         
-        # Manter aplicação rodando
-        await bot_instance.application.start()
-        
-        # Loop infinito para manter o bot ativo
+        # Manter aplicação rodando sem polling
         while True:
-            await asyncio.sleep(1)
+            import time
+            time.sleep(1)
             
     except Exception as e:
         logger.error(f"❌ Erro crítico: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    main() 
