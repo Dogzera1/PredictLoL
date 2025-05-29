@@ -3050,6 +3050,9 @@ def main():
                 def webhook_v13():
                     try:
                         from flask import request
+                        
+                        logger.info("!!! DEBUG: FUNÇÃO WEBHOOK_V13 INICIADA !!!")
+
                         logger.info(f"📨 Webhook v13 recebido: {request.method} {request.path}")
 
                         update_data = request.get_json(force=True)
