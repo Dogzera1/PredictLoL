@@ -82,14 +82,14 @@ import aiohttp
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# ML imports
+# ML imports - Lazy loading para evitar timeout no Railway
 try:
-    from ml_prediction_system import MLPredictionSystem
-    ML_AVAILABLE = True
-    logger.info("🤖 Sistema de ML real importado com sucesso")
+    import ml_prediction_system
+    ML_MODULE_AVAILABLE = True
+    logger.info("🤖 Módulo ML importado (lazy loading)")
 except ImportError as e:
-    ML_AVAILABLE = False
-    logger.warning(f"⚠️ ML não disponível: {e}")
+    ML_MODULE_AVAILABLE = False
+    logger.warning(f"⚠️ Módulo ML não disponível: {e}")
 
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
@@ -379,15 +379,13 @@ class DynamicPredictionSystem:
     """Sistema de predição dinâmica com ML real + algoritmos como fallback"""
 
     def __init__(self):
-        # Inicializar ML real se disponível
+        # Inicializar ML real se disponível (com timeout para Railway)
         self.ml_system = None
-        if ML_AVAILABLE:
-            try:
-                self.ml_system = MLPredictionSystem()
-                logger.info("🤖 Sistema de ML REAL inicializado com sucesso")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao inicializar ML: {e}")
-                self.ml_system = None
+        self.ml_loading = False
+        
+        if ML_MODULE_AVAILABLE:
+            # Tentar carregar ML de forma assíncrona/com timeout
+            self._initialize_ml_with_timeout()
         
         # Base de dados de times com ratings atualizados (dados reais) - FALLBACK
         self.teams_database = {
@@ -413,6 +411,61 @@ class DynamicPredictionSystem:
         
         ml_status = "ML REAL" if self.ml_system else "ALGORITMOS MATEMÁTICOS"
         logger.info(f"🔮 Sistema de Predição inicializado: {ml_status}")
+
+    def _initialize_ml_with_timeout(self):
+        """Inicializa ML com timeout para evitar travamento no Railway"""
+        try:
+            import threading
+            
+            # Verificar se é Railway
+            is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME'))
+            
+            if is_railway:
+                # No Railway, atrasar inicialização do ML para não bloquear startup
+                logger.info("🚀 Railway detectado - ML será carregado sob demanda")
+                return
+            
+            timeout = 30  # Timeout local
+            
+            def init_ml():
+                try:
+                    self.ml_loading = True
+                    self.ml_system = ml_prediction_system.MLPredictionSystem()
+                    logger.info("🤖 Sistema de ML REAL inicializado com sucesso")
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao inicializar ML: {e}")
+                    self.ml_system = None
+                finally:
+                    self.ml_loading = False
+            
+            # Tentar inicializar em thread separada com timeout
+            ml_thread = threading.Thread(target=init_ml, daemon=True)
+            ml_thread.start()
+            ml_thread.join(timeout=timeout)
+            
+            if ml_thread.is_alive():
+                logger.warning(f"⚠️ ML timeout ({timeout}s) - usando algoritmos matemáticos")
+                self.ml_system = None
+                self.ml_loading = False
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na inicialização ML com timeout: {e}")
+            self.ml_system = None
+            self.ml_loading = False
+
+    def _ensure_ml_loaded(self):
+        """Carrega ML sob demanda se não foi carregado ainda (Railway)"""
+        if ML_MODULE_AVAILABLE and self.ml_system is None and not self.ml_loading:
+            try:
+                logger.info("🤖 Carregando ML sob demanda...")
+                self.ml_loading = True
+                self.ml_system = ml_prediction_system.MLPredictionSystem()
+                logger.info("🤖 ML carregado sob demanda com sucesso")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao carregar ML sob demanda: {e}")
+                self.ml_system = None
+            finally:
+                self.ml_loading = False
 
     async def predict_live_match(self, match: Dict) -> Dict:
         """Predição com ML real ou fallback para algoritmos matemáticos"""
@@ -452,6 +505,34 @@ class DynamicPredictionSystem:
                     logger.info(f"⚠️ ML predição baixa confiança, usando fallback")
                 except Exception as e:
                     logger.warning(f"⚠️ Erro no ML, usando fallback: {e}")
+            elif ML_MODULE_AVAILABLE and not self.ml_loading:
+                # Tentar carregar ML sob demanda (Railway)
+                self._ensure_ml_loaded()
+                if self.ml_system:
+                    # Tentar novamente após carregar
+                    try:
+                        ml_prediction = self.ml_system.predict_match(team1_name, team2_name, league)
+                        if ml_prediction and ml_prediction.get('confidence') in ['Alta', 'Muito Alta']:
+                            return {
+                                'team1': team1_name, 'team2': team2_name,
+                                'team1_win_probability': ml_prediction['team1_win_probability'], 
+                                'team2_win_probability': ml_prediction['team2_win_probability'],
+                                'team1_odds': 1/ml_prediction['team1_win_probability'] if ml_prediction['team1_win_probability'] > 0 else 2.0,
+                                'team2_odds': 1/ml_prediction['team2_win_probability'] if ml_prediction['team2_win_probability'] > 0 else 2.0,
+                                'favored_team': ml_prediction['predicted_winner'],
+                                'win_probability': max(ml_prediction['team1_win_probability'], ml_prediction['team2_win_probability']),
+                                'confidence': ml_prediction['confidence'],
+                                'analysis': ml_prediction['ml_analysis'],
+                                'league': league,
+                                'prediction_factors': {
+                                    'ml_models_used': ml_prediction.get('model_predictions', {}),
+                                    'best_model': ml_prediction.get('best_model_used', 'ensemble'),
+                                    'system_type': 'MACHINE_LEARNING_REAL'
+                                },
+                                'timestamp': datetime.now(), 'cache_status': 'ml_on_demand'
+                            }
+                    except Exception as e:
+                        logger.warning(f"⚠️ Erro no ML sob demanda: {e}")
             
             # 🧮 FALLBACK: ALGORITMOS MATEMÁTICOS
             logger.info(f"🧮 Usando algoritmos matemáticos para {team1_name} vs {team2_name}")
@@ -1378,7 +1459,7 @@ Clique nos botões abaixo para navegação rápida:
 
 ⭐ **Recomendação:** {tip['recommended_team']}
 
-🤖 **Sistema:** {'ML REAL' if ML_AVAILABLE else 'Algoritmos Matemáticos'}
+🤖 **Sistema:** {'ML REAL' if ML_MODULE_AVAILABLE else 'Algoritmos Matemáticos'}
                 """
             else:
                 tip_message = """
@@ -1743,7 +1824,7 @@ Use o botão "Cadastrar Grupo" abaixo
 
 ⭐ **Recomendação:** {tip['recommended_team']}
 
-🤖 **Sistema:** {'ML REAL' if ML_AVAILABLE else 'Algoritmos Matemáticos'}
+🤖 **Sistema:** {'ML REAL' if ML_MODULE_AVAILABLE else 'Algoritmos Matemáticos'}
                 """
             else:
                 tip_message = """
