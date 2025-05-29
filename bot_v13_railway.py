@@ -78,14 +78,23 @@ from telegram.error import TelegramError
 import numpy as np
 import aiohttp
 
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# ML imports
+try:
+    from ml_prediction_system import MLPredictionSystem
+    ML_AVAILABLE = True
+    logger.info("🤖 Sistema de ML real importado com sucesso")
+except ImportError as e:
+    ML_AVAILABLE = False
+    logger.warning(f"⚠️ ML não disponível: {e}")
+
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
 OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
 PORT = int(os.getenv('PORT', 5800))
-
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 # Flask app para healthcheck
 app = Flask(__name__)
@@ -367,10 +376,20 @@ class RiotAPIClient:
             return 'Unknown League'
 
 class DynamicPredictionSystem:
-    """Sistema de predição dinâmica baseado em dados reais da API da Riot"""
+    """Sistema de predição dinâmica com ML real + algoritmos como fallback"""
 
     def __init__(self):
-        # Base de dados de times com ratings atualizados (dados reais)
+        # Inicializar ML real se disponível
+        self.ml_system = None
+        if ML_AVAILABLE:
+            try:
+                self.ml_system = MLPredictionSystem()
+                logger.info("🤖 Sistema de ML REAL inicializado com sucesso")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao inicializar ML: {e}")
+                self.ml_system = None
+        
+        # Base de dados de times com ratings atualizados (dados reais) - FALLBACK
         self.teams_database = {
             # LCK
             'T1': {'rating': 95, 'region': 'LCK', 'recent_form': 0.85, 'consistency': 0.88},
@@ -391,10 +410,12 @@ class DynamicPredictionSystem:
         }
         self.prediction_cache = {}
         self.cache_duration = 300  # 5 minutos
-        logger.info("🔮 Sistema de Predição Dinâmica inicializado com dados reais")
+        
+        ml_status = "ML REAL" if self.ml_system else "ALGORITMOS MATEMÁTICOS"
+        logger.info(f"🔮 Sistema de Predição inicializado: {ml_status}")
 
     async def predict_live_match(self, match: Dict) -> Dict:
-        """Predição dinâmica para partida ao vivo usando dados reais"""
+        """Predição com ML real ou fallback para algoritmos matemáticos"""
         try:
             teams = match.get('teams', [])
             if len(teams) < 2:
@@ -404,54 +425,94 @@ class DynamicPredictionSystem:
             team2_name = teams[1].get('name', 'Team 2')
             league = match.get('league', 'Unknown')
 
-            # Buscar dados dos times
-            team1_data = self._get_team_data(team1_name, league)
-            team2_data = self._get_team_data(team2_name, league)
-
-            # Calcular probabilidades
-            base_prob = self._calculate_base_probability(team1_data, team2_data)
-            region_adj = self._calculate_region_adjustment(team1_data, team2_data)
-            form_adj = self._calculate_form_adjustment(team1_data, team2_data)
-
-            team1_prob = max(0.15, min(0.85, base_prob + region_adj + form_adj))
-            team2_prob = 1 - team1_prob
-
-            # Calcular odds
-            team1_odds = 1 / team1_prob if team1_prob > 0 else 2.0
-            team2_odds = 1 / team2_prob if team2_prob > 0 else 2.0
-
-            # Determinar confiança
-            confidence = self._calculate_confidence(team1_data, team2_data)
-
-            # Determinar favorito
-            if team1_prob > team2_prob:
-                favored_team = team1_name
-                win_probability = team1_prob
-            else:
-                favored_team = team2_name
-                win_probability = team2_prob
-
-            # Gerar análise
-            analysis = self._generate_match_analysis(
-                team1_name, team2_name, team1_data, team2_data, team1_prob
-            )
-
-            return {
-                'team1': team1_name, 'team2': team2_name,
-                'team1_win_probability': team1_prob, 'team2_win_probability': team2_prob,
-                'team1_odds': team1_odds, 'team2_odds': team2_odds,
-                'favored_team': favored_team, 'win_probability': win_probability,
-                'confidence': confidence, 'analysis': analysis, 'league': league,
-                'prediction_factors': {
-                    'team1_rating': team1_data['rating'], 'team2_rating': team2_data['rating'],
-                    'team1_form': team1_data['recent_form'], 'team2_form': team2_data['recent_form']
-                },
-                'timestamp': datetime.now(), 'cache_status': 'miss'
-            }
+            # 🤖 TENTAR ML REAL PRIMEIRO
+            if self.ml_system:
+                try:
+                    ml_prediction = self.ml_system.predict_match(team1_name, team2_name, league)
+                    if ml_prediction and ml_prediction.get('confidence') in ['Alta', 'Muito Alta']:
+                        # Converter para formato esperado
+                        return {
+                            'team1': team1_name, 'team2': team2_name,
+                            'team1_win_probability': ml_prediction['team1_win_probability'], 
+                            'team2_win_probability': ml_prediction['team2_win_probability'],
+                            'team1_odds': 1/ml_prediction['team1_win_probability'] if ml_prediction['team1_win_probability'] > 0 else 2.0,
+                            'team2_odds': 1/ml_prediction['team2_win_probability'] if ml_prediction['team2_win_probability'] > 0 else 2.0,
+                            'favored_team': ml_prediction['predicted_winner'],
+                            'win_probability': max(ml_prediction['team1_win_probability'], ml_prediction['team2_win_probability']),
+                            'confidence': ml_prediction['confidence'],
+                            'analysis': ml_prediction['ml_analysis'],
+                            'league': league,
+                            'prediction_factors': {
+                                'ml_models_used': ml_prediction.get('model_predictions', {}),
+                                'best_model': ml_prediction.get('best_model_used', 'ensemble'),
+                                'system_type': 'MACHINE_LEARNING_REAL'
+                            },
+                            'timestamp': datetime.now(), 'cache_status': 'ml_real'
+                        }
+                    logger.info(f"⚠️ ML predição baixa confiança, usando fallback")
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro no ML, usando fallback: {e}")
+            
+            # 🧮 FALLBACK: ALGORITMOS MATEMÁTICOS
+            logger.info(f"🧮 Usando algoritmos matemáticos para {team1_name} vs {team2_name}")
+            return await self._predict_with_algorithms(match)
 
         except Exception as e:
             logger.error(f"❌ Erro na predição: {e}")
             return self._get_fallback_prediction()
+
+    async def _predict_with_algorithms(self, match: Dict) -> Dict:
+        """Predição usando algoritmos matemáticos (fallback)"""
+        teams = match.get('teams', [])
+        team1_name = teams[0].get('name', 'Team 1')
+        team2_name = teams[1].get('name', 'Team 2')
+        league = match.get('league', 'Unknown')
+
+        # Buscar dados dos times
+        team1_data = self._get_team_data(team1_name, league)
+        team2_data = self._get_team_data(team2_name, league)
+
+        # Calcular probabilidades
+        base_prob = self._calculate_base_probability(team1_data, team2_data)
+        region_adj = self._calculate_region_adjustment(team1_data, team2_data)
+        form_adj = self._calculate_form_adjustment(team1_data, team2_data)
+
+        team1_prob = max(0.15, min(0.85, base_prob + region_adj + form_adj))
+        team2_prob = 1 - team1_prob
+
+        # Calcular odds
+        team1_odds = 1 / team1_prob if team1_prob > 0 else 2.0
+        team2_odds = 1 / team2_prob if team2_prob > 0 else 2.0
+
+        # Determinar confiança
+        confidence = self._calculate_confidence(team1_data, team2_data)
+
+        # Determinar favorito
+        if team1_prob > team2_prob:
+            favored_team = team1_name
+            win_probability = team1_prob
+        else:
+            favored_team = team2_name
+            win_probability = team2_prob
+
+        # Gerar análise
+        analysis = self._generate_match_analysis(
+            team1_name, team2_name, team1_data, team2_data, team1_prob
+        )
+
+        return {
+            'team1': team1_name, 'team2': team2_name,
+            'team1_win_probability': team1_prob, 'team2_win_probability': team2_prob,
+            'team1_odds': team1_odds, 'team2_odds': team2_odds,
+            'favored_team': favored_team, 'win_probability': win_probability,
+            'confidence': confidence, 'analysis': analysis, 'league': league,
+            'prediction_factors': {
+                'team1_rating': team1_data['rating'], 'team2_rating': team2_data['rating'],
+                'team1_form': team1_data['recent_form'], 'team2_form': team2_data['recent_form'],
+                'system_type': 'MATHEMATICAL_ALGORITHMS'
+            },
+            'timestamp': datetime.now(), 'cache_status': 'algorithms'
+        }
 
     def _get_team_data(self, team_name: str, league: str) -> Dict:
         """Busca dados reais do time"""
@@ -765,21 +826,31 @@ class ScheduleManager:
                 events = data['data']['events']
 
             if events:
-                cutoff_date = datetime.now() + timedelta(days=days_ahead)
+                # CORREÇÃO: Usar timezone aware para comparação
+                from datetime import timezone
+                cutoff_date = datetime.now(timezone.utc) + timedelta(days=days_ahead)
+                now_utc = datetime.now(timezone.utc)
+                
                 for event in events:
                     try:
                         start_time_str = event.get('startTime', '')
                         if start_time_str:
+                            # Converter para datetime com timezone
                             start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
-                            if start_time <= cutoff_date and start_time > datetime.now():
+                            
+                            # Verificar se está no intervalo desejado
+                            if now_utc <= start_time <= cutoff_date:
                                 teams = self._extract_teams_from_event(event)
                                 if len(teams) >= 2:
+                                    # Converter para horário local para exibição
+                                    local_time = start_time.astimezone()
+                                    
                                     match = {
                                         'teams': teams,
                                         'league': self._extract_league_from_event(event),
                                         'tournament': event.get('tournament', {}).get('name', 'Tournament'),
                                         'start_time': start_time_str,
-                                        'start_time_formatted': start_time.strftime('%d/%m %H:%M'),
+                                        'start_time_formatted': local_time.strftime('%d/%m %H:%M'),
                                         'status': event.get('state', 'scheduled'),
                                         'match_id': event.get('id', f"match_{len(matches)}")
                                     }
@@ -833,7 +904,8 @@ class ScheduleManager:
 
     def get_matches_today(self) -> List[Dict]:
         """Retorna partidas de hoje"""
-        today = datetime.now().date()
+        from datetime import timezone
+        today = datetime.now(timezone.utc).date()
         today_matches = []
 
         for match in self.scheduled_matches:
@@ -1305,6 +1377,8 @@ Clique nos botões abaixo para navegação rápida:
 {tip['reasoning']}
 
 ⭐ **Recomendação:** {tip['recommended_team']}
+
+🤖 **Sistema:** {'ML REAL' if ML_AVAILABLE else 'Algoritmos Matemáticos'}
                 """
             else:
                 tip_message = """
@@ -1668,6 +1742,8 @@ Use o botão "Cadastrar Grupo" abaixo
 {tip['reasoning']}
 
 ⭐ **Recomendação:** {tip['recommended_team']}
+
+🤖 **Sistema:** {'ML REAL' if ML_AVAILABLE else 'Algoritmos Matemáticos'}
                 """
             else:
                 tip_message = """
