@@ -3048,7 +3048,31 @@ def main():
 
                 @app.route(webhook_path, methods=['POST'])
                 def webhook_v13():
-                    return "OK", 200
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    
+                    try:
+                        logger.info("🔷 DEBUG: Webhook_v13 iniciado")
+                        from flask import request
+                        logger.info(f"🔷 DEBUG: Request method={request.method}, path={request.path}")
+                        logger.info(f"🔷 DEBUG: Request headers={dict(request.headers)}")
+                        logger.info(f"🔷 DEBUG: Request content_type={request.content_type}")
+                        
+                        # Tentar obter dados
+                        try:
+                            data = request.get_data()
+                            logger.info(f"🔷 DEBUG: Raw data length={len(data) if data else 0}")
+                        except Exception as data_error:
+                            logger.error(f"🔷 DEBUG: Erro ao obter raw data: {data_error}")
+                        
+                        logger.info("🔷 DEBUG: Retornando OK")
+                        return "OK", 200
+                        
+                    except Exception as e:
+                        logger.error(f"🔷 DEBUG: Erro na função webhook: {e}")
+                        import traceback
+                        logger.error(f"🔷 DEBUG: Traceback: {traceback.format_exc()}")
+                        return "ERROR", 500
 
                 # Configurar webhook
                 railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
@@ -3088,18 +3112,18 @@ def main():
 
                 logger.info("✅ Bot configurado (Railway webhook v13) - Iniciando Flask...")
 
-                # Configurar Flask para produção
-                app.config['ENV'] = 'production'
-                app.config['DEBUG'] = False
+                # Configurar Flask para DEBUG - ATIVADO PARA DIAGNÓSTICO
+                app.config['ENV'] = 'development'  # Mudado para development
+                app.config['DEBUG'] = True         # Ativado debug
 
                 # Log detalhado para Railway v13
-                logger.info(f"🌐 Iniciando Flask v13 na porta {PORT}")
+                logger.info(f"🌐 Iniciando Flask v13 na porta {PORT} - DEBUG MODE ATIVADO")
                 logger.info(f"🔗 Health check disponível em: /health")
                 logger.info(f"🔗 Webhook disponível em: {webhook_url}")
                 logger.info(f"🔗 Root disponível em: /")
                 logger.info(f"🔗 Ping disponível em: /ping")
 
-                app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
+                app.run(host='0.0.0.0', port=PORT, debug=True, threaded=True)
 
             else:
                 # Modo Local - Polling v13
