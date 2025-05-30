@@ -2502,10 +2502,6 @@ async def main():
             total_handlers = sum(len(handlers) for handlers in dispatcher.handlers.values())
             logger.info(f"✅ {total_handlers} handlers registrados (Updater v13-19)")
 
-        # Contar handlers
-        total_handlers = len(application.handlers[0])
-        logger.info(f"✅ {total_handlers} handlers registrados no application v20+")
-
         if is_railway:
             # Modo Railway - Webhook
             logger.info("🚀 Detectado ambiente Railway - Configurando webhook")
