@@ -18,6 +18,7 @@ from dataclasses import dataclass
 import json
 import pytz
 import random
+import concurrent.futures
 
 # VERIFICAÇÃO CRÍTICA DE CONFLITOS NO INÍCIO
 def early_conflict_check():
@@ -3663,11 +3664,21 @@ Use /live para ver todas as partidas ao vivo.
     def _handle_schedule_callback(self, query):
         """Handle callback para agenda"""
         try:
-            # Buscar partidas agendadas
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            scheduled_matches = loop.run_until_complete(self.schedule_manager.get_scheduled_matches())
-            loop.close()
+            # Usar método síncrono para evitar conflitos de event loop
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Se o loop já está rodando, usar task
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._get_schedule_sync)
+                        scheduled_matches = future.result(timeout=10)
+                else:
+                    scheduled_matches = loop.run_until_complete(self.schedule_manager.get_scheduled_matches())
+            except:
+                # Fallback para método síncrono
+                scheduled_matches = []
 
             if scheduled_matches:
                 message = "📅 **AGENDA DE PARTIDAS** 📅\n\n"
@@ -3698,14 +3709,34 @@ Use /live para ver todas as partidas ao vivo.
             logger.error(f"Erro no callback schedule: {e}")
             query.edit_message_text("❌ Erro ao carregar agenda. Tente novamente.")
 
+    def _get_schedule_sync(self):
+        """Método síncrono para buscar agenda"""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self.schedule_manager.get_scheduled_matches())
+        finally:
+            loop.close()
+
     def _handle_live_matches_callback(self, query):
         """Handle callback para partidas ao vivo"""
         try:
-            # Buscar partidas ao vivo
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
-            loop.close()
+            # Usar método síncrono para evitar conflitos de event loop
+            try:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Se o loop já está rodando, usar task
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._get_live_matches_sync)
+                        live_matches = future.result(timeout=10)
+                else:
+                    live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+            except:
+                # Fallback para método síncrono
+                live_matches = []
 
             if live_matches:
                 message = "🔴 **PARTIDAS AO VIVO** 🔴\n\n"
@@ -3735,6 +3766,16 @@ Use /live para ver todas as partidas ao vivo.
         except Exception as e:
             logger.error(f"Erro no callback live_matches: {e}")
             query.edit_message_text("❌ Erro ao carregar partidas ao vivo. Tente novamente.")
+
+    def _get_live_matches_sync(self):
+        """Método síncrono para buscar partidas ao vivo"""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self.riot_client.get_live_matches())
+        finally:
+            loop.close()
 
     def _handle_units_info_callback(self, query):
         """Handle callback para informações das unidades"""
@@ -3787,20 +3828,26 @@ Use /live para ver todas as partidas ao vivo.
 • Critério mínimo: 75% confiança
 • EV mínimo: 8%
 • Limite semanal: SEM LIMITE
-• Frequência: 3 minutos
+
+⚡ **Para usar:**
+1. /live - Ver partidas ao vivo
+2. /tips - Gerar predições profissionais
+3. /monitoring - Acompanhar análises
+
+💡 O sistema analisa automaticamente partidas ao vivo e gera tips quando detecta oportunidades profissionais.
             """
 
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar Status", callback_data="monitoring")],
-                [InlineKeyboardButton("🔍 Forçar Scan", callback_data="force_scan")],
-                [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")]
+                [InlineKeyboardButton("🎮 Partidas ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
+                [InlineKeyboardButton("📊 Monitoramento", callback_data="monitoring")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
             
         except Exception as e:
             logger.error(f"Erro no callback monitoring: {e}")
-            query.edit_message_text("❌ Erro ao carregar status de monitoramento.")
+            query.edit_message_text("❌ Erro ao carregar monitoramento.")
 
     def _handle_predictions_callback(self, query):
         """Handle callback para predições"""
@@ -4574,7 +4621,46 @@ async def main():
                     logger.debug(f"Webhook já estava removido v20+: {e}")
 
                 logger.info("🔄 Iniciando polling v20+...")
-                application.run_polling(drop_pending_updates=True)
+                
+                # Corrigir problema do event loop
+                try:
+                    # Primeiro tentar método padrão
+                    application.run_polling(drop_pending_updates=True)
+                except RuntimeError as e:
+                    if "event loop" in str(e).lower():
+                        logger.info("🔄 Event loop em execução, usando método alternativo...")
+                        # Método alternativo para event loop já rodando
+                        await application.initialize()
+                        await application.start()
+                        await application.updater.start_polling(drop_pending_updates=True)
+                        
+                        logger.info("✅ Bot iniciado com polling v20+ (método alternativo)")
+                        
+                        # Manter o bot rodando
+                        try:
+                            import signal
+                            import asyncio
+                            
+                            # Configurar handlers de sinal
+                            def signal_handler(signum, frame):
+                                logger.info("🛑 Sinal recebido, parando bot...")
+                                asyncio.create_task(application.stop())
+                                asyncio.create_task(application.shutdown())
+                                
+                            signal.signal(signal.SIGINT, signal_handler)
+                            signal.signal(signal.SIGTERM, signal_handler)
+                            
+                            # Loop infinito assíncrono
+                            while True:
+                                await asyncio.sleep(1)
+                                
+                        except KeyboardInterrupt:
+                            logger.info("🛑 Parando bot...")
+                        finally:
+                            await application.stop()
+                            await application.shutdown()
+                    else:
+                        raise
             
             else:
                 # Polling v13-19
