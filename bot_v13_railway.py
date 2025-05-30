@@ -1658,7 +1658,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 
 ⏰ Último alerta: {alert_stats['last_tip_alert'].strftime('%d/%m %H:%M') if alert_stats['last_tip_alert'] else 'Nunca'}
                     """
-
+                    
                     keyboard = [
                         [InlineKeyboardButton("❌ Desativar Alertas", callback_data=f"unregister_alerts_{chat_id}")],
                         [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="alert_stats")],
@@ -1717,7 +1717,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 
 💡 **Dica:** Crie um grupo privado só para os tips!
                 """
-
+                
                 keyboard = [
                     [InlineKeyboardButton("📖 Como Usar", callback_data="alert_help")],
                     [InlineKeyboardButton("🎯 Testar Tip", callback_data="tips")],
@@ -1730,6 +1730,162 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
         except Exception as e:
             logger.error(f"Erro no comando alerts: {e}")
             update.message.reply_text("❌ Erro no sistema de alertas. Tente novamente.")
+
+    def units_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /units - Explicação do sistema de unidades"""
+        try:
+            units_info = self.tips_system.units_system.get_units_explanation()
+            
+            # Adicionar informações específicas do bot
+            additional_info = f"""
+
+💰 **CONFIGURAÇÃO ATUAL:**
+• Bankroll base: $1000.00
+• 1 unidade = $10.00 (1% do bankroll)
+• Máximo por aposta: 5 unidades ($50.00)
+• Mínimo por aposta: 0.5 unidades ($5.00)
+
+📊 **PERFORMANCE ATUAL:**
+• Total de apostas registradas: {self.tips_system.units_system.performance_stats['total_bets']}
+• Unidades apostadas: {self.tips_system.units_system.performance_stats['total_units_staked']:.1f}
+• ROI: {self.tips_system.units_system.performance_stats['roi_percentage']:.1f}%
+
+🔧 **AJUSTES DISPONÍVEIS:**
+Use /performance para estatísticas detalhadas
+Use /history para histórico completo
+            """
+
+            complete_message = units_info + additional_info
+
+            keyboard = [
+                [InlineKeyboardButton("📊 Performance", callback_data="performance_stats")],
+                [InlineKeyboardButton("📋 Histórico", callback_data="bet_history")],
+                [InlineKeyboardButton("🎯 Gerar Tip", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(complete_message, reply_markup=reply_markup, parse_mode="Markdown")
+
+        except Exception as e:
+            logger.error(f"Erro no comando units: {e}")
+            update.message.reply_text("❌ Erro ao buscar informações de unidades. Tente novamente.")
+
+    def performance_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /performance - Performance do sistema de unidades"""
+        try:
+            stats = self.tips_system.units_system.performance_stats
+            
+            performance_message = f"""
+📊 **PERFORMANCE DO SISTEMA DE UNIDADES** 📊
+
+🎲 **ESTATÍSTICAS GERAIS:**
+• Total de apostas: {stats['total_bets']}
+• Vitórias: {stats['wins']}
+• Derrotas: {stats['losses']}
+• Strike Rate: {stats['strike_rate']:.1f}%
+
+💰 **UNIDADES:**
+• Total apostado: {stats['total_units_staked']:.1f} unidades
+• Lucro/Prejuízo: {stats['total_units_profit']:.1f} unidades
+• ROI: {stats['roi_percentage']:.1f}%
+
+💵 **VALORES (Bankroll $1000):**
+• Valor apostado: ${stats['total_units_staked'] * 10:.2f}
+• Lucro/Prejuízo: ${stats['total_units_profit'] * 10:.2f}
+• Saldo atual: ${1000 + (stats['total_units_profit'] * 10):.2f}
+
+📈 **ANÁLISE:**
+"""
+            
+            if stats['total_bets'] == 0:
+                performance_message += """
+ℹ️ **SEM DADOS AINDA**
+• Nenhuma aposta registrada ainda
+• Sistema pronto para começar
+• Use /tips para gerar primeira oportunidade
+                """
+            else:
+                if stats['roi_percentage'] > 10:
+                    performance_message += "🔥 **EXCELENTE PERFORMANCE!** ROI acima de 10%"
+                elif stats['roi_percentage'] > 5:
+                    performance_message += "✅ **BOA PERFORMANCE!** ROI positivo e consistente"
+                elif stats['roi_percentage'] > 0:
+                    performance_message += "📈 **PERFORMANCE POSITIVA** - Mantendo lucro"
+                else:
+                    performance_message += "⚠️ **ATENÇÃO** - Performance negativa, revisar estratégia"
+
+            keyboard = [
+                [InlineKeyboardButton("📋 Ver Histórico", callback_data="bet_history")],
+                [InlineKeyboardButton("🎯 Novo Tip", callback_data="tips")],
+                [InlineKeyboardButton("📊 Sistema Unidades", callback_data="units_info")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(performance_message, reply_markup=reply_markup, parse_mode="Markdown")
+
+        except Exception as e:
+            logger.error(f"Erro no comando performance: {e}")
+            update.message.reply_text("❌ Erro ao buscar performance. Tente novamente.")
+
+    def history_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /history - Histórico de apostas"""
+        try:
+            bet_history = self.tips_system.units_system.bet_history
+            
+            if not bet_history:
+                history_message = """
+📋 **HISTÓRICO DE APOSTAS** 📋
+
+ℹ️ **NENHUMA APOSTA REGISTRADA**
+
+🎯 **Como funciona:**
+• Sistema registra automaticamente tips gerados
+• Cada tip vira uma entrada no histórico
+• Performance calculada automaticamente
+
+🚀 **Para começar:**
+• Use /tips para gerar primeira oportunidade
+• Tips profissionais são registrados automaticamente
+• Acompanhe performance em tempo real
+
+💡 **Dica:** O sistema só registra tips que atendem aos critérios profissionais (75%+ confiança, 8%+ EV)
+                """
+            else:
+                history_message = f"""
+📋 **HISTÓRICO DE APOSTAS** 📋
+
+📊 **ÚLTIMAS {min(len(bet_history), 10)} APOSTAS:**
+
+"""
+                for i, bet in enumerate(bet_history[-10:], 1):
+                    result_emoji = "✅" if bet.get('result') == 'win' else "❌" if bet.get('result') == 'loss' else "⏳"
+                    history_message += f"""
+**{i}. {bet.get('team', 'Team')}** {result_emoji}
+• Unidades: {bet.get('units', 0):.1f}
+• Data: {bet.get('date', 'N/A')}
+• Liga: {bet.get('league', 'N/A')}
+• Resultado: {bet.get('result', 'Pendente')}
+
+"""
+
+                history_message += f"""
+📈 **RESUMO:**
+• Total de registros: {len(bet_history)}
+• Exibindo: {min(len(bet_history), 10)} mais recentes
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("📊 Ver Performance", callback_data="performance_stats")],
+                [InlineKeyboardButton("🎯 Novo Tip", callback_data="tips")],
+                [InlineKeyboardButton("📊 Sistema Unidades", callback_data="units_info")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(history_message, reply_markup=reply_markup, parse_mode="Markdown")
+
+        except Exception as e:
+            logger.error(f"Erro no comando history: {e}")
+            update.message.reply_text("❌ Erro ao buscar histórico. Tente novamente.")
 
     def callback_handler(self, update: Update, context: CallbackContext) -> None:
         """Handler para callbacks dos botões"""
@@ -1766,6 +1922,12 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
                 self._handle_unregister_alerts_callback(query, chat_id)
             elif data == "alert_help":
                 self._handle_alert_help_callback(query)
+            elif data == "performance_stats":
+                self._handle_performance_stats_callback(query)
+            elif data == "bet_history":
+                self._handle_bet_history_callback(query)
+            elif data == "units_info":
+                self._handle_units_info_callback(query)
             else:
                 query.edit_message_text("❌ Opção não reconhecida.")
 
@@ -1979,6 +2141,112 @@ Use o botão "Cadastrar Novamente" abaixo
 💡 **Dica:** Crie um grupo privado só para os tips!
         """
         query.edit_message_text(help_message, parse_mode="Markdown")
+
+    def _handle_performance_stats_callback(self, query):
+        """Handle callback para estatísticas de performance"""
+        stats = self.tips_system.units_system.performance_stats
+        stats_message = f"""
+📊 **ESTATÍSTICAS DO SISTEMA DE UNIDADES** 📊
+
+🎲 **ESTATÍSTICAS GERAIS:**
+• Total de apostas: {stats['total_bets']}
+• Vitórias: {stats['wins']}
+• Derrotas: {stats['losses']}
+• Strike Rate: {stats['strike_rate']:.1f}%
+
+💰 **UNIDADES:**
+• Total apostado: {stats['total_units_staked']:.1f} unidades
+• Lucro/Prejuízo: {stats['total_units_profit']:.1f} unidades
+• ROI: {stats['roi_percentage']:.1f}%
+
+💵 **VALORES (Bankroll $1000):**
+• Valor apostado: ${stats['total_units_staked'] * 10:.2f}
+• Lucro/Prejuízo: ${stats['total_units_profit'] * 10:.2f}
+• Saldo atual: ${1000 + (stats['total_units_profit'] * 10):.2f}
+
+📈 **ANÁLISE:**
+"""
+        
+        if stats['total_bets'] == 0:
+            stats_message += """
+ℹ️ **SEM DADOS AINDA**
+• Nenhuma aposta registrada ainda
+• Sistema pronto para começar
+• Use /tips para gerar primeira oportunidade
+            """
+        else:
+            if stats['roi_percentage'] > 10:
+                stats_message += "🔥 **EXCELENTE PERFORMANCE!** ROI acima de 10%"
+            elif stats['roi_percentage'] > 5:
+                stats_message += "✅ **BOA PERFORMANCE!** ROI positivo e consistente"
+            elif stats['roi_percentage'] > 0:
+                stats_message += "📈 **PERFORMANCE POSITIVA** - Mantendo lucro"
+            else:
+                stats_message += "⚠️ **ATENÇÃO** - Performance negativa, revisar estratégia"
+
+        keyboard = [
+            [InlineKeyboardButton("📋 Ver Histórico", callback_data="bet_history")],
+            [InlineKeyboardButton("🎯 Novo Tip", callback_data="tips")],
+            [InlineKeyboardButton("📊 Sistema Unidades", callback_data="units_info")],
+            [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.edit_message_text(stats_message, reply_markup=reply_markup, parse_mode="Markdown")
+
+    def _handle_bet_history_callback(self, query):
+        """Handle callback para histórico de apostas"""
+        bet_history = self.tips_system.units_system.bet_history
+        
+        if not bet_history:
+            history_message = """
+📋 **HISTÓRICO DE APOSTAS** 📋
+
+ℹ️ **NENHUMA APOSTA REGISTRADA**
+
+🎯 **Como funciona:**
+• Sistema registra automaticamente tips gerados
+• Cada tip vira uma entrada no histórico
+• Performance calculada automaticamente
+
+🚀 **Para começar:**
+• Use /tips para gerar primeira oportunidade
+• Tips profissionais são registrados automaticamente
+• Acompanhe performance em tempo real
+
+💡 **Dica:** O sistema só registra tips que atendem aos critérios profissionais (75%+ confiança, 8%+ EV)
+            """
+        else:
+            history_message = f"""
+📋 **HISTÓRICO DE APOSTAS** 📋
+
+📊 **ÚLTIMAS {min(len(bet_history), 10)} APOSTAS:**
+
+"""
+            for i, bet in enumerate(bet_history[-10:], 1):
+                result_emoji = "✅" if bet.get('result') == 'win' else "❌" if bet.get('result') == 'loss' else "⏳"
+                history_message += f"""
+**{i}. {bet.get('team', 'Team')}** {result_emoji}
+• Unidades: {bet.get('units', 0):.1f}
+• Data: {bet.get('date', 'N/A')}
+• Liga: {bet.get('league', 'N/A')}
+• Resultado: {bet.get('result', 'Pendente')}
+
+"""
+
+            history_message += f"""
+📈 **RESUMO:**
+• Total de registros: {len(bet_history)}
+• Exibindo: {min(len(bet_history), 10)} mais recentes
+            """
+
+        keyboard = [
+            [InlineKeyboardButton("📊 Ver Performance", callback_data="performance_stats")],
+            [InlineKeyboardButton("🎯 Novo Tip", callback_data="tips")],
+            [InlineKeyboardButton("📊 Sistema Unidades", callback_data="units_info")],
+            [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.edit_message_text(history_message, reply_markup=reply_markup, parse_mode="Markdown")
 
     # Implementar outros handlers callback necessários...
     def _handle_schedule_callback(self, query): 
@@ -2455,6 +2723,9 @@ async def main():
             application.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
             application.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
             application.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
+            application.add_handler(CommandHandler("units", bot_instance.units_command))
+            application.add_handler(CommandHandler("performance", bot_instance.performance_command))
+            application.add_handler(CommandHandler("history", bot_instance.history_command))
             application.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
 
             total_handlers = len(application.handlers[0])
@@ -2497,6 +2768,9 @@ async def main():
             dispatcher.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
             dispatcher.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
             dispatcher.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
+            dispatcher.add_handler(CommandHandler("units", bot_instance.units_command))
+            dispatcher.add_handler(CommandHandler("performance", bot_instance.performance_command))
+            dispatcher.add_handler(CommandHandler("history", bot_instance.history_command))
             dispatcher.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
 
             total_handlers = sum(len(handlers) for handlers in dispatcher.handlers.values())
