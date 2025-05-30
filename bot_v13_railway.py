@@ -422,33 +422,33 @@ class RiotAPIClient:
                 now = datetime.now()
                 
                 for event in events:
-                    # Verificar status - APENAS partidas em andamento
+                    # Verificar status - APENAS partidas em andamento (agora com case-insensitive)
                     status = event.get('state', '').lower()
-                    if status not in ['inprogress', 'live', 'ongoing']:
+                    if status not in ['inprogress', 'live', 'ongoing', 'started']:
                         continue
-                    
-                    # Verificar se tem startTime e se está dentro da janela de jogo
-                    start_time_str = event.get('startTime', '')
-                    if start_time_str:
-                        try:
-                            from datetime import timezone
-                            start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
-                            start_time_local = start_time.astimezone()
-                            
-                            # Partida deve ter começado e não pode ter mais de 3 horas
-                            time_diff = now - start_time_local.replace(tzinfo=None)
-                            if time_diff.total_seconds() < 0 or time_diff.total_seconds() > 10800:  # 3 horas
-                                continue
-                        except:
-                            continue
                     
                     teams = self._extract_teams(event)
                     if len(teams) >= 2:
+                        # Calcular tempo estimado de jogo se tiver startTime
+                        game_time = 0
+                        start_time_str = event.get('startTime', '')
+                        if start_time_str:
+                            try:
+                                from datetime import timezone
+                                start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                                start_time_local = start_time.astimezone()
+                                time_diff = now - start_time_local.replace(tzinfo=None)
+                                if time_diff.total_seconds() > 0:
+                                    game_time = int(time_diff.total_seconds())
+                            except:
+                                pass
+                        
                         match = {
                             'teams': teams,
                             'league': self._extract_league(event),
                             'status': 'live',  # Forçar status live
                             'start_time': start_time_str,
+                            'game_time': game_time,
                             'tournament': event.get('tournament', {}).get('name', 'Tournament')
                         }
                         matches.append(match)
