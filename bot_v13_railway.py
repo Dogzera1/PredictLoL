@@ -1031,121 +1031,185 @@ class ProfessionalTipsSystem:
         self.given_tips = set()
         self.monitoring = False
         self.last_scan = None
+        self.monitoring_task = None
 
         # Critérios profissionais
         self.min_ev_percentage = 8.0
         self.min_confidence_score = 75.0
         self.max_tips_per_week = 5
 
-        # Verificar se é Railway - pular monitoramento automático para startup rápido
-        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME'))
-        
-        if not is_railway:
-            # Iniciar monitoramento automático apenas local
-            self.start_monitoring()
-            logger.info("🎯 Sistema de Tips Profissional inicializado com MONITORAMENTO ATIVO")
-        else:
-            logger.info("🎯 Sistema de Tips Profissional inicializado - Railway mode (sem threading)")
+        # Sempre iniciar monitoramento - funciona tanto no Railway quanto local
+        self.start_monitoring()
+        logger.info("🎯 Sistema de Tips Profissional inicializado com MONITORAMENTO ATIVO")
 
     def start_monitoring(self):
-        """Inicia monitoramento contínuo - APENAS LOCAL"""
+        """Inicia monitoramento contínuo de todas as partidas"""
         if not self.monitoring:
             self.monitoring = True
-            logger.info("🔍 Monitoramento ativo - modo local")
-            # Monitoramento simplificado sem threading complexo
+            
+            def monitor_loop():
+                """Loop de monitoramento em thread separada"""
+                while self.monitoring:
+                    try:
+                        # Criar novo loop asyncio para esta thread
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        # Executar scan de partidas
+                        loop.run_until_complete(self._scan_all_matches_for_tips())
+                        
+                        # Fechar loop
+                        loop.close()
+                        
+                        # Aguardar 5 minutos antes do próximo scan
+                        if self.monitoring:
+                            time.sleep(300)  # 5 minutos
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Erro no monitoramento de tips: {e}")
+                        # Em caso de erro, aguardar 1 minuto antes de tentar novamente
+                        if self.monitoring:
+                            time.sleep(60)
+
+            # Iniciar thread de monitoramento
+            monitor_thread = threading.Thread(target=monitor_loop, daemon=True, name="TipsMonitor")
+            monitor_thread.start()
+            logger.info("🔍 Monitoramento contínuo de tips iniciado - Verificação a cada 5 minutos")
+
+    def stop_monitoring(self):
+        """Para o monitoramento"""
+        self.monitoring = False
+        logger.info("🛑 Monitoramento de tips interrompido")
+
+    async def _scan_all_matches_for_tips(self):
+        """Escaneia TODAS as partidas (ao vivo e agendadas) para encontrar oportunidades"""
+        try:
+            logger.info("🔍 Escaneando TODAS as partidas para oportunidades de tips...")
+
+            # Buscar partidas ao vivo
+            live_matches = await self.riot_client.get_live_matches()
+            logger.info(f"📍 Encontradas {len(live_matches)} partidas ao vivo")
+
+            # Buscar partidas agendadas (próximas 24h)
+            schedule_manager = ScheduleManager(self.riot_client)
+            scheduled_matches = await schedule_manager.get_scheduled_matches(days_ahead=1)
+            logger.info(f"📅 Encontradas {len(scheduled_matches)} partidas agendadas")
+
+            all_matches = live_matches + scheduled_matches
+            logger.info(f"🎯 Total de {len(all_matches)} partidas para análise")
+
+            opportunities_found = 0
+
+            for i, match in enumerate(all_matches, 1):
+                try:
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        logger.debug(f"🔍 Analisando {i}/{len(all_matches)}: {team1} vs {team2}")
+
+                    # Analisar partida para tip
+                    tip_analysis = await self._analyze_match_for_tip(match)
+
+                    if tip_analysis and self._meets_professional_criteria(tip_analysis):
+                        tip_id = self._generate_tip_id(match)
+
+                        # Verificar se já foi dado este tip
+                        if tip_id not in self.given_tips:
+                            professional_tip = self._create_professional_tip(tip_analysis)
+
+                            if professional_tip:
+                                self.tips_database.append(professional_tip)
+                                self.given_tips.add(tip_id)
+                                opportunities_found += 1
+
+                                logger.info(f"🎯 NOVA OPORTUNIDADE ENCONTRADA: {professional_tip['title']}")
+                                logger.info(f"   📊 Confiança: {professional_tip['confidence_score']:.1f}% | EV: {professional_tip['ev_percentage']:.1f}%")
+                                logger.info(f"   🎲 Unidades: {professional_tip['units']} | Valor: ${professional_tip['stake_amount']:.2f}")
+
+                                # ENVIAR ALERTA AUTOMÁTICO PARA GRUPOS
+                                try:
+                                    if hasattr(self, '_bot_instance') and self._bot_instance:
+                                        alerts_system = self._bot_instance.alerts_system
+                                        bot_app = self._bot_instance.bot_application
+
+                                        if alerts_system.group_chat_ids and bot_app:
+                                            await alerts_system.send_tip_alert(professional_tip, bot_app)
+                                            logger.info(f"📢 Alerta automático enviado para {len(alerts_system.group_chat_ids)} grupos")
+                                        else:
+                                            logger.info("📢 Nenhum grupo cadastrado para alertas ainda")
+
+                                except Exception as alert_error:
+                                    logger.warning(f"❌ Erro ao enviar alerta automático: {alert_error}")
+                        else:
+                            logger.debug(f"🔄 Tip já foi dado anteriormente: {tip_id}")
+                    else:
+                        if tip_analysis:
+                            logger.debug(f"📊 Partida não atende critérios: Conf={tip_analysis.get('confidence_score', 0):.1f}% EV={tip_analysis.get('ev_percentage', 0):.1f}%")
+
+                except Exception as match_error:
+                    logger.warning(f"❌ Erro ao analisar partida {i}: {match_error}")
+                    continue
+
+            # Atualizar timestamp do último scan
+            self.last_scan = datetime.now()
+
+            if opportunities_found > 0:
+                logger.info(f"✅ SCAN COMPLETO: {opportunities_found} novas oportunidades de tips encontradas!")
+            else:
+                logger.info("ℹ️ SCAN COMPLETO: Nenhuma nova oportunidade encontrada neste scan")
+
+            # Limpeza de tips antigos
+            self._cleanup_old_tips()
+
+        except Exception as e:
+            logger.error(f"❌ Erro geral no scan de partidas: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+
+    def _cleanup_old_tips(self):
+        """Remove tips antigos do cache (mais de 24h)"""
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=24)
+            old_tip_ids = []
+
+            # Encontrar tips antigos
+            for tip in self.tips_database:
+                if tip.get('timestamp', datetime.now()) < cutoff_time:
+                    old_tip_ids.append(tip.get('tip_id'))
+
+            # Remover do cache de tips dados
+            for tip_id in old_tip_ids:
+                self.given_tips.discard(tip_id)
+
+            # Remover do banco de dados de tips
+            self.tips_database = [tip for tip in self.tips_database 
+                                if tip.get('timestamp', datetime.now()) >= cutoff_time]
+
+            if old_tip_ids:
+                logger.info(f"🧹 {len(old_tip_ids)} tips antigos removidos do cache")
+
+        except Exception as e:
+            logger.error(f"❌ Erro na limpeza de tips antigos: {e}")
 
     def set_bot_instance(self, bot_instance):
-        """Define instância do bot"""
+        """Define instância do bot para envio de alertas automáticos"""
         self._bot_instance = bot_instance
+        logger.info("🤖 Bot instance conectada ao sistema de tips")
 
     def get_monitoring_status(self) -> Dict:
         """Status do monitoramento"""
+        recent_tips = [tip for tip in self.tips_database 
+                      if (datetime.now() - tip.get('timestamp', datetime.now())).days < 7]
+        
         return {
             'monitoring_active': self.monitoring,
             'last_scan': self.last_scan.strftime('%H:%M:%S') if self.last_scan else 'Nunca',
             'total_tips_found': len(self.tips_database),
-            'tips_this_week': len([tip for tip in self.tips_database
-                                 if (datetime.now() - tip['timestamp']).days < 7]),
-            'scan_frequency': '5 minutos'
+            'tips_this_week': len(recent_tips),
+            'scan_frequency': '5 minutos',
+            'given_tips_cache': len(self.given_tips)
         }
-
-    async def generate_professional_tip(self) -> Optional[Dict]:
-        """Gera tip profissional usando ML"""
-        try:
-            live_matches = await self.riot_client.get_live_matches()
-            schedule_manager = ScheduleManager(self.riot_client)
-            scheduled_matches = await schedule_manager.get_scheduled_matches(days_ahead=1)
-
-            all_matches = live_matches + scheduled_matches
-
-            best_tip = None
-            best_score = 0
-
-            for match in all_matches:
-                tip_analysis = await self._analyze_match_for_tip(match)
-
-                if tip_analysis and self._meets_professional_criteria(tip_analysis):
-                    combined_score = tip_analysis['confidence_score'] + tip_analysis['ev_percentage']
-
-                    if combined_score > best_score:
-                        best_score = combined_score
-                        best_tip = self._create_professional_tip(tip_analysis)
-
-            return best_tip
-
-        except Exception as e:
-            logger.error(f"Erro ao gerar tip: {e}")
-            return None
-
-    async def _analyze_match_for_tip(self, match: Dict) -> Optional[Dict]:
-        """Analisa partida para tip"""
-        try:
-            teams = match.get('teams', [])
-            if len(teams) < 2:
-                return None
-
-            team1_name = teams[0].get('name', '')
-            team2_name = teams[1].get('name', '')
-            league = match.get('league', '')
-
-            prediction_system = DynamicPredictionSystem()
-            ml_prediction = await prediction_system.predict_live_match(match)
-
-            if not ml_prediction or ml_prediction['confidence'] not in ['Alta', 'Muito Alta']:
-                return None
-
-            favored_team = ml_prediction['favored_team']
-            win_probability = ml_prediction['win_probability']
-            confidence_level = ml_prediction['confidence']
-
-            confidence_mapping = {'Muito Alta': 90, 'Alta': 80, 'Média': 70, 'Baixa': 60}
-            confidence_score = confidence_mapping.get(confidence_level, 60)
-
-            ml_odds = ml_prediction['team1_odds'] if favored_team == team1_name else ml_prediction['team2_odds']
-            market_probability = win_probability * 0.95
-            market_odds = 1 / market_probability if market_probability > 0 else 2.0
-
-            ev_percentage = ((ml_odds * win_probability) - 1) * 100
-            league_tier = self._determine_league_tier(league)
-
-            return {
-                'team1': team1_name, 'team2': team2_name,
-                'league': league, 'league_tier': league_tier,
-                'favored_team': favored_team,
-                'opposing_team': team2_name if favored_team == team1_name else team1_name,
-                'win_probability': win_probability,
-                'confidence_score': confidence_score,
-                'confidence_level': confidence_level,
-                'ev_percentage': ev_percentage,
-                'ml_odds': ml_odds, 'market_odds': market_odds,
-                'ml_analysis': ml_prediction['analysis'],
-                'prediction_factors': ml_prediction['prediction_factors'],
-                'match_data': match
-            }
-
-        except Exception as e:
-            logger.error(f"Erro na análise: {e}")
-            return None
 
     def _meets_professional_criteria(self, analysis: Dict) -> bool:
         """Verifica critérios profissionais"""
@@ -1225,6 +1289,101 @@ class ProfessionalTipsSystem:
             return f"{team1}_{team2}_{league}_{timestamp}".replace(' ', '_')
         return f"tip_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
+    async def generate_professional_tip(self) -> Optional[Dict]:
+        """Gera tip profissional usando ML e retorna o melhor disponível"""
+        try:
+            # Buscar partidas disponíveis
+            live_matches = await self.riot_client.get_live_matches()
+            schedule_manager = ScheduleManager(self.riot_client)
+            scheduled_matches = await schedule_manager.get_scheduled_matches(days_ahead=1)
+
+            all_matches = live_matches + scheduled_matches
+            logger.info(f"🎯 Analisando {len(all_matches)} partidas para tip profissional")
+
+            # Analisar cada partida com ML
+            best_tip = None
+            best_score = 0
+
+            for match in all_matches:
+                tip_analysis = await self._analyze_match_for_tip(match)
+
+                if tip_analysis and self._meets_professional_criteria(tip_analysis):
+                    # Calcular score combinado (confiança + EV)
+                    combined_score = tip_analysis['confidence_score'] + tip_analysis['ev_percentage']
+
+                    if combined_score > best_score:
+                        best_score = combined_score
+                        best_tip = self._create_professional_tip(tip_analysis)
+
+            if best_tip:
+                logger.info(f"🎯 Melhor tip encontrado: {best_tip['title']} (Score: {best_score:.1f})")
+            else:
+                logger.info("ℹ️ Nenhum tip profissional disponível no momento")
+
+            return best_tip
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao gerar tip profissional: {e}")
+            return None
+
+    async def _analyze_match_for_tip(self, match: Dict) -> Optional[Dict]:
+        """Analisa partida para determinar se é uma oportunidade de tip"""
+        try:
+            teams = match.get('teams', [])
+            if len(teams) < 2:
+                return None
+
+            team1_name = teams[0].get('name', '')
+            team2_name = teams[1].get('name', '')
+            league = match.get('league', '')
+
+            # Usar sistema de predição para análise
+            prediction_system = DynamicPredictionSystem()
+            ml_prediction = await prediction_system.predict_live_match(match)
+
+            if not ml_prediction or ml_prediction['confidence'] not in ['Alta', 'Muito Alta']:
+                return None
+
+            favored_team = ml_prediction['favored_team']
+            win_probability = ml_prediction['win_probability']
+            confidence_level = ml_prediction['confidence']
+
+            # Mapear confiança para score numérico
+            confidence_mapping = {'Muito Alta': 90, 'Alta': 80, 'Média': 70, 'Baixa': 60}
+            confidence_score = confidence_mapping.get(confidence_level, 60)
+
+            # Calcular EV (Expected Value)
+            ml_odds = ml_prediction['team1_odds'] if favored_team == team1_name else ml_prediction['team2_odds']
+            
+            # Simular odds de mercado (normalmente 5% menor que a probabilidade real)
+            market_probability = win_probability * 0.95
+            market_odds = 1 / market_probability if market_probability > 0 else 2.0
+
+            # Calcular EV percentage
+            ev_percentage = ((ml_odds * win_probability) - 1) * 100
+            
+            # Determinar tier da liga
+            league_tier = self._determine_league_tier(league)
+
+            return {
+                'team1': team1_name, 'team2': team2_name,
+                'league': league, 'league_tier': league_tier,
+                'favored_team': favored_team,
+                'opposing_team': team2_name if favored_team == team1_name else team1_name,
+                'win_probability': win_probability,
+                'confidence_score': confidence_score,
+                'confidence_level': confidence_level,
+                'ev_percentage': ev_percentage,
+                'ml_odds': ml_odds, 'market_odds': market_odds,
+                'ml_analysis': ml_prediction['analysis'],
+                'prediction_factors': ml_prediction['prediction_factors'],
+                'match_data': match
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Erro na análise da partida: {e}")
+            return None
+
 class LoLBotV3UltraAdvanced:
     """Bot LoL V3 Ultra Avançado com Sistema de Unidades Profissional + ML + Alertas"""
 
@@ -1302,6 +1461,7 @@ Use /menu para ver todas as opções!
 • /schedule - Agenda de partidas
 • /live - Partidas ao vivo
 • /monitoring - Status do monitoramento
+• /force_scan - Scan manual (admin)
 • /alerts - Sistema de alertas
 
 🎲 **SISTEMA DE UNIDADES:**
@@ -1313,6 +1473,9 @@ Use /menu para ver todas as opções!
 • /help - Ajuda completa
 • /about - Sobre o bot
 
+🔍 **MONITORAMENTO ATIVO 24/7:**
+O sistema escaneia automaticamente todas as partidas a cada 5 minutos, buscando oportunidades que atendam aos critérios profissionais de grupos de apostas.
+
 Clique nos botões abaixo para navegação rápida:
         """
 
@@ -1321,10 +1484,11 @@ Clique nos botões abaixo para navegação rápida:
              InlineKeyboardButton("🔮 Predições", callback_data="predictions")],
             [InlineKeyboardButton("📅 Agenda", callback_data="schedule"),
              InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+            [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring"),
+             InlineKeyboardButton("🚀 Scan Manual", callback_data="force_scan")],
             [InlineKeyboardButton("📢 Alertas", callback_data="alert_stats"),
              InlineKeyboardButton("📊 Unidades", callback_data="units_info")],
-            [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring"),
-             InlineKeyboardButton("❓ Ajuda", callback_data="help")]
+            [InlineKeyboardButton("❓ Ajuda", callback_data="help")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         update.message.reply_text(menu_message, reply_markup=reply_markup, parse_mode="Markdown")
@@ -1507,30 +1671,63 @@ Clique nos botões abaixo para navegação rápida:
         try:
             monitoring_status = self.tips_system.get_monitoring_status()
 
-            monitoring_message = f"""
-🔍 **STATUS DO MONITORAMENTO** 🔍
+            # Verificar se o monitoramento está realmente ativo
+            monitoring_status_emoji = "🟢" if monitoring_status['monitoring_active'] else "🔴"
+            last_scan = monitoring_status['last_scan']
+            
+            # Calcular tempo desde último scan
+            time_since_scan = "Nunca"
+            if last_scan != "Nunca" and self.tips_system.last_scan:
+                now = datetime.now()
+                time_diff = now - self.tips_system.last_scan
+                minutes_ago = int(time_diff.total_seconds() / 60)
+                
+                if minutes_ago < 1:
+                    time_since_scan = "Agora mesmo"
+                elif minutes_ago < 60:
+                    time_since_scan = f"{minutes_ago} minutos atrás"
+                else:
+                    hours_ago = int(minutes_ago / 60)
+                    time_since_scan = f"{hours_ago} horas atrás"
 
-🎯 **SISTEMA DE TIPS:**
-• Status: {'🟢 Ativo' if monitoring_status['monitoring_active'] else '🔴 Inativo'}
-• Última verificação: {monitoring_status['last_scan']}
+            monitoring_message = f"""
+🔍 **STATUS DO MONITORAMENTO COMPLETO** 🔍
+
+🎯 **SISTEMA DE TIPS PROFISSIONAL:**
+• Status: {monitoring_status_emoji} {'ATIVO' if monitoring_status['monitoring_active'] else 'INATIVO'}
+• Última verificação: {last_scan}
+• Tempo decorrido: {time_since_scan}
 • Frequência: A cada {monitoring_status['scan_frequency']}
 
-📊 **ESTATÍSTICAS:**
-• Tips encontrados: {monitoring_status['total_tips_found']}
+📊 **ESTATÍSTICAS DE DESCOBERTAS:**
+• Tips encontrados (total): {monitoring_status['total_tips_found']}
 • Tips esta semana: {monitoring_status['tips_this_week']}
+• Cache de tips dados: {monitoring_status.get('given_tips_cache', 0)}
 
 🔍 **O QUE ESTÁ SENDO MONITORADO:**
 • ✅ Partidas ao vivo (tempo real)
 • ✅ Partidas agendadas (próximas 24h)
-• ✅ Todas as ligas principais
+• ✅ Todas as ligas principais (LCK, LPL, LEC, LCS, CBLOL)
 • ✅ Critérios profissionais (75%+ confiança, 8%+ EV)
 
+🎲 **CRITÉRIOS DE QUALIDADE:**
+• Confiança mínima: 75%
+• EV mínimo: 8%
+• Apenas tips de alta/muito alta confiança
+• Sistema de unidades profissional ativo
+
 ⚡ **PROCESSO AUTOMÁTICO:**
-O sistema escaneia continuamente todas as partidas disponíveis na API da Riot Games, analisando cada uma para encontrar oportunidades que atendam aos critérios profissionais de grupos de apostas.
+O sistema escaneia continuamente todas as partidas disponíveis na API da Riot Games, analisando cada uma com IA para encontrar oportunidades que atendam aos critérios rigorosos de grupos de apostas profissionais.
+
+🤖 **SISTEMA DE IA:**
+• Machine Learning: {'🟢 Disponível' if ML_MODULE_AVAILABLE else '🟡 Fallback matemático'}
+• Base de dados: {len(self.prediction_system.teams_database)} times
+• Alertas automáticos: {'🟢 Ativo' if len(self.alerts_system.group_chat_ids) > 0 else '🟡 Sem grupos'}
             """
 
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="monitoring")],
+                [InlineKeyboardButton("🚀 Scan Manual", callback_data="force_scan")],
                 [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
                 [InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
                 [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
@@ -1541,6 +1738,105 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
         except Exception as e:
             logger.error(f"Erro no comando monitoring: {e}")
             update.message.reply_text("❌ Erro ao buscar status. Tente novamente.")
+
+    def force_scan_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /force_scan - força um scan manual imediato"""
+        try:
+            user = query.from_user
+            
+            # Verificar se é o owner
+            if user.id != OWNER_ID:
+                query.answer("❌ Apenas o administrador pode forçar scans manuais.")
+                return
+
+            # Responder callback primeiro
+            query.answer("🔍 Iniciando scan manual...")
+
+            # Atualizar mensagem para mostrar progresso
+            progress_message = """
+🔍 **SCAN MANUAL INICIADO** 🔍
+
+⏳ **STATUS:**
+• Buscando partidas disponíveis...
+• Analisando com sistema de IA...
+• Verificando critérios profissionais...
+
+⚡ **Aguarde alguns segundos...**
+            """
+
+            query.edit_message_text(progress_message, parse_mode="Markdown")
+
+            # Executar scan em thread separada para não bloquear
+            def run_manual_scan():
+                try:
+                    # Usar asyncio para executar o scan
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    # Executar scan
+                    loop.run_until_complete(self.tips_system._scan_all_matches_for_tips())
+                    
+                    # Fechar loop
+                    loop.close()
+                    
+                    # Buscar status atualizado
+                    status = self.tips_system.get_monitoring_status()
+                    
+                    # Atualizar mensagem com resultado
+                    result_message = f"""
+🔍 **SCAN MANUAL COMPLETO** ✅
+
+📊 **RESULTADOS:**
+• Status: Executado com sucesso
+• Horário: {datetime.now().strftime('%H:%M:%S')}
+• Tips encontrados: {status['total_tips_found']}
+• Tips esta semana: {status['tips_this_week']}
+
+🎯 **PRÓXIMO SCAN AUTOMÁTICO:**
+• Em aproximadamente 5 minutos
+• Monitoramento: {'🟢 Ativo' if status['monitoring_active'] else '🔴 Inativo'}
+
+💡 **Use /monitoring para ver status completo**
+                    """
+                    
+                    keyboard = [
+                        [InlineKeyboardButton("🔄 Novo Scan", callback_data="force_scan")],
+                        [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring")],
+                        [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
+                        [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    # Editar mensagem original
+                    query.edit_message_text(result_message, reply_markup=reply_markup, parse_mode="Markdown")
+                    
+                except Exception as scan_error:
+                    error_message = f"""
+❌ **ERRO NO SCAN MANUAL**
+
+🔍 **Detalhes do erro:**
+{str(scan_error)}
+
+💡 **Tente novamente em alguns minutos**
+                    """
+                    
+                    keyboard = [
+                        [InlineKeyboardButton("🔄 Tentar Novamente", callback_data="force_scan")],
+                        [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring")],
+                        [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    query.edit_message_text(error_message, reply_markup=reply_markup, parse_mode="Markdown")
+                    logger.error(f"❌ Erro no scan manual: {scan_error}")
+
+            # Executar em thread separada
+            scan_thread = threading.Thread(target=run_manual_scan, daemon=True)
+            scan_thread.start()
+
+        except Exception as e:
+            logger.error(f"Erro no callback force_scan: {e}")
+            query.edit_message_text("❌ Erro ao iniciar scan manual. Tente novamente.")
 
     def predictions_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /predictions"""
@@ -1928,6 +2224,8 @@ Use /history para histórico completo
                 self._handle_bet_history_callback(query)
             elif data == "units_info":
                 self._handle_units_info_callback(query)
+            elif data == "force_scan":
+                self._handle_force_scan_callback(query)
             else:
                 query.edit_message_text("❌ Opção não reconhecida.")
 
@@ -2214,7 +2512,7 @@ Use o botão "Cadastrar Novamente" abaixo
 • Acompanhe performance em tempo real
 
 💡 **Dica:** O sistema só registra tips que atendem aos critérios profissionais (75%+ confiança, 8%+ EV)
-            """
+                """
         else:
             history_message = f"""
 📋 **HISTÓRICO DE APOSTAS** 📋
@@ -2237,7 +2535,7 @@ Use o botão "Cadastrar Novamente" abaixo
 📈 **RESUMO:**
 • Total de registros: {len(bet_history)}
 • Exibindo: {min(len(bet_history), 10)} mais recentes
-            """
+                """
 
         keyboard = [
             [InlineKeyboardButton("📊 Ver Performance", callback_data="performance_stats")],
@@ -2488,6 +2786,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 • /schedule - Agenda de partidas
 • /live - Partidas ao vivo
 • /monitoring - Status do monitoramento
+• /force_scan - Scan manual (admin)
 • /alerts - Sistema de alertas
 
 🎲 **SISTEMA DE UNIDADES:**
@@ -2499,6 +2798,9 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 • /help - Ajuda completa
 • /about - Sobre o bot
 
+🔍 **MONITORAMENTO ATIVO 24/7:**
+O sistema escaneia automaticamente todas as partidas a cada 5 minutos, buscando oportunidades que atendam aos critérios profissionais de grupos de apostas.
+
 Clique nos botões abaixo para navegação rápida:
         """
 
@@ -2507,10 +2809,11 @@ Clique nos botões abaixo para navegação rápida:
              InlineKeyboardButton("🔮 Predições", callback_data="predictions")],
             [InlineKeyboardButton("📅 Agenda", callback_data="schedule"),
              InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+            [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring"),
+             InlineKeyboardButton("🚀 Scan Manual", callback_data="force_scan")],
             [InlineKeyboardButton("📢 Alertas", callback_data="alert_stats"),
              InlineKeyboardButton("📊 Unidades", callback_data="units_info")],
-            [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring"),
-             InlineKeyboardButton("❓ Ajuda", callback_data="help")]
+            [InlineKeyboardButton("❓ Ajuda", callback_data="help")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text(menu_message, reply_markup=reply_markup, parse_mode="Markdown")
@@ -2574,6 +2877,82 @@ Clique nos botões abaixo para navegação rápida:
         except Exception as e:
             logger.error(f"Erro no callback match details: {e}")
             query.edit_message_text("❌ Erro ao buscar detalhes. Tente novamente.")
+
+    def _handle_force_scan_callback(self, query):
+        """Handle callback para scan manual"""
+        try:
+            user = update.effective_user
+            
+            # Verificar se é o owner
+            if user.id != OWNER_ID:
+                update.message.reply_text("❌ Apenas o administrador pode forçar scans manuais.")
+                return
+
+            # Enviar mensagem de início
+            scan_message = update.message.reply_text("🔍 **INICIANDO SCAN MANUAL**\n\n⏳ Buscando partidas disponíveis...")
+
+            # Executar scan em thread separada para não bloquear
+            def run_manual_scan():
+                try:
+                    # Usar asyncio para executar o scan
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    # Executar scan
+                    loop.run_until_complete(self.tips_system._scan_all_matches_for_tips())
+                    
+                    # Fechar loop
+                    loop.close()
+                    
+                    # Buscar status atualizado
+                    status = self.tips_system.get_monitoring_status()
+                    
+                    # Atualizar mensagem com resultado
+                    result_message = f"""
+🔍 **SCAN MANUAL COMPLETO** ✅
+
+📊 **RESULTADOS:**
+• Status: Executado com sucesso
+• Horário: {datetime.now().strftime('%H:%M:%S')}
+• Tips encontrados: {status['total_tips_found']}
+• Tips esta semana: {status['tips_this_week']}
+
+🎯 **PRÓXIMO SCAN AUTOMÁTICO:**
+• Em aproximadamente 5 minutos
+• Monitoramento: {'🟢 Ativo' if status['monitoring_active'] else '🔴 Inativo'}
+
+💡 **Use /monitoring para ver status completo**
+                    """
+                    
+                    keyboard = [
+                        [InlineKeyboardButton("🔄 Novo Scan", callback_data="force_scan")],
+                        [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring")],
+                        [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    # Editar mensagem original
+                    scan_message.edit_text(result_message, reply_markup=reply_markup, parse_mode="Markdown")
+                    
+                except Exception as scan_error:
+                    error_message = f"""
+❌ **ERRO NO SCAN MANUAL**
+
+🔍 **Detalhes do erro:**
+{str(scan_error)}
+
+💡 **Tente novamente em alguns minutos**
+                    """
+                    scan_message.edit_text(error_message, parse_mode="Markdown")
+                    logger.error(f"❌ Erro no scan manual: {scan_error}")
+
+            # Executar em thread separada
+            scan_thread = threading.Thread(target=run_manual_scan, daemon=True)
+            scan_thread.start()
+
+        except Exception as e:
+            logger.error(f"Erro no callback force_scan: {e}")
+            update.message.reply_text("❌ Erro ao iniciar scan manual. Tente novamente.")
 
 # Instância global do bot
 bot_instance = None
@@ -2721,6 +3100,7 @@ async def main():
             application.add_handler(CommandHandler("live", bot_instance.live_matches_command))
             application.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
             application.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
+            application.add_handler(CommandHandler("force_scan", bot_instance.force_scan_command))
             application.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
             application.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
             application.add_handler(CommandHandler("units", bot_instance.units_command))
@@ -2766,6 +3146,7 @@ async def main():
             dispatcher.add_handler(CommandHandler("live", bot_instance.live_matches_command))
             dispatcher.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
             dispatcher.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
+            dispatcher.add_handler(CommandHandler("force_scan", bot_instance.force_scan_command))
             dispatcher.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
             dispatcher.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
             dispatcher.add_handler(CommandHandler("units", bot_instance.units_command))
@@ -2926,4 +3307,4 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main()) 
+    asyncio.run(main())
