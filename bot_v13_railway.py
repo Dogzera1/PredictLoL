@@ -2416,105 +2416,214 @@ async def main():
 
         logger.info(f"🔍 Modo detectado: {'🚀 RAILWAY (webhook)' if is_railway else '🏠 LOCAL (polling)'}")
 
-        # Versão v20+ - usar Application em vez de Updater
-        from telegram.ext import Application
-        
-        application = Application.builder().token(TOKEN).build()
-
-        # Limpar webhook existente
+        # Sistema de compatibilidade para diferentes versões do python-telegram-bot
         try:
-            logger.info("🧹 Limpando webhook existente...")
-            await application.bot.delete_webhook(drop_pending_updates=True)
-            logger.info("✅ Webhook anterior removido")
-        except Exception as e:
-            logger.warning(f"⚠️ Erro ao limpar webhook: {e}")
+            from telegram.ext import Application
+            USE_APPLICATION = True
+            logger.info("🔗 Usando python-telegram-bot v20+ (Application)")
+        except ImportError:
+            try:
+                from telegram.ext import Updater
+                USE_APPLICATION = False
+                logger.info("🔗 Usando python-telegram-bot v13-19 (Updater)")
+            except ImportError:
+                logger.error("❌ Nenhuma versão compatível do python-telegram-bot encontrada")
+                return
 
-        # Definir aplicação para sistema de alertas
-        bot_instance.set_bot_application(application)
+        # Configurar bot baseado na versão disponível
+        if USE_APPLICATION:
+            # Versão v20+ - usar Application
+            application = Application.builder().token(TOKEN).build()
+            
+            # Limpar webhook existente
+            try:
+                logger.info("🧹 Limpando webhook existente...")
+                await application.bot.delete_webhook(drop_pending_updates=True)
+                logger.info("✅ Webhook anterior removido")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao limpar webhook: {e}")
 
-        # Handlers para v20+
-        application.add_handler(CommandHandler("start", bot_instance.start_command))
-        application.add_handler(CommandHandler("menu", bot_instance.menu_command))
-        application.add_handler(CommandHandler("tips", bot_instance.tips_command))
-        application.add_handler(CommandHandler("live", bot_instance.live_matches_command))
-        application.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
-        application.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
-        application.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
-        application.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
-        application.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
+            # Definir aplicação para sistema de alertas
+            bot_instance.set_bot_application(application)
+
+            # Handlers para v20+
+            application.add_handler(CommandHandler("start", bot_instance.start_command))
+            application.add_handler(CommandHandler("menu", bot_instance.menu_command))
+            application.add_handler(CommandHandler("tips", bot_instance.tips_command))
+            application.add_handler(CommandHandler("live", bot_instance.live_matches_command))
+            application.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
+            application.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
+            application.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
+            application.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
+            application.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
+
+            total_handlers = len(application.handlers[0])
+            logger.info(f"✅ {total_handlers} handlers registrados (Application v20+)")
+            
+        else:
+            # Versão v13-19 - usar Updater  
+            try:
+                # Tentar com use_context primeiro
+                updater = Updater(TOKEN, use_context=True)
+            except TypeError:
+                try:
+                    # Fallback para versão sem use_context
+                    updater = Updater(TOKEN)
+                except TypeError:
+                    # Última tentativa - versão muito antiga com queue
+                    import queue
+                    update_queue = queue.Queue()
+                    updater = Updater(TOKEN, update_queue=update_queue)
+            
+            dispatcher = updater.dispatcher
+            
+            # Limpar webhook existente
+            try:
+                logger.info("🧹 Limpando webhook existente...")
+                updater.bot.delete_webhook(drop_pending_updates=True)
+                logger.info("✅ Webhook anterior removido")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao limpar webhook: {e}")
+
+            # Definir aplicação para sistema de alertas  
+            bot_instance.set_bot_application(updater)
+
+            # Handlers para v13-19
+            dispatcher.add_handler(CommandHandler("start", bot_instance.start_command))
+            dispatcher.add_handler(CommandHandler("menu", bot_instance.menu_command))
+            dispatcher.add_handler(CommandHandler("tips", bot_instance.tips_command))
+            dispatcher.add_handler(CommandHandler("live", bot_instance.live_matches_command))
+            dispatcher.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
+            dispatcher.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
+            dispatcher.add_handler(CommandHandler("predictions", bot_instance.predictions_command))
+            dispatcher.add_handler(CommandHandler("alerts", bot_instance.alerts_command))
+            dispatcher.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
+
+            total_handlers = sum(len(handlers) for handlers in dispatcher.handlers.values())
+            logger.info(f"✅ {total_handlers} handlers registrados (Updater v13-19)")
 
         # Contar handlers
         total_handlers = len(application.handlers[0])
         logger.info(f"✅ {total_handlers} handlers registrados no application v20+")
 
         if is_railway:
-            # Modo Railway - Webhook v20+
-            logger.info("🚀 Detectado ambiente Railway v20+ - Configurando webhook")
+            # Modo Railway - Webhook
+            logger.info("🚀 Detectado ambiente Railway - Configurando webhook")
 
             webhook_path = f"/webhook"
 
-            @app.route(webhook_path, methods=['POST'])
-            async def webhook_v20():
-                try:
-                    update_data = request.get_json(force=True)
-                    if update_data:
-                        from telegram import Update
-                        update_obj = Update.de_json(update_data, application.bot)
-                        await application.process_update(update_obj)
-                        logger.info(f"🔄 Webhook v20+ processou atualização: {update_obj.update_id if update_obj else 'None'}")
-                    return "OK", 200
-                except Exception as e:
-                    logger.error(f"❌ Erro no webhook v20+: {e}")
-                    return "ERROR", 500
-
-            # Configurar webhook
-            railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
-            if not railway_url.startswith('http'):
-                railway_url = f"https://{railway_url}"
-            webhook_url = f"{railway_url}{webhook_path}"
-
-            try:
-                logger.info("🔄 Removendo webhook anterior v20+...")
-                await application.bot.delete_webhook(drop_pending_updates=True)
+            if USE_APPLICATION:
+                # Webhook para Application (v20+)
+                @app.route(webhook_path, methods=['POST'])
+                async def webhook_v20():
+                    try:
+                        update_data = request.get_json(force=True)
+                        if update_data:
+                            from telegram import Update
+                            update_obj = Update.de_json(update_data, application.bot)
+                            await application.process_update(update_obj)
+                            logger.info(f"🔄 Webhook v20+ processado: {update_obj.update_id if update_obj else 'None'}")
+                        return "OK", 200
+                    except Exception as e:
+                        logger.error(f"❌ Erro no webhook v20+: {e}")
+                        return "ERROR", 500
                 
-                logger.info(f"🔗 Configurando webhook v20+: {webhook_url}")
-                await application.bot.set_webhook(webhook_url)
-                logger.info(f"✅ Webhook v20+ configurado")
+                # Configurar webhook v20+
+                railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                if not railway_url.startswith('http'):
+                    railway_url = f"https://{railway_url}"
+                webhook_url = f"{railway_url}{webhook_path}"
 
-                webhook_info = await application.bot.get_webhook_info()
-                logger.info(f"📋 Webhook v20+ ativo: {webhook_info.url}")
-
-                me = await application.bot.get_me()
-                logger.info(f"🤖 Bot v20+ verificado: @{me.username}")
+                try:
+                    logger.info("🔄 Configurando webhook v20+...")
+                    await application.bot.delete_webhook(drop_pending_updates=True)
+                    await application.bot.set_webhook(webhook_url)
                     
-            except Exception as e:
-                logger.error(f"❌ Erro ao configurar webhook v20+: {e}")
+                    webhook_info = await application.bot.get_webhook_info()
+                    logger.info(f"📋 Webhook v20+ ativo: {webhook_info.url}")
+                    
+                    me = await application.bot.get_me()
+                    logger.info(f"🤖 Bot v20+ verificado: @{me.username}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Erro ao configurar webhook v20+: {e}")
+            
+            else:
+                # Webhook para Updater (v13-19)  
+                @app.route(webhook_path, methods=['POST'])
+                def webhook_v13():
+                    try:
+                        update_data = request.get_json(force=True)
+                        if update_data:
+                            from telegram import Update
+                            update_obj = Update.de_json(update_data, updater.bot)
+                            dispatcher.process_update(update_obj)
+                            logger.info(f"🔄 Webhook v13-19 processado: {update_obj.update_id if update_obj else 'None'}")
+                        return "OK", 200
+                    except Exception as e:
+                        logger.error(f"❌ Erro no webhook v13-19: {e}")
+                        return "ERROR", 500
+                
+                # Configurar webhook v13-19
+                railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                if not railway_url.startswith('http'):
+                    railway_url = f"https://{railway_url}"
+                webhook_url = f"{railway_url}{webhook_path}"
 
-            logger.info("✅ Bot configurado (Railway webhook v20+) - Iniciando Flask...")
+                try:
+                    logger.info("🔄 Configurando webhook v13-19...")
+                    updater.bot.delete_webhook(drop_pending_updates=True)
+                    updater.bot.set_webhook(webhook_url)
+                    
+                    webhook_info = updater.bot.get_webhook_info()
+                    logger.info(f"📋 Webhook v13-19 ativo: {webhook_info.url}")
+                    
+                    me = updater.bot.get_me()
+                    logger.info(f"🤖 Bot v13-19 verificado: @{me.username}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Erro ao configurar webhook v13-19: {e}")
+
+            logger.info("✅ Bot configurado (Railway webhook) - Iniciando Flask...")
 
             app.config['ENV'] = 'production'
             app.config['DEBUG'] = False
 
-            logger.info(f"🌐 Iniciando Flask v20+ na porta {PORT}")
+            logger.info(f"🌐 Iniciando Flask na porta {PORT}")
             logger.info(f"🔗 Webhook disponível em: {webhook_url}")
 
             app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False, threaded=True)
 
         else:
-            # Modo Local - Polling v20+
-            logger.info("🏠 Ambiente local v20+ detectado - Usando polling")
+            # Modo Local - Polling
+            logger.info("🏠 Ambiente local detectado - Usando polling")
 
-            logger.info("✅ Bot configurado (polling v20+) - Iniciando...")
+            if USE_APPLICATION:
+                # Polling v20+
+                logger.info("✅ Bot configurado (polling v20+) - Iniciando...")
 
-            try:
-                await application.bot.delete_webhook(drop_pending_updates=True)
-                logger.info("🧹 Webhook removido antes de iniciar polling v20+")
-            except Exception as e:
-                logger.debug(f"Webhook já estava removido v20+: {e}")
+                try:
+                    await application.bot.delete_webhook(drop_pending_updates=True)
+                    logger.info("🧹 Webhook removido antes de iniciar polling v20+")
+                except Exception as e:
+                    logger.debug(f"Webhook já estava removido v20+: {e}")
 
-            logger.info("🔄 Iniciando polling v20+...")
-            # Usar método síncrono para evitar loop conflict
-            application.run_polling(drop_pending_updates=True)
+                logger.info("🔄 Iniciando polling v20+...")
+                application.run_polling(drop_pending_updates=True)
+            
+            else:
+                # Polling v13-19
+                logger.info("✅ Bot configurado (polling v13-19) - Iniciando...")
+
+                try:
+                    updater.bot.delete_webhook(drop_pending_updates=True)
+                    logger.info("🧹 Webhook removido antes de iniciar polling v13-19")
+                except Exception as e:
+                    logger.debug(f"Webhook já estava removido v13-19: {e}")
+
+                logger.info("🔄 Iniciando polling v13-19...")
+                updater.start_polling(drop_pending_updates=True)
+                updater.idle()
 
     except Exception as e:
         logger.error(f"❌ Erro crítico: {e}")
