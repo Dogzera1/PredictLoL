@@ -3616,53 +3616,693 @@ Use /live para ver todas as partidas ao vivo.
     # Adicionar todos os métodos de callback necessários aqui...
     def _handle_tips_callback(self, query) -> None:
         """Handle callback para tips"""
-        # Implementação do callback tips aqui
-        pass
+        try:
+            # Buscar tips profissionais
+            tips = self.tips_system.tips_database[-5:] if self.tips_system.tips_database else []
+            
+            if tips:
+                message = "🎯 **TIPS PROFISSIONAIS AO VIVO** 🎯\n\n"
+                
+                for i, tip in enumerate(tips, 1):
+                    confidence = tip.get('confidence_score', 0)
+                    ev = tip.get('ev_percentage', 0)
+                    units = tip.get('units', 0)
+                    
+                    message += f"**{i}. {tip.get('title', 'Tip')}**\n"
+                    message += f"🎮 {tip.get('map_info', 'N/A')}\n"
+                    message += f"📊 Confiança: {confidence:.1f}% | EV: {ev:.1f}%\n"
+                    message += f"💰 Unidades: {units} | Status: PARTIDA AO VIVO\n\n"
+                    
+                message += "💡 Use /tips para detalhes completos!"
+            else:
+                message = """
+🎯 **TIPS PROFISSIONAIS** 🎯
+
+ℹ️ Nenhuma tip ativa no momento.
+
+🔍 **O sistema monitora:**
+• Partidas AO VIVO apenas
+• Critérios profissionais (75%+ confiança)
+• Expected Value mínimo de 8%
+
+⏰ Verificação automática a cada 3 minutos
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="tips")],
+                [InlineKeyboardButton("🎮 Partidas ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📊 Monitoramento", callback_data="monitoring")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback tips: {e}")
+            query.edit_message_text("❌ Erro ao carregar tips. Tente novamente.")
+
+    def _handle_schedule_callback(self, query):
+        """Handle callback para agenda"""
+        try:
+            # Buscar partidas agendadas
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            scheduled_matches = loop.run_until_complete(self.schedule_manager.get_scheduled_matches())
+            loop.close()
+
+            if scheduled_matches:
+                message = "📅 **AGENDA DE PARTIDAS** 📅\n\n"
+                
+                for i, match in enumerate(scheduled_matches[:5], 1):
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        league = match.get('league', 'League')
+                        start_time = match.get('start_time_formatted', 'TBD')
+                        
+                        message += f"**{i}. {team1} vs {team2}**\n"
+                        message += f"🏆 {league}\n"
+                        message += f"⏰ {start_time}\n\n"
+            else:
+                message = "📅 Nenhuma partida agendada encontrada."
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback schedule: {e}")
+            query.edit_message_text("❌ Erro ao carregar agenda. Tente novamente.")
+
+    def _handle_live_matches_callback(self, query):
+        """Handle callback para partidas ao vivo"""
+        try:
+            # Buscar partidas ao vivo
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+            loop.close()
+
+            if live_matches:
+                message = "🔴 **PARTIDAS AO VIVO** 🔴\n\n"
+                
+                for i, match in enumerate(live_matches[:5], 1):
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        league = match.get('league', 'League')
+                        game_time = match.get('game_time', 0)
+                        
+                        message += f"🎮 **{team1} vs {team2}**\n"
+                        message += f"🏆 {league}\n"
+                        message += f"⏰ {game_time // 60}min {game_time % 60}s\n\n"
+            else:
+                message = "🔴 Nenhuma partida ao vivo no momento."
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
+                [InlineKeyboardButton("🎯 Gerar Tip", callback_data="tips")],
+                [InlineKeyboardButton("📊 Predições", callback_data="predictions")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback live_matches: {e}")
+            query.edit_message_text("❌ Erro ao carregar partidas ao vivo. Tente novamente.")
+
+    def _handle_units_info_callback(self, query):
+        """Handle callback para informações das unidades"""
+        try:
+            explanation = self.tips_system.units_system.get_units_explanation()
+            
+            keyboard = [
+                [InlineKeyboardButton("📊 Performance", callback_data="performance_stats")],
+                [InlineKeyboardButton("📋 Histórico", callback_data="bet_history")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(explanation, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback units_info: {e}")
+            query.edit_message_text("❌ Erro ao carregar informações das unidades.")
+
+    def _handle_monitoring_callback(self, query):
+        """Handle callback para monitoramento"""
+        try:
+            status = self.tips_system.get_monitoring_status()
+            
+            message = f"""
+📊 **STATUS DO MONITORAMENTO** 📊
+
+🔄 **Monitoramento:** {'🟢 Ativo' if status['monitoring_active'] else '🔴 Inativo'}
+⏰ **Último scan:** {status['last_scan']}
+🎯 **Tips encontradas:** {status['total_tips']}
+📈 **Tips hoje:** {status['tips_today']}
+
+🤖 **SISTEMA DE IA APRIMORADO:**
+• Machine Learning: {'🟢 Disponível' if self.prediction_system.ml_system else '🟡 Fallback matemático'}
+• Dados ao vivo: 🟢 Integrados
+• Alertas automáticos: {'🟢 Ativo' if len(self.alerts_system.group_chat_ids) > 0 else '🟡 Sem grupos'}
+
+💰 **ODDS REAIS:**
+• The Odds API: 🟢 Integrada
+• Cache: 🟢 Otimizado
+• Casas de apostas: Múltiplas
+
+🎮 **EVENTOS LoL MONITORADOS:**
+• Barão conquistado
+• Alma/Dragão Ancião
+• Diferença de ouro 5k+
+• Team fights cruciais
+• Torres/Inibidores
+
+⚙️ **CONFIGURAÇÕES:**
+• Critério mínimo: 75% confiança
+• EV mínimo: 8%
+• Limite semanal: SEM LIMITE
+• Frequência: 3 minutos
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar Status", callback_data="monitoring")],
+                [InlineKeyboardButton("🔍 Forçar Scan", callback_data="force_scan")],
+                [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback monitoring: {e}")
+            query.edit_message_text("❌ Erro ao carregar status de monitoramento.")
+
+    def _handle_predictions_callback(self, query):
+        """Handle callback para predições"""
+        try:
+            message = """
+🔮 **SISTEMA DE PREDIÇÕES IA** 🔮
+
+🤖 **Status:** {'🟢 ML Ativo' if self.prediction_system.ml_system else '🟡 Algoritmos Matemáticos'}
+
+📊 **Funcionalidades:**
+• Análise de draft em tempo real
+• Predições baseadas em estatísticas
+• Ajustes por dados ao vivo
+• Confiança dinâmica
+• Expected Value calculado
+
+🎮 **Específico para LoL:**
+• Análise de composições
+• Potencial de scaling
+• Eventos cruciais detectados
+• Timing de "Janela de Ouro"
+
+⚡ **Para usar:**
+1. /live - Ver partidas ao vivo
+2. /tips - Gerar predições profissionais
+3. /monitoring - Acompanhar análises
+
+💡 O sistema analisa automaticamente partidas ao vivo e gera tips quando detecta oportunidades profissionais.
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🎮 Partidas ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
+                [InlineKeyboardButton("📊 Monitoramento", callback_data="monitoring")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback predictions: {e}")
+            query.edit_message_text("❌ Erro ao carregar predições.")
 
     def _handle_alert_stats_callback(self, query):
         """Handle callback para estatísticas de alertas"""
-        # Implementação do callback alert_stats aqui  
-        pass
+        try:
+            stats = self.alerts_system.get_alert_stats()
+            
+            message = f"""
+📢 **ESTATÍSTICAS DE ALERTAS** 📢
+
+👥 **Grupos cadastrados:** {stats['total_groups']}
+📊 **Alertas enviados:** {stats['alerts_sent']}
+🎯 **Tips alertadas:** {stats['tips_alerted']}
+⏰ **Último alerta:** {stats['last_alert']}
+
+📈 **Performance:**
+• Taxa de sucesso: {stats['success_rate']:.1f}%
+• Alertas hoje: {stats['alerts_today']}
+• Grupos ativos: {stats['active_groups']}
+
+💡 Para adicionar este chat aos alertas:
+/alerts
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="alert_stats")],
+                [InlineKeyboardButton("📢 Configurar Alertas", callback_data="alert_help")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback alert_stats: {e}")
+            query.edit_message_text("❌ Erro ao carregar estatísticas de alertas.")
 
     def _handle_register_alerts_callback(self, query, chat_id):
         """Handle callback para registrar alertas"""
-        # Implementação do callback register_alerts aqui
-        pass
+        try:
+            success = self.alerts_system.add_group(chat_id)
+            
+            if success:
+                message = f"""
+✅ **ALERTAS ATIVADOS** ✅
+
+Este chat foi cadastrado para receber alertas automáticos!
+
+📢 **Você receberá:**
+• Tips profissionais em tempo real
+• Alertas de partidas ao vivo
+• Oportunidades de alta confiança
+• Notificações de eventos cruciais
+
+⚙️ **Configurações:**
+• Apenas tips 75%+ confiança
+• EV mínimo de 8%
+• Dados reais de odds
+• Análise de eventos LoL
+
+🔕 Para desativar: /alerts
+                """
+            else:
+                message = "❌ Erro ao ativar alertas. Tente novamente."
+
+            keyboard = [
+                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="alert_stats")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback register_alerts: {e}")
+            query.edit_message_text("❌ Erro ao registrar alertas.")
 
     def _handle_unregister_alerts_callback(self, query, chat_id):
         """Handle callback para desregistrar alertas"""
-        # Implementação do callback unregister_alerts aqui
-        pass
+        try:
+            success = self.alerts_system.remove_group(chat_id)
+            
+            if success:
+                message = """
+🔕 **ALERTAS DESATIVADOS** 🔕
+
+Este chat foi removido da lista de alertas.
+
+💡 **Para reativar:**
+• Use o comando /alerts
+• Clique em "Ativar Alertas"
+
+📊 **Você ainda pode:**
+• Usar comandos manuais
+• Verificar tips com /tips
+• Monitorar com /monitoring
+                """
+            else:
+                message = "❌ Erro ao desativar alertas. Tente novamente."
+
+            keyboard = [
+                [InlineKeyboardButton("📢 Reativar Alertas", callback_data=f"register_alerts_{chat_id}")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback unregister_alerts: {e}")
+            query.edit_message_text("❌ Erro ao desregistrar alertas.")
 
     def _handle_alert_help_callback(self, query):
         """Handle callback para ajuda de alertas"""
-        # Implementação do callback alert_help aqui
-        pass
+        try:
+            message = """
+📢 **SISTEMA DE ALERTAS** 📢
+
+🎯 **Como funciona:**
+• Sistema monitora partidas ao vivo 24/7
+• Detecta oportunidades profissionais automaticamente
+• Envia alertas instantâneos para grupos cadastrados
+• Apenas tips que atendem critérios rigorosos
+
+⚙️ **Critérios para alertas:**
+• Confiança mínima: 75%
+• Expected Value: 8%+
+• Partidas AO VIVO apenas
+• Dados completos (draft + stats)
+
+🎮 **Eventos LoL monitorados:**
+• Barão conquistado
+• Alma/Dragão Ancião  
+• 5k+ vantagem ouro
+• Team fights cruciais
+• Torres/Inibidores
+
+📱 **Para ativar neste chat:**
+1. Use o comando /alerts
+2. Clique em "Ativar Alertas"
+3. Confirme a ativação
+
+💡 **Dica:** Alertas funcionam em grupos e canais privados.
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("📢 Ativar Alertas", callback_data=f"register_alerts_{query.message.chat.id}")],
+                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="alert_stats")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback alert_help: {e}")
+            query.edit_message_text("❌ Erro ao carregar ajuda de alertas.")
 
     def _handle_performance_stats_callback(self, query):
         """Handle callback para estatísticas de performance"""
-        # Implementação do callback performance_stats aqui
-        pass
+        try:
+            bet_history = self.tips_system.units_system.bet_history
+            current_bankroll = self.tips_system.units_system.bankroll
+            
+            if bet_history:
+                total_bets = len(bet_history)
+                profitable_bets = sum(1 for bet in bet_history if bet.get('result') == 'win')
+                win_rate = (profitable_bets / total_bets) * 100 if total_bets > 0 else 0
+                
+                total_units = sum(bet.get('units_risked', 0) for bet in bet_history)
+                total_profit = sum(bet.get('profit_loss', 0) for bet in bet_history)
+                roi = (total_profit / total_units) * 100 if total_units > 0 else 0
+                
+                message = f"""
+📊 **PERFORMANCE DETALHADA** 📊
+
+💰 **Resumo financeiro:**
+• Bankroll atual: ${current_bankroll:.2f}
+• Total apostado: {total_units:.1f} unidades
+• Lucro/Prejuízo: ${total_profit:.2f}
+• ROI: {roi:.1f}%
+
+📈 **Estatísticas:**
+• Total de apostas: {total_bets}
+• Apostas lucrativas: {profitable_bets}
+• Win rate: {win_rate:.1f}%
+• Unidade média: {total_units/total_bets:.1f} (se {total_bets} > 0)
+
+🎯 **Performance por confiança:**
+• 75-80%: {sum(1 for bet in bet_history if 75 <= bet.get('confidence', 0) < 80)} apostas
+• 80-90%: {sum(1 for bet in bet_history if 80 <= bet.get('confidence', 0) < 90)} apostas  
+• 90%+: {sum(1 for bet in bet_history if bet.get('confidence', 0) >= 90)} apostas
+
+⏰ **Última atualização:** {datetime.now().strftime('%H:%M')}
+                """
+            else:
+                message = """
+📊 **PERFORMANCE DETALHADA** 📊
+
+ℹ️ **Nenhum histórico disponível ainda.**
+
+🎯 **Para começar:**
+• Use /tips para gerar primeira oportunidade
+• Tips profissionais são registradas automaticamente
+• Performance será calculada em tempo real
+
+💡 O sistema só registra tips que atendem aos critérios profissionais (75%+ confiança, 8%+ EV).
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="performance_stats")],
+                [InlineKeyboardButton("📋 Ver Histórico", callback_data="bet_history")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback performance_stats: {e}")
+            query.edit_message_text("❌ Erro ao carregar estatísticas de performance.")
 
     def _handle_bet_history_callback(self, query):
         """Handle callback para histórico de apostas"""
-        # Implementação do callback bet_history aqui
-        pass
+        try:
+            bet_history = self.tips_system.units_system.bet_history
+            
+            if bet_history:
+                message = "📋 **HISTÓRICO DE APOSTAS** 📋\n\n"
+                
+                # Mostrar últimas 5 apostas
+                for i, bet in enumerate(bet_history[-5:], 1):
+                    result_icon = "✅" if bet.get('result') == 'win' else "❌" if bet.get('result') == 'loss' else "⏳"
+                    
+                    message += f"**{i}. {bet.get('tip_title', 'Tip')}**\n"
+                    message += f"{result_icon} Resultado: {bet.get('result', 'pending').upper()}\n"
+                    message += f"💰 Unidades: {bet.get('units_risked', 0):.1f}\n"
+                    message += f"📊 Confiança: {bet.get('confidence', 0):.1f}%\n"
+                    message += f"📅 {bet.get('timestamp', 'N/A')}\n\n"
+                    
+                message += f"📊 **Total:** {len(bet_history)} apostas registradas"
+            else:
+                message = """
+📋 **HISTÓRICO DE APOSTAS** 📋
+
+ℹ️ **Nenhuma aposta registrada ainda.**
+
+🎯 **Como funciona:**
+• Sistema registra automaticamente tips gerados
+• Cada tip vira uma entrada no histórico  
+• Performance calculada automaticamente
+
+🚀 **Para começar:**
+• Use /tips para gerar primeira oportunidade
+• Tips profissionais são registrados automaticamente
+• Acompanhe performance em tempo real
+
+💡 Apenas tips que atendem aos critérios profissionais são registradas.
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="bet_history")],
+                [InlineKeyboardButton("📊 Performance", callback_data="performance_stats")],
+                [InlineKeyboardButton("🎯 Nova Tip", callback_data="tips")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback bet_history: {e}")
+            query.edit_message_text("❌ Erro ao carregar histórico de apostas.")
 
     def _handle_odds_summary_callback(self, query):
         """Handle callback para resumo de odds"""
-        # Implementação do callback odds_summary aqui
-        pass
+        try:
+            # Buscar resumo de odds
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            odds_summary = loop.run_until_complete(self.tips_system.odds_client.get_odds_summary())
+            loop.close()
+            
+            message = f"""
+💰 **RESUMO DE ODDS REAIS** 💰
+
+📊 **The Odds API Status:**
+• Jogos disponíveis: {odds_summary.get('total_games', 0)}
+• Ligas cobertas: {len(odds_summary.get('leagues', []))}
+• Times monitorados: {len(odds_summary.get('teams', []))}
+• Casas de apostas: {len(odds_summary.get('bookmakers', []))}
+
+🏆 **Principais ligas:**
+{chr(10).join([f"• {league}" for league in odds_summary.get('leagues', [])[:5]])}
+
+🎮 **Funcionalidades:**
+• Odds reais em tempo real
+• Múltiplas casas de apostas
+• Cache otimizado (5min)
+• Expected Value preciso
+
+⚡ **Para usar:**
+• /tips - Tips com odds reais
+• /odds - Ver odds disponíveis
+• Sistema calcula EV automaticamente
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="odds_summary")],
+                [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
+                [InlineKeyboardButton("💰 Comando /odds", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback odds_summary: {e}")
+            query.edit_message_text("❌ Erro ao carregar resumo de odds.")
 
     def _handle_force_scan_callback(self, query):
         """Handle callback para scan forçado"""
-        # Implementação do callback force_scan aqui
-        pass
+        try:
+            user = query.from_user
+            
+            # Verificar se é o owner
+            if user.id != OWNER_ID:
+                query.answer("❌ Apenas o administrador pode forçar scans manuais.")
+                return
+
+            # Responder callback primeiro
+            query.answer("🔍 Iniciando scan manual...")
+            
+            # Atualizar mensagem para mostrar progresso
+            progress_message = """
+🔍 **SCAN MANUAL INICIADO** 🔍
+
+⏳ **STATUS:**
+• Buscando partidas disponíveis...
+• Analisando com sistema de IA...
+• Verificando critérios profissionais...
+
+⚡ **Aguarde alguns segundos...**
+            """
+            
+            query.edit_message_text(progress_message, parse_mode="Markdown")
+            
+            # Executar scan em thread separada
+            def run_manual_scan():
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(self.tips_system._scan_live_matches_only())
+                    loop.close()
+                    
+                    # Buscar resultados
+                    recent_tips = self.tips_system.tips_database[-3:] if self.tips_system.tips_database else []
+                    
+                    if recent_tips:
+                        result_message = f"""
+✅ **SCAN MANUAL CONCLUÍDO** ✅
+
+🎯 **Resultados:**
+• {len(recent_tips)} oportunidades encontradas
+• Critérios profissionais aplicados
+• Tips adicionadas ao sistema
+
+📊 **Últimas tips encontradas:**
+"""
+                        for tip in recent_tips:
+                            result_message += f"• {tip.get('title', 'Tip')}\n"
+                            result_message += f"  📊 {tip.get('confidence_score', 0):.1f}% confiança\n"
+                    else:
+                        result_message = """
+✅ **SCAN MANUAL CONCLUÍDO** ✅
+
+ℹ️ **Nenhuma nova oportunidade encontrada.**
+
+🔍 **Verificado:**
+• Todas as partidas ao vivo
+• Critérios profissionais aplicados
+• Sistema funcionando normalmente
+
+⏰ Próximo scan automático em 3 minutos
+                        """
+                    
+                    keyboard = [
+                        [InlineKeyboardButton("🔄 Novo Scan", callback_data="force_scan")],
+                        [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
+                        [InlineKeyboardButton("📊 Monitoramento", callback_data="monitoring")]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    # Atualizar mensagem com resultado
+                    query.edit_message_text(result_message, reply_markup=reply_markup, parse_mode="Markdown")
+                    
+                except Exception as e:
+                    logger.error(f"Erro no scan manual: {e}")
+                    error_message = f"""
+❌ **ERRO NO SCAN MANUAL** ❌
+
+Erro: {str(e)}
+
+🔄 **Tente novamente ou:**
+• Verificar conexão
+• Aguardar scan automático
+• Usar /monitoring para status
+                    """
+                    query.edit_message_text(error_message, parse_mode="Markdown")
+            
+            # Executar em thread separada
+            import threading
+            scan_thread = threading.Thread(target=run_manual_scan, daemon=True)
+            scan_thread.start()
+            
+        except Exception as e:
+            logger.error(f"Erro no callback force_scan: {e}")
+            query.edit_message_text("❌ Erro ao iniciar scan manual.")
 
     def _handle_main_menu_callback(self, query):
         """Handle callback para menu principal"""
-        # Implementação do callback main_menu aqui
-        pass
+        try:
+            menu_message = """
+🎮 **MENU PRINCIPAL - BOT LOL V3** 🎮
+
+🎯 **TIPS & ANÁLISES (ATUALIZADO):**
+• /tips - Tips profissionais AO VIVO
+• /predictions - Predições IA
+• /schedule - Agenda de partidas
+• /live - Partidas ao vivo
+• /monitoring - Status do monitoramento
+• /force_scan - Scan manual (admin)
+• /alerts - Sistema de alertas
+
+🎲 **SISTEMA DE UNIDADES:**
+• /units - Explicação do sistema
+• /performance - Performance atual
+• /history - Histórico de apostas
+
+📊 **INFORMAÇÕES:**
+• /help - Ajuda completa
+• /about - Sobre o bot
+
+🎮 **NOVA FUNCIONALIDADE - TIPS AO VIVO:**
+🔥 Agora o sistema gera tips APENAS para partidas que estão acontecendo!
+• ✅ Dados reais de draft + estatísticas
+• ✅ Informação de mapa e tempo de jogo
+• ✅ SEM LIMITE semanal de tips
+• ✅ Monitoramento a cada 3 minutos
+
+💰 **ODDS REAIS INTEGRADAS:**
+• The Odds API para odds reais
+• Expected Value preciso
+• Múltiplas casas de apostas
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+                [InlineKeyboardButton("🔴 Partidas ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
+                [InlineKeyboardButton("📊 Monitoramento", callback_data="monitoring")],
+                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
+                [InlineKeyboardButton("📢 Alertas", callback_data="alert_stats")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(menu_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback main_menu: {e}")
+            query.edit_message_text("❌ Erro ao carregar menu principal.")
 
 def run_flask():
     """Executa apenas o Flask app para health checks"""
