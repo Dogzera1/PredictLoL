@@ -110,38 +110,91 @@ class LoLBotV3UltraAdvanced:
         
         logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado - Sistema Completo!")
         
+        # Tenta múltiplas vezes para resolver conflitos
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    logger.info(f"🔄 Tentativa {attempt + 1}/{max_retries} de inicialização...")
+                    await asyncio.sleep(5)  # Aguarda entre tentativas
+                
+                # 1. Inicializa aplicação do Telegram
+                self.application = Application.builder().token(self.bot_token).build()
+                
+                # 2. Configura todos os handlers
+                self._setup_all_handlers()
+                
+                # 3. Inicializa aplicação
+                await self.application.initialize()
+                await self.application.start()
+                
+                # 4. Inicia ScheduleManager (automação total)
+                logger.info("🔧 Iniciando ScheduleManager...")
+                schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
+                
+                # 5. Inicia polling do Telegram com proteção contra conflitos
+                logger.info("📱 Iniciando Telegram bot...")
+                await self._start_polling_with_retry()
+                
+                self.is_running = True
+                logger.info("✅ Bot LoL V3 Ultra Avançado totalmente operacional!")
+                
+                # 6. Configura shutdown graceful
+                self._setup_signal_handlers(schedule_task)
+                
+                # 7. Mantém bot rodando
+                await schedule_task
+                break  # Sucesso, sai do loop
+                
+            except Exception as e:
+                if "terminated by other getUpdates request" in str(e):
+                    logger.warning(f"⚠️ Conflito detectado na tentativa {attempt + 1}: {e}")
+                    if attempt < max_retries - 1:
+                        logger.info("🔄 Tentando novamente em 10 segundos...")
+                        await self._cleanup_bot_instance()
+                        await asyncio.sleep(10)
+                        continue
+                    else:
+                        logger.error("❌ Máximo de tentativas atingido. Conflito não resolvido.")
+                        raise
+                else:
+                    logger.error(f"Erro crítico ao iniciar bot: {e}")
+                    await self.stop_bot()
+                    raise
+
+    async def _start_polling_with_retry(self) -> None:
+        """Inicia polling com retry em caso de conflitos"""
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                await self.application.updater.start_polling(
+                    timeout=30,
+                    pool_timeout=30,
+                    connect_timeout=30,
+                    read_timeout=30
+                )
+                logger.info("✅ Polling iniciado com sucesso")
+                break
+            except Exception as e:
+                if "terminated by other getUpdates request" in str(e) or "Conflict" in str(e):
+                    logger.warning(f"⚠️ Conflito no polling (tentativa {attempt + 1}): {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(3 * (attempt + 1))  # Backoff exponencial
+                        continue
+                raise
+
+    async def _cleanup_bot_instance(self) -> None:
+        """Limpa instância atual do bot para resolver conflitos"""
         try:
-            # 1. Inicializa aplicação do Telegram
-            self.application = Application.builder().token(self.bot_token).build()
-            
-            # 2. Configura todos os handlers
-            self._setup_all_handlers()
-            
-            # 3. Inicializa aplicação
-            await self.application.initialize()
-            await self.application.start()
-            
-            # 4. Inicia ScheduleManager (automação total)
-            logger.info("🔧 Iniciando ScheduleManager...")
-            schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
-            
-            # 5. Inicia polling do Telegram
-            logger.info("📱 Iniciando Telegram bot...")
-            await self.application.updater.start_polling()
-            
-            self.is_running = True
-            logger.info("✅ Bot LoL V3 Ultra Avançado totalmente operacional!")
-            
-            # 6. Configura shutdown graceful
-            self._setup_signal_handlers(schedule_task)
-            
-            # 7. Mantém bot rodando
-            await schedule_task
-            
+            logger.info("🧹 Limpando instância do bot...")
+            if self.application and self.application.updater:
+                await self.application.updater.stop()
+                await self.application.stop()
+                await self.application.shutdown()
+            self.application = None
+            logger.info("✅ Instância limpa")
         except Exception as e:
-            logger.error(f"Erro crítico ao iniciar bot: {e}")
-            await self.stop_bot()
-            raise
+            logger.warning(f"⚠️ Erro na limpeza: {e}")
 
     async def stop_bot(self) -> None:
         """Para o bot e todos os sistemas"""
