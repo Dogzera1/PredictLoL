@@ -46,6 +46,7 @@ try:
     from bot.telegram_bot import LoLBotV3UltraAdvanced, TelegramAlertsSystem
     from bot.api_clients.pandascore_api_client import PandaScoreAPIClient
     from bot.api_clients.riot_api_client import RiotAPIClient
+    from bot.core_logic import DynamicPredictionSystem, LoLGameAnalyzer, ProfessionalUnitsSystem
     from bot.utils.constants import PANDASCORE_API_KEY, TELEGRAM_CONFIG
 except ImportError as e:
     logger.error(f"❌ Erro crítico ao importar módulos: {e}")
@@ -145,17 +146,25 @@ class BotApplication:
             
             # 2. Sistema de Tips Profissionais
             logger.info("🎯 Inicializando sistema de tips...")
+            
+            # Cria componentes necessários
+            units_system = ProfessionalUnitsSystem()
+            game_analyzer = LoLGameAnalyzer()
+            prediction_system = DynamicPredictionSystem(
+                game_analyzer=game_analyzer,
+                units_system=units_system
+            )
+            
             self.tips_system = ProfessionalTipsSystem(
                 pandascore_client=self.pandascore_client,
-                riot_client=self.riot_client
+                riot_client=self.riot_client,
+                prediction_system=prediction_system
             )
             
             # 3. Sistema de Alertas Telegram
             logger.info("📤 Inicializando sistema de alertas...")
             self.telegram_alerts = TelegramAlertsSystem(
-                bot_token=self.bot_token,
-                max_messages_per_hour=TELEGRAM_CONFIG["rate_limit_per_user"],
-                cache_duration_minutes=TELEGRAM_CONFIG["cache_duration_minutes"]
+                bot_token=self.bot_token
             )
             
             # 4. ScheduleManager (orquestrador total)
