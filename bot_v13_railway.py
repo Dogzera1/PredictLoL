@@ -2146,6 +2146,174 @@ class ProfessionalTipsSystem:
         self.monitor_thread = None
         self.last_scan_time = None
         self.scan_interval = 180  # 3 minutos
+        
+        # Base de dados de tips encontrados
+        self.tips_database = []
+        self.given_tips = set()
+        
+        # INICIAR MONITORAMENTO AUTOMÁTICO
+        self.start_monitoring()
+        logger.info("🎯 Sistema de Tips Profissional inicializado com MONITORAMENTO ATIVO DE PARTIDAS AO VIVO")
+
+    def start_monitoring(self):
+        """Inicia monitoramento contínuo APENAS de partidas ao vivo com dados completos"""
+        if not self.monitoring:
+            self.monitoring = True
+            
+            def monitor_loop():
+                """Loop de monitoramento em thread separada"""
+                while self.monitoring:
+                    try:
+                        # Criar novo loop asyncio para esta thread
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        
+                        # Executar scan APENAS de partidas ao vivo
+                        loop.run_until_complete(self._scan_live_matches_only())
+                        
+                        # Fechar loop
+                        loop.close()
+                        
+                        # Aguardar 3 minutos antes do próximo scan
+                        if self.monitoring:
+                            time.sleep(self.scan_interval)
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Erro no monitoramento de tips: {e}")
+                        # Em caso de erro, aguardar 1 minuto antes de tentar novamente
+                        if self.monitoring:
+                            time.sleep(60)
+
+            # Iniciar thread de monitoramento
+            self.monitor_thread = threading.Thread(target=monitor_loop, daemon=True, name="TipsMonitor")
+            self.monitor_thread.start()
+            logger.info("🔍 Monitoramento contínuo de tips iniciado - APENAS PARTIDAS AO VIVO - Verificação a cada 3 minutos")
+
+    def stop_monitoring(self):
+        """Para o monitoramento"""
+        self.monitoring = False
+        logger.info("🛑 Monitoramento de tips interrompido")
+
+    async def _scan_live_matches_only(self):
+        """Escaneia APENAS partidas ao vivo com dados completos (drafts + estatísticas)"""
+        try:
+            logger.info("🔍 Escaneando APENAS partidas AO VIVO com dados completos...")
+
+            # Buscar APENAS partidas ao vivo (não agendadas)
+            live_matches = await self.riot_client.get_live_matches_with_details()
+            logger.info(f"📍 Encontradas {len(live_matches)} partidas ao vivo com dados completos")
+
+            opportunities_found = 0
+
+            for i, match in enumerate(live_matches, 1):
+                try:
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        game_number = match.get('game_number', 1)
+                        logger.debug(f"🔍 Analisando JOGO {game_number}: {team1} vs {team2}")
+
+                    # Verificar se partida tem dados suficientes (draft + stats)
+                    if not self._has_complete_match_data(match):
+                        logger.debug(f"⏳ Partida sem dados completos ainda - aguardando...")
+                        continue
+
+                    # Analisar partida para tip COM dados completos
+                    tip_analysis = await self._analyze_live_match_with_data(match)
+
+                    if tip_analysis and self._meets_professional_criteria(tip_analysis):
+                        tip_id = self._generate_tip_id_with_game(match)
+
+                        # Verificar se já foi dado este tip específico (incluindo número do jogo)
+                        if tip_id not in self.given_tips:
+                            professional_tip = self._create_professional_tip_with_game_data(tip_analysis)
+
+                            if professional_tip:
+                                self.tips_database.append(professional_tip)
+                                self.given_tips.add(tip_id)
+                                opportunities_found += 1
+
+                                logger.info(f"🎯 NOVA OPORTUNIDADE ENCONTRADA: {professional_tip['title']}")
+                                logger.info(f"   📊 Confiança: {professional_tip['confidence_score']:.1f}% | EV: {professional_tip['ev_percentage']:.1f}%")
+                                logger.info(f"   🎲 Unidades: {professional_tip['units']} | Valor: ${professional_tip['stake_amount']:.2f}")
+                                logger.info(f"   🗺️ {professional_tip['map_info']}")
+
+                                # ENVIAR ALERTA AUTOMÁTICO PARA GRUPOS
+                                try:
+                                    if hasattr(self, '_bot_instance') and self._bot_instance:
+                                        alerts_system = self._bot_instance.alerts_system
+                                        bot_app = self._bot_instance.bot_application
+
+                                        if alerts_system.group_chat_ids and bot_app:
+                                            await alerts_system.send_tip_alert(professional_tip, bot_app)
+                                            logger.info(f"📢 Alerta automático enviado para {len(alerts_system.group_chat_ids)} grupos")
+                                        else:
+                                            logger.info("📢 Nenhum grupo cadastrado para alertas ainda")
+
+                                except Exception as alert_error:
+                                    logger.warning(f"❌ Erro ao enviar alerta automático: {alert_error}")
+                        else:
+                            logger.debug(f"🔄 Tip já foi dado anteriormente: {tip_id}")
+                    else:
+                        if tip_analysis:
+                            logger.debug(f"📊 Partida não atende critérios: Conf={tip_analysis.get('confidence_score', 0):.1f}% EV={tip_analysis.get('ev_percentage', 0):.1f}%")
+
+                except Exception as match_error:
+                    logger.warning(f"❌ Erro ao analisar partida {i}: {match_error}")
+                    continue
+
+            # Atualizar timestamp do último scan
+            self.last_scan_time = datetime.now()
+
+            if opportunities_found > 0:
+                logger.info(f"✅ SCAN COMPLETO: {opportunities_found} novas oportunidades de tips encontradas!")
+            else:
+                logger.info("ℹ️ SCAN COMPLETO: Nenhuma nova oportunidade encontrada neste scan")
+
+            # Limpeza de tips antigos e cache
+            self._cleanup_old_tips()
+            self._cleanup_old_cache()
+
+        except Exception as e:
+            logger.error(f"❌ Erro geral no scan de partidas ao vivo: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+
+    def _has_complete_match_data(self, match: Dict) -> bool:
+        """Verifica se a partida tem dados completos (draft + estatísticas)"""
+        try:
+            # Verificar se tem dados de draft
+            draft_data = match.get('draft_data')
+            if not draft_data:
+                return False
+
+            # Verificar se tem estatísticas da partida
+            match_stats = match.get('match_statistics')
+            if not match_stats:
+                return False
+
+            # Verificar se a partida realmente começou (não apenas draft)
+            game_time = match.get('game_time', 0)
+            if game_time < 300:  # Menos de 5 minutos = ainda muito cedo
+                return False
+
+            # Verificar se tem dados dos times
+            teams = match.get('teams', [])
+            if len(teams) < 2:
+                return False
+
+            # Verificar se tem informação do mapa/game
+            game_number = match.get('game_number')
+            if not game_number:
+                return False
+
+            logger.debug(f"✅ Partida tem dados completos - Game {game_number}, {game_time}s de jogo")
+            return True
+
+        except Exception as e:
+            logger.debug(f"❌ Erro ao verificar dados da partida: {e}")
+            return False
 
     async def _analyze_live_match_with_data(self, match: Dict) -> Optional[Dict]:
         """Analisa partida ao vivo COM dados de draft e estatísticas"""
@@ -2160,9 +2328,16 @@ class ProfessionalTipsSystem:
             game_number = match.get('game_number', 1)
             game_time = match.get('game_time', 0)
 
-            # Usar sistema de predição COM dados ao vivo
-            prediction_system = DynamicPredictionSystem()
-            ml_prediction = await prediction_system.predict_live_match_with_live_data(match)
+            # OTIMIZAÇÃO: Cache de análise
+            cache_key = f"live_analysis_{team1_name}_{team2_name}_{league}_{game_number}"
+            if cache_key in self.analysis_cache:
+                cached = self.analysis_cache[cache_key]
+                if (datetime.now() - cached['timestamp']).seconds < 180:  # 3 min cache
+                    logger.debug(f"📦 Cache hit para análise: {team1_name} vs {team2_name}")
+                    return cached['data']
+
+            # OTIMIZAÇÃO: Usar sistema de predição reutilizável (não criar novo)
+            ml_prediction = await self.prediction_system.predict_live_match_with_live_data(match)
 
             if not ml_prediction or ml_prediction['confidence'] not in ['Alta', 'Muito Alta']:
                 return None
@@ -2186,7 +2361,7 @@ class ProfessionalTipsSystem:
             draft_analysis = self._analyze_draft_data(match.get('draft_data', {}))
             stats_analysis = self._analyze_match_statistics(match.get('match_statistics', {}))
 
-            return {
+            result = {
                 'team1': team1_name, 'team2': team2_name,
                 'league': league, 'league_tier': league_tier,
                 'favored_team': favored_team,
@@ -2205,6 +2380,14 @@ class ProfessionalTipsSystem:
                 'live_odds': live_odds,
                 'match_data': match
             }
+            
+            # OTIMIZAÇÃO: Cache resultado
+            self.analysis_cache[cache_key] = {
+                'data': result,
+                'timestamp': datetime.now()
+            }
+            
+            return result
 
         except Exception as e:
             logger.error(f"❌ Erro na análise da partida ao vivo: {e}")
@@ -2392,14 +2575,15 @@ class ProfessionalTipsSystem:
         
         return {
             'monitoring_active': self.monitoring,
-            'last_scan': self.last_scan.strftime('%H:%M:%S') if self.last_scan else 'Nunca',
+            'last_scan': self.last_scan_time.strftime('%H:%M:%S') if self.last_scan_time else 'Nunca',
             'total_tips': len(self.tips_database),  # Chave correta esperada pelos callbacks
             'tips_today': tips_today,  # Chave correta esperada pelos callbacks
             'tips_this_week': len(recent_tips),
-            'scan_frequency': '3 minutos (apenas partidas ao vivo)',
+            'scan_frequency': '3 minutos (partidas AO VIVO)',
             'given_tips_cache': len(self.given_tips),
-            'focus': 'APENAS partidas ao vivo com dados completos',
-            'weekly_limit': 'REMOVIDO - Tips ilimitados'
+            'focus': 'APENAS partidas ao vivo com dados completos (draft + estatísticas)',
+            'criteria': f'Confiança ≥{self.min_confidence_score}% e EV ≥{self.min_ev_percentage}%',
+            'thread_status': 'Ativo' if (self.monitor_thread and self.monitor_thread.is_alive()) else 'Inativo'
         }
 
     def set_bot_instance(self, bot_instance):
@@ -2604,6 +2788,74 @@ class ProfessionalTipsSystem:
         except Exception as e:
             logger.error(f"❌ Erro na análise da partida: {e}")
             return None
+
+    def _cleanup_old_cache(self):
+        """Limpa cache antigo para evitar uso excessivo de memória"""
+        try:
+            current_time = datetime.now()
+            
+            # Limpar análises antigas (mais de 10 minutos)
+            old_keys = []
+            for key, cached_item in self.analysis_cache.items():
+                if (current_time - cached_item['timestamp']).seconds > 600:
+                    old_keys.append(key)
+            
+            for key in old_keys:
+                del self.analysis_cache[key]
+            
+            # Limpar tips antigos (mais de 1 hora)
+            old_tip_keys = []
+            for key, cached_item in self.tips_cache.items():
+                if (current_time - cached_item.get('timestamp', current_time)).seconds > 3600:
+                    old_tip_keys.append(key)
+            
+            for key in old_tip_keys:
+                del self.tips_cache[key]
+                
+            if old_keys or old_tip_keys:
+                logger.debug(f"🧹 Cache limpo: {len(old_keys)} análises, {len(old_tip_keys)} tips")
+                
+        except Exception as e:
+            logger.warning(f"Erro ao limpar cache: {e}")
+
+    def _cleanup_old_tips(self):
+        """Remove tips antigos do banco de dados (mais de 24h)"""
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=24)
+            old_tips = []
+            
+            for tip in self.tips_database:
+                if tip.get('timestamp', datetime.now()) < cutoff_time:
+                    old_tips.append(tip)
+            
+            # Remover tips antigos
+            for old_tip in old_tips:
+                if old_tip in self.tips_database:
+                    self.tips_database.remove(old_tip)
+            
+            # Limpar IDs de tips antigos
+            old_tip_ids = set()
+            for tip_id in self.given_tips:
+                # Extrair data do tip_id se possível
+                if '_' in tip_id:
+                    parts = tip_id.split('_')
+                    for part in parts:
+                        if len(part) == 8 and part.isdigit():  # YYYYMMDD
+                            try:
+                                tip_date = datetime.strptime(part, '%Y%m%d')
+                                if (datetime.now() - tip_date).days > 1:
+                                    old_tip_ids.add(tip_id)
+                            except:
+                                pass
+            
+            for old_id in old_tip_ids:
+                self.given_tips.discard(old_id)
+            
+            if old_tips or old_tip_ids:
+                logger.debug(f"🧹 Tips antigos limpos: {len(old_tips)} tips, {len(old_tip_ids)} IDs")
+                
+        except Exception as e:
+            logger.warning(f"Erro ao limpar tips antigos: {e}")
 
 class LoLBotV3UltraAdvanced:
     """Bot LoL V3 Ultra Avançado com Sistema de Unidades Profissional + ML + Alertas"""
