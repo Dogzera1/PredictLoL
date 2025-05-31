@@ -179,6 +179,14 @@ Verifique logs no Railway:
 3. Verifique se todas as dependências estão em requirements.txt
 ```
 
+### **❌ Erro de SyntaxError:**
+```bash
+Se vir erro relacionado a f-strings com barras invertidas:
+1. Este problema foi corrigido na versão atual
+2. Faça pull da versão mais recente do repositório
+3. Re-deploy no Railway
+```
+
 ### **⚠️ Tips não são geradas:**
 ```bash
 Normal nos primeiros momentos:
