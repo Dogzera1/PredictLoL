@@ -1695,14 +1695,14 @@ Use /menu para ver todas as opções!
         ml_status = "✅ ATIVO" if ML_AVAILABLE else "⚠️ BÁSICO"
         
         menu_message = f"""
-🎮 **MENU PRINCIPAL - BOT LOL V3** 🎮
+🎮 MENU PRINCIPAL - BOT LOL V3 🎮
 
-🤖 **MACHINE LEARNING: {ml_status}**
+🤖 MACHINE LEARNING: {ml_status}
 • /ml_predictions - Sistema ML completo
 • /ml_live_analysis - Análise ao vivo ML
 • /money_line_tips - Tips money line especializados
 
-🎯 **TIPS & ANÁLISES:**
+🎯 TIPS & ANÁLISES:
 • /tips - Tips profissionais
 • /predictions - Predições IA
 • /schedule - Agenda de partidas
@@ -1710,12 +1710,12 @@ Use /menu para ver todas as opções!
 • /monitoring - Status do monitoramento
 • /alerts - Sistema de alertas
 
-🎲 **SISTEMA DE UNIDADES:**
+🎲 SISTEMA DE UNIDADES:
 • /units - Explicação do sistema
 • /performance - Performance atual
 • /history - Histórico de apostas
 
-📊 **INFORMAÇÕES:**
+📊 INFORMAÇÕES:
 • /help - Ajuda completa
 • /about - Sobre o bot
 
@@ -1737,9 +1737,9 @@ Clique nos botões abaixo para navegação rápida:
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         if TELEGRAM_VERSION == "v20+":
-            await update.message.reply_text(menu_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text(menu_message, reply_markup=reply_markup)
         else:
-            await update.message.reply_text(menu_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            await update.message.reply_text(menu_message, reply_markup=reply_markup)
 
     async def schedule_command(self, update: Update, context) -> None:
         """Comando /schedule"""
@@ -2000,16 +2000,70 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 
         try:
             callback_data = query.data
+            logger.info(f"🔄 Callback recebido: {callback_data}")
+            
+            # Callbacks principais do menu
+            if callback_data == "main_menu":
+                await self._handle_main_menu_callback(query)
+            elif callback_data == "predictions":
+                await self._handle_predictions_callback(query)
+            elif callback_data == "prediction_cache":
+                await self._handle_prediction_cache_callback(query)
+            elif callback_data == "alert_stats":
+                await self._handle_alert_stats_callback(query)
             
             # Callbacks do sistema de odds
-            if callback_data.startswith("odds_"):
+            elif callback_data.startswith("odds_"):
                 await self._handle_odds_callback(query)
             
-            # ... existing callbacks ...
+            # Callbacks do sistema de tips
+            elif callback_data == "tips":
+                await self._handle_tips_callback(query)
+            
+            # Callbacks de agenda
+            elif callback_data == "schedule":
+                await self._handle_schedule_callback(query)
+            elif callback_data == "schedule_today":
+                await self._handle_schedule_today_callback(query)
+            
+            # Callbacks de partidas ao vivo
+            elif callback_data == "live_matches":
+                await self._handle_live_matches_callback(query)
+            elif callback_data.startswith("match_details_"):
+                match_index = int(callback_data.split("_")[2])
+                await self._handle_match_details_callback(query, match_index)
+            
+            # Callbacks de sistema de unidades
+            elif callback_data == "units_info":
+                await self._handle_units_info_callback(query)
+            
+            # Callbacks de monitoramento
+            elif callback_data == "monitoring":
+                await self._handle_monitoring_callback(query)
+            
+            # Callback para registro de alertas
+            elif callback_data.startswith("register_alerts_"):
+                chat_id = int(callback_data.split("_")[2])
+                self.alerts_system.add_group(chat_id)
+                await query.answer("✅ Grupo cadastrado para alertas!")
+            elif callback_data.startswith("unregister_alerts_"):
+                chat_id = int(callback_data.split("_")[2])
+                self.alerts_system.remove_group(chat_id)
+                await query.answer("❌ Grupo removido dos alertas.")
+            
+            else:
+                logger.warning(f"⚠️ Callback não reconhecido: {callback_data}")
+                await query.edit_message_text(
+                    "❌ Comando não reconhecido. Use /start para voltar ao menu principal.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]])
+                )
             
         except Exception as e:
-            logger.error(f"Erro no callback_handler: {e}")
-            await query.edit_message_text("❌ Erro ao processar comando.")
+            logger.error(f"❌ Erro no callback_handler: {e}")
+            await query.edit_message_text(
+                "❌ Erro ao processar comando. Tente novamente.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]])
+            )
 
     async def _handle_odds_callback(self, query) -> None:
         """Handle callbacks do sistema de odds"""
@@ -2706,9 +2760,9 @@ Use o botão "Cadastrar Grupo" abaixo
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if TELEGRAM_VERSION == "v20+":
-                await update.message.reply_text(alerts_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text(alerts_message, reply_markup=reply_markup)
             else:
-                await update.message.reply_text(alerts_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text(alerts_message, reply_markup=reply_markup)
 
         except Exception as e:
             logger.error(f"Erro no comando alerts: {e}")
@@ -2719,32 +2773,55 @@ Use o botão "Cadastrar Grupo" abaixo
                 await update.message.reply_text(error_message)
 
     async def _handle_predictions_callback(self, query):
-        # Reutilizar a lógica do comando, mas adaptando para callback
-        # query.message representa a mensagem original do botão
-        # Precisamos simular um `update` e `context` para o comando
-        class MockUpdate:
-            def __init__(self, message):
-                self.message = message
-                self.effective_chat = message.chat # Adicionado para compatibilidade com alerts_command
-        
-        class MockContext:
-            def __init__(self, bot):
-                self.bot = bot
+        """Callback para mostrar predições"""
+        try:
+            # Buscar partidas para predições
+            matches = await self.riot_client.get_live_matches()
+            
+            if matches:
+                # Pegar primeira partida para exemplo
+                match = matches[0]
+                prediction = await self.prediction_system.predict_live_match(match)
+                
+                message = f"""
+🔮 **PREDIÇÕES IA** 🔮
 
-        # Para predictions_command, ele espera update.message.reply_text
-        # Para _handle_alert_stats_callback, ele espera query.edit_message_text
-        # Aqui, vamos chamar predictions_command que usa reply_text
-        
-        # Precisamos construir um 'update' similar ao que o CommandHandler passaria
-        mock_update_obj = MockUpdate(query.message)
-        
-        # O 'context' para CommandHandler (v13) é um CallbackContext, 
-        # para v20+ é ContextTypes.DEFAULT_TYPE.
-        # Para simplificar a chamada direta, passamos o bot.
-        mock_context_obj = MockContext(query.message.bot)
+🎮 **Partida Analisada:**
+**{match.get('teams', [{}])[0].get('name', 'Team1')} vs {match.get('teams', [{}])[1].get('name', 'Team2')}**
+🏆 Liga: {match.get('league', 'Unknown')}
 
-        await self.predictions_command(mock_update_obj, mock_context_obj)
+🎯 **Predição:**
+• Probabilidade: {prediction.get('win_probability', 0):.1f}%
+• Confiança: {prediction.get('confidence', 'Baixa')}
+• Recomendação: {prediction.get('recommendation', 'Aguardar')}
 
+📊 **Análise:**
+{prediction.get('analysis', 'Análise não disponível')[:300]}...
+                """
+            else:
+                message = """
+🔮 **PREDIÇÕES IA** 🔮
+
+ℹ️ **Nenhuma partida ativa no momento**
+
+🔍 Aguardando partidas para análise...
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="predictions")],
+                [InlineKeyboardButton("📊 Cache", callback_data="prediction_cache")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+
+        except Exception as e:
+            logger.error(f"Erro no _handle_predictions_callback: {e}")
+            await query.edit_message_text(
+                "❌ Erro ao carregar predições. Tente novamente.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
 
     async def _handle_prediction_cache_callback(self, query):
         cache_status = self.prediction_system.get_cache_status()
@@ -2760,54 +2837,98 @@ Use o botão "Cadastrar Grupo" abaixo
         await query.edit_message_text(cache_message, parse_mode=ParseMode.MARKDOWN,
                                       reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="predictions")]]))
 
-
     async def _handle_alert_stats_callback(self, query):
-        alert_stats = self.alerts_system.get_alert_stats()
-        stats_message = f"""
-📊 **ESTATÍSTICAS DOS ALERTAS DE TIPS** 📊
+        """Callback para mostrar estatísticas de alertas"""
+        try:
+            alert_stats = self.alerts_system.get_alert_stats()
+            stats_message = f"""
+📊 **ESTATÍSTICAS DOS ALERTAS** 📊
 
 🎯 **SISTEMA DE ALERTAS:**
-• Total de grupos: {alert_stats['total_groups']}
-• Total de tips enviados: {alert_stats['total_tips_sent']}
-• Tips esta semana: {alert_stats['tips_this_week']}
-• Tips únicos: {alert_stats['unique_tips_sent']}
-• Último alerta: {alert_stats['last_tip_alert'].strftime('%d/%m %H:%M') if alert_stats['last_tip_alert'] else 'Nunca'}
+• Total de grupos: {alert_stats.get('total_groups', 0)}
+• Tips enviados: {alert_stats.get('total_sent', 0)}
+• Taxa de sucesso: {alert_stats.get('success_rate', 0):.1f}%
+• Último alerta: {alert_stats.get('last_alert', 'Nunca')}
 
-📊 **MÉDIAS ESTA SEMANA:**
-• Confiança média: {alert_stats['avg_confidence']:.1f}%
-• EV médio: {alert_stats['avg_ev']:.1f}%
-• Unidades médias: {alert_stats['avg_units']:.1f}
+📊 **ESTA SEMANA:**
+• Tips enviados: {alert_stats.get('tips_this_week', 0)}
+• Grupos ativos: {alert_stats.get('active_groups', 0)}
 
-🤖 **CRITÉRIOS PARA ALERTAS:**
+⚡ **CRITÉRIOS PARA ALERTAS:**
 • Confiança mínima: 80%
 • EV mínimo: 10%
 • Unidades mínimas: 2.0
-• Análise ML: Alta/Muito Alta
 
-⚡ **PROCESSO AUTOMÁTICO:**
-O sistema monitora continuamente todas as partidas e envia alertas automáticos quando encontra tips que atendem aos critérios rigorosos.
-"""
+🤖 **PROCESSO AUTOMÁTICO:**
+O sistema monitora continuamente e envia alertas automáticos quando encontra tips de alta qualidade.
+            """
 
-        keyboard = [
-            [InlineKeyboardButton("🔄 Atualizar", callback_data="alert_stats")],
-            [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
-            [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="alert_stats")],
+                [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(stats_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            await query.edit_message_text(stats_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
-    async def _handle_register_alerts_callback(self, query, chat_id):
-        self.alerts_system.add_group(chat_id)
-        await query.answer("✅ Grupo cadastrado com sucesso!") # Use query.answer para feedback rápido
-        # Opcionalmente, edite a mensagem anterior para refletir o novo status
-        # await self.alerts_command(query.message, query.message.bot) # Se quiser reenviar a mensagem /alerts
+        except Exception as e:
+            logger.error(f"Erro no _handle_alert_stats_callback: {e}")
+            await query.edit_message_text(
+                "❌ Erro ao carregar estatísticas. Tente novamente.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
 
-    async def _handle_unregister_alerts_callback(self, query, chat_id):
-        self.alerts_system.remove_group(chat_id)
-        await query.answer("❌ Grupo removido dos alertas.") # Use query.answer
-        # Opcionalmente, edite a mensagem anterior
-        # await self.alerts_command(query.message, query.message.bot)
+    async def _handle_main_menu_callback(self, query):
+        """Callback para mostrar menu principal"""
+        try:
+            ml_status = "✅ ATIVO" if ML_AVAILABLE else "⚠️ BÁSICO"
+            
+            menu_message = f"""
+🎮 **MENU PRINCIPAL - BOT LOL V3** 🎮
+
+🤖 **MACHINE LEARNING: {ml_status}**
+• Sistema ML completo para predições
+• Análise em tempo real após draft
+• Tips especializados money line
+
+🎯 **FUNCIONALIDADES PRINCIPAIS:**
+• 🎯 Tips profissionais com monitoramento
+• 🔮 Predições IA com dados reais
+• 📅 Agenda de partidas completa
+• 🎮 Partidas ao vivo selecionáveis
+• 📊 Sistema de unidades profissional
+• 💰 Odds reais integradas
+
+🎲 **SISTEMA DE UNIDADES:**
+Baseado em grupos de apostas profissionais
+Critérios: 65%+ confiança, 5%+ EV mínimo
+
+Use os botões abaixo para navegar:
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🤖 ML System", callback_data="ml_predictions"),
+                 InlineKeyboardButton("🎯 Money Line", callback_data="money_line_tips")],
+                [InlineKeyboardButton("🔮 Predições", callback_data="predictions"),
+                 InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule"),
+                 InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📊 Unidades", callback_data="units_info"),
+                 InlineKeyboardButton("💰 Odds Reais", callback_data="odds")],
+                [InlineKeyboardButton("📢 Alertas", callback_data="alert_stats"),
+                 InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(menu_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+
+        except Exception as e:
+            logger.error(f"Erro no _handle_main_menu_callback: {e}")
+            await query.edit_message_text(
+                "❌ Erro ao carregar menu. Tente /start novamente.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Reiniciar", callback_data="start")]])
+            )
 
     async def force_scan_command(self, update: Update, context) -> None:
         """Comando para forçar escaneamento de partidas (apenas admins)"""
