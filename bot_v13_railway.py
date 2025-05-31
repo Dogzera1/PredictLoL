@@ -4444,6 +4444,20 @@ def main():
             dispatcher.add_handler(CommandHandler("minhasconfiguracoes", bot.minhasconfiguracoes_command))
             dispatcher.add_handler(CommandHandler("filtrosnotificacao", bot.filtrosnotificacao_command))
             
+            # COMANDOS ADICIONAIS DA DOCUMENTAÇÃO (v13) - FALTAVAM ESTES HANDLERS!
+            dispatcher.add_handler(CommandHandler("livematches", bot.livematches_command))
+            dispatcher.add_handler(CommandHandler("proximosjogoslol", bot.proximosjogoslol_command))
+            dispatcher.add_handler(CommandHandler("forcescan", bot.forcescan_command))
+            dispatcher.add_handler(CommandHandler("performance", bot.performance_command))
+            dispatcher.add_handler(CommandHandler("history", bot.history_command))
+            dispatcher.add_handler(CommandHandler("odds", bot.odds_command))
+            dispatcher.add_handler(CommandHandler("units", bot.units_command))
+            dispatcher.add_handler(CommandHandler("filtrarligas", bot.filtrarligas_command))
+            dispatcher.add_handler(CommandHandler("timesfavoritos", bot.timesfavoritos_command))
+            dispatcher.add_handler(CommandHandler("statuslol", bot.statuslol_command))
+            dispatcher.add_handler(CommandHandler("comandos", bot.comandos_command))
+            dispatcher.add_handler(CommandHandler("help", bot.help_command))
+            
             dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler))
 
             # Contar handlers corretamente
