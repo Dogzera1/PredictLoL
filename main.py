@@ -28,20 +28,28 @@ from typing import List
 # Adiciona o diretório raiz ao path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Setup de logging (antes dos outros imports)
+from bot.utils.logger_config import setup_logging, get_logger
+logger = setup_logging(log_level="INFO", log_file="bot_lol_v3.log")
+
 # Configuração de ambiente
-from dotenv import load_dotenv
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    logger.warning("⚠️ python-dotenv não disponível, usando apenas environment variables")
 
 # Imports do sistema
-from bot.systems import ScheduleManager, ProfessionalTipsSystem
-from bot.telegram_bot import LoLBotV3UltraAdvanced, TelegramAlertsSystem
-from bot.api_clients.pandascore_api_client import PandaScoreAPIClient
-from bot.api_clients.riot_api_client import RiotAPIClient
-from bot.utils.logger_config import setup_logging, get_logger
-from bot.utils.constants import PANDASCORE_API_KEY, TELEGRAM_CONFIG
-
-# Setup de logging
-logger = setup_logging(log_level="INFO", log_file="bot_lol_v3.log")
+try:
+    from bot.systems.schedule_manager import ScheduleManager
+    from bot.systems.tips_system import ProfessionalTipsSystem
+    from bot.telegram_bot import LoLBotV3UltraAdvanced, TelegramAlertsSystem
+    from bot.api_clients.pandascore_api_client import PandaScoreAPIClient
+    from bot.api_clients.riot_api_client import RiotAPIClient
+    from bot.utils.constants import PANDASCORE_API_KEY, TELEGRAM_CONFIG
+except ImportError as e:
+    logger.error(f"❌ Erro crítico ao importar módulos: {e}")
+    sys.exit(1)
 
 
 class BotApplication:
@@ -86,14 +94,28 @@ class BotApplication:
 
     def _parse_admin_user_ids(self) -> List[int]:
         """Parse dos IDs de administradores"""
+        # Primeiro tenta variável de ambiente
         admin_ids_str = os.getenv("TELEGRAM_ADMIN_USER_IDS", "")
+        
+        # Se não encontrar, usa o padrão das constantes
         if not admin_ids_str:
+            default_admins = TELEGRAM_CONFIG.get("admin_user_ids", [])
+            if isinstance(default_admins, list) and default_admins:
+                try:
+                    # Converte strings para int se necessário
+                    admin_ids = [int(uid) if isinstance(uid, str) else uid for uid in default_admins]
+                    logger.info(f"👑 {len(admin_ids)} administradores (padrão) configurados")
+                    return admin_ids
+                except (ValueError, TypeError) as e:
+                    logger.error(f"❌ Erro ao parsear admin IDs padrão: {e}")
+                    return []
+            
             logger.warning("⚠️ Nenhum admin user ID configurado")
             return []
         
         try:
             admin_ids = [int(uid.strip()) for uid in admin_ids_str.split(",") if uid.strip()]
-            logger.info(f"👑 {len(admin_ids)} administradores configurados")
+            logger.info(f"👑 {len(admin_ids)} administradores (env) configurados")
             return admin_ids
         except ValueError as e:
             logger.error(f"❌ Erro ao parsear admin user IDs: {e}")
@@ -101,14 +123,13 @@ class BotApplication:
 
     def _validate_config(self) -> None:
         """Valida configuração essencial"""
-        if self.bot_token == "BOT_TOKEN_HERE" or not self.bot_token:
-            raise ValueError(
-                "❌ TELEGRAM_BOT_TOKEN não configurado!\n"
-                "Configure a variável de ambiente TELEGRAM_BOT_TOKEN"
-            )
+        if not self.bot_token or self.bot_token == "BOT_TOKEN_HERE":
+            logger.warning("⚠️ TELEGRAM_BOT_TOKEN não configurado via environment variable")
+            logger.info("ℹ️ Usando token padrão das constantes")
         
         if not self.pandascore_api_key:
             logger.warning("⚠️ PandaScore API key não configurada")
+            logger.info("ℹ️ Usando API key padrão das constantes")
         
         logger.info("✅ Configuração validada")
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import asyncio
 import time
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from dataclasses import dataclass
 import signal
 import sys
@@ -19,13 +19,15 @@ except ImportError:
     Update = Application = CommandHandler = CallbackQueryHandler = ContextTypes = None
     MessageHandler = filters = ParseMode = TelegramError = None
 
-from ..systems.schedule_manager import ScheduleManager
-from ..systems.tips_system import ProfessionalTipsSystem
 from ..telegram_bot.alerts_system import TelegramAlertsSystem, SubscriptionType
 from ..api_clients.pandascore_api_client import PandaScoreAPIClient
 from ..api_clients.riot_api_client import RiotAPIClient
 from ..utils.logger_config import get_logger
 from ..utils.constants import TELEGRAM_CONFIG
+
+if TYPE_CHECKING:
+    from ..systems.schedule_manager import ScheduleManager
+    from ..systems.tips_system import ProfessionalTipsSystem
 
 logger = get_logger(__name__)
 
@@ -69,7 +71,7 @@ class LoLBotV3UltraAdvanced:
     def __init__(
         self,
         bot_token: str,
-        schedule_manager: ScheduleManager,
+        schedule_manager: "ScheduleManager",
         admin_user_ids: List[int] = None
     ):
         """

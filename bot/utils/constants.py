@@ -174,13 +174,13 @@ RIOT_HEADERS = {
 
 # Configurações do Telegram
 TELEGRAM_CONFIG = {
-    "bot_token": "BOT_TOKEN_HERE",  # Será obtido via environment variable
+    "bot_token": "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg",  # Token real como padrão
     "parse_mode": "MarkdownV2",
     "disable_web_page_preview": True,
     "max_message_length": 4096,
     "rate_limit_per_user": 10,  # mensagens por hora por usuário
     "cache_duration_minutes": 5,
-    "admin_user_ids": []  # IDs dos administradores
+    "admin_user_ids": ["8012415611"]  # ID do admin como padrão
 }
 
 # Template para tips do Telegram

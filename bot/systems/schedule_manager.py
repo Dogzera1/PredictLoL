@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Set, Any, Tuple
+from typing import Dict, List, Optional, Set, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime, timedelta
@@ -10,12 +10,14 @@ import logging
 
 from ..api_clients.pandascore_api_client import PandaScoreAPIClient
 from ..api_clients.riot_api_client import RiotAPIClient
-from ..systems.tips_system import ProfessionalTipsSystem
 from ..telegram_bot.alerts_system import TelegramAlertsSystem
 from ..data_models.match_data import MatchData
 from ..utils.constants import SCAN_INTERVAL_MINUTES, SUPPORTED_LEAGUES, CLEANUP_INTERVAL_HOURS
 from ..utils.helpers import get_current_timestamp
 from ..utils.logger_config import get_logger
+
+if TYPE_CHECKING:
+    from .tips_system import ProfessionalTipsSystem
 
 logger = get_logger(__name__)
 
@@ -97,7 +99,7 @@ class ScheduleManager:
 
     def __init__(
         self,
-        tips_system: ProfessionalTipsSystem,
+        tips_system: "ProfessionalTipsSystem",
         telegram_alerts: TelegramAlertsSystem,
         pandascore_client: PandaScoreAPIClient,
         riot_client: RiotAPIClient

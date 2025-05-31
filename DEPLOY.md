@@ -40,18 +40,21 @@
 
 No dashboard do Railway, vá em **Variables** e adicione:
 
-#### **🔑 OBRIGATÓRIAS:**
+#### **🔑 OBRIGATÓRIAS (para produção):**
 ```env
-TELEGRAM_BOT_TOKEN=SEU_TOKEN_AQUI
-TELEGRAM_ADMIN_USER_IDS=SEU_USER_ID_AQUI
-```
-
-#### **📡 OPCIONAIS:**
-```env
-PANDASCORE_API_KEY=SUA_API_KEY_AQUI
-LOG_LEVEL=INFO
+TELEGRAM_BOT_TOKEN=7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg
+TELEGRAM_ADMIN_USER_IDS=8012415611
 ENVIRONMENT=production
 ```
+
+#### **📡 OPCIONAIS (já têm padrão configurado):**
+```env
+PANDASCORE_API_KEY=90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ
+LOG_LEVEL=INFO
+SCAN_INTERVAL_MINUTES=3
+```
+
+> **📝 Nota:** O sistema já tem valores padrão configurados nas constantes, então essas variáveis são opcionais. O bot funcionará mesmo sem elas configuradas.
 
 ### **Passo 3: Deploy Automático**
 
@@ -61,6 +64,8 @@ O Railway fará deploy automaticamente quando detectar:
 - ✅ `runtime.txt` ← Versão do Python
 - ✅ `railway.json` ← Configurações específicas
 
+**🔄 Re-deploy:** Se o primeiro deploy falhou por erro de configuração, simplesmente configure as variáveis de ambiente e clique em "Deploy" novamente.
+
 ---
 
 ## 🔧 Configuração Detalhada
@@ -68,16 +73,17 @@ O Railway fará deploy automaticamente quando detectar:
 ### **Variáveis de Ambiente Completas:**
 
 ```env
-# ===== TELEGRAM (OBRIGATÓRIO) =====
-TELEGRAM_BOT_TOKEN=1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789
-TELEGRAM_ADMIN_USER_IDS=123456789,987654321
+# ===== TELEGRAM (já configurado como padrão) =====
+TELEGRAM_BOT_TOKEN=7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg
+TELEGRAM_ADMIN_USER_IDS=8012415611
 
-# ===== APIs (OPCIONAL) =====
+# ===== APIs (já configurado como padrão) =====
 PANDASCORE_API_KEY=90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ
 
-# ===== SISTEMA (OPCIONAL) =====
+# ===== SISTEMA (opcional) =====
 LOG_LEVEL=INFO
 ENVIRONMENT=production
+SCAN_INTERVAL_MINUTES=3
 ```
 
 ### **Múltiplos Administradores:**
