@@ -18,6 +18,12 @@ from dataclasses import dataclass
 import json
 import pytz
 
+# Configurar encoding para Windows
+if os.name == 'nt':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+
 # VERIFICAÇÃO CRÍTICA DE CONFLITOS NO INÍCIO
 def early_conflict_check():
     """Verificação precoce de conflitos antes de importar bibliotecas pesadas"""
@@ -44,20 +50,20 @@ def early_conflict_check():
                         result = subprocess.run(['tasklist', '/FI', f'PID eq {old_pid}'],
                                               capture_output=True, text=True)
                         if str(old_pid) in result.stdout:
-                            print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
-                            print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
-                            print("💡 Execute: python stop_all_conflicts.py")
+                            print(f"[CONFLITO] OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
+                            print("[ABORTAR] ABORTANDO PARA EVITAR CONFLITOS!")
+                            print("[DICA] Execute: python stop_all_conflicts.py")
                             sys.exit(1)
                     else:  # Unix/Linux
                         os.kill(old_pid, 0)  # Não mata, só verifica
-                        print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
-                        print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
-                        print("💡 Execute: python stop_all_conflicts.py")
+                        print(f"[CONFLITO] OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
+                        print("[ABORTAR] ABORTANDO PARA EVITAR CONFLITOS!")
+                        print("[DICA] Execute: python stop_all_conflicts.py")
                         sys.exit(1)
                 except OSError:
                     # Processo não existe mais, remover lock
                     os.remove(lock_file)
-                    print("🧹 Lock antigo removido (processo morto)")
+                    print("[LIMPEZA] Lock antigo removido (processo morto)")
             except:
                 # Arquivo corrompido, remover
                 try:
@@ -65,7 +71,7 @@ def early_conflict_check():
                 except:
                     pass
 
-        print("✅ Verificação precoce de conflitos OK")
+        print("[OK] Verificação precoce de conflitos OK")
 
 # Executar verificação precoce
 early_conflict_check()
@@ -3983,113 +3989,29 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
         """Handler síncrono para callbacks dos botões - v13"""
         import asyncio
         try:
-            # Tentar executar a versão async
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.callback_handler(update, context))
-            loop.close()
+            # Log da callback recebida
+            query = update.callback_query
+            callback_data = query.data if query else "Unknown"
+            logger.info(f"📞 callback_handler_sync: Callback recebida: {callback_data}")
+            
+            # Tentar executar a versão async usando a função auxiliar melhorada
+            self._run_async_command_sync(self.callback_handler, update, context)
+            logger.info(f"✅ callback_handler_sync: Callback {callback_data} processada com sucesso")
+            
         except Exception as e:
-            logger.error(f"Erro no callback_handler_sync: {e}")
-            # Fallback simples
+            logger.error(f"❌ callback_handler_sync: Erro: {e}")
+            import traceback
+            logger.error(f"❌ Traceback completo: {traceback.format_exc()}")
+            
+            # Fallback simples mas informativo
             query = update.callback_query
             try:
                 query.answer()
-                query.edit_message_text("⚡ Botão recebido! Use os comandos do menu.")
-            except:
-                pass
-
-    def _run_async_command_sync(self, async_method, update: Update, context) -> None:
-        """Função auxiliar para executar comandos async de forma síncrona para v13"""
-        import asyncio
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(async_method(update, context))
-            loop.close()
-        except Exception as e:
-            logger.error(f"Erro no comando async sync: {e}")
-            try:
-                update.message.reply_text(f"❌ Erro interno no comando. Detalhes: {str(e)[:100]}")
-            except:
-                pass
-
-    # Versões síncronas dos comandos async para v13
-    def menu_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.menu_command, update, context)
-    
-    def schedule_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.schedule_command, update, context)
-    
-    def monitoring_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.monitoring_command, update, context)
-    
-    def tips_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.tips_command, update, context)
-    
-    def live_matches_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.live_matches_command, update, context)
-    
-    def predictions_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.predictions_command, update, context)
-    
-    def alerts_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.alerts_command, update, context)
-    
-    def livematches_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.livematches_command, update, context)
-    
-    def proximosjogoslol_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.proximosjogoslol_command, update, context)
-    
-    def forcescan_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.forcescan_command, update, context)
-    
-    def performance_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.performance_command, update, context)
-    
-    def history_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.history_command, update, context)
-    
-    def odds_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.odds_command, update, context)
-    
-    def units_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.units_command, update, context)
-    
-    def filtrarligas_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.filtrarligas_command, update, context)
-    
-    def timesfavoritos_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.timesfavoritos_command, update, context)
-    
-    def statuslol_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.statuslol_command, update, context)
-    
-    def comandos_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.comandos_command, update, context)
-    
-    def help_command_sync(self, update: Update, context) -> None:
-        self._run_async_command_sync(self.help_command, update, context)
-
-    # Comando de teste para diagnóstico
-    def test_command_sync(self, update: Update, context) -> None:
-        """Comando de teste para diagnóstico"""
-        try:
-            logger.info("🧪 test_command_sync: Comando chamado")
-            user = update.effective_user
-            user_name = user.first_name if user and user.first_name else "Usuário"
-            
-            test_message = f"🧪 TESTE FUNCIONANDO!\n\nOlá {user_name}!\n\nSe você vê esta mensagem, o bot está funcionando."
-            
-            update.message.reply_text(test_message)
-            logger.info("✅ test_command_sync: Mensagem enviada com sucesso")
-            
-        except Exception as e:
-            logger.error(f"❌ test_command_sync: Erro: {e}")
-            try:
-                update.message.reply_text("❌ Erro no comando de teste")
-            except:
-                pass
+                callback_data = query.data if query else "unknown"
+                query.edit_message_text(f"❌ Erro ao processar botão '{callback_data}'\n\n⚡ Use os comandos do menu para continuar.")
+                logger.info("📤 Mensagem de fallback enviada")
+            except Exception as fallback_error:
+                logger.error(f"❌ Erro no fallback: {fallback_error}")
 
     def _run_async_command_sync(self, async_method, update: Update, context) -> None:
         """Função auxiliar para executar comandos async de forma síncrona para v13"""
@@ -4155,10 +4077,100 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
                 user_name = update.effective_user.first_name if update.effective_user else "Usuário"
                 error_message = f"❌ Erro no comando {command_name}\n\n👋 {user_name}, tente novamente em alguns segundos."
                 
-                update.message.reply_text(error_message)
-                logger.info(f"📤 Mensagem de erro enviada para comando {command_name}")
+                # Para callbacks, usar edit_message_text. Para comandos, usar reply_text
+                if hasattr(update, 'callback_query') and update.callback_query:
+                    try:
+                        update.callback_query.answer()
+                        update.callback_query.edit_message_text(error_message)
+                        logger.info(f"📤 Mensagem de erro de callback enviada para comando {command_name}")
+                    except:
+                        # Fallback para reply se edit falhar
+                        update.callback_query.message.reply_text(error_message)
+                        logger.info(f"📤 Mensagem de erro de callback (fallback) enviada para comando {command_name}")
+                else:
+                    update.message.reply_text(error_message)
+                    logger.info(f"📤 Mensagem de erro enviada para comando {command_name}")
+                    
             except Exception as reply_error:
                 logger.error(f"❌ Não foi possível enviar mensagem de erro: {reply_error}")
+
+    # Comando de teste para diagnóstico
+    def test_command_sync(self, update: Update, context) -> None:
+        """Comando de teste para diagnóstico"""
+        try:
+            logger.info("🧪 test_command_sync: Comando chamado")
+            user = update.effective_user
+            user_name = user.first_name if user and user.first_name else "Usuário"
+            
+            test_message = f"🧪 TESTE FUNCIONANDO!\n\nOlá {user_name}!\n\nSe você vê esta mensagem, o bot está funcionando."
+            
+            update.message.reply_text(test_message)
+            logger.info("✅ test_command_sync: Mensagem enviada com sucesso")
+            
+        except Exception as e:
+            logger.error(f"❌ test_command_sync: Erro: {e}")
+            try:
+                update.message.reply_text("❌ Erro no comando de teste")
+            except:
+                pass
+
+    # Versões síncronas dos comandos async para v13
+    def menu_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.menu_command, update, context)
+    
+    def schedule_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.schedule_command, update, context)
+    
+    def monitoring_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.monitoring_command, update, context)
+    
+    def tips_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.tips_command, update, context)
+    
+    def live_matches_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.live_matches_command, update, context)
+    
+    def predictions_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.predictions_command, update, context)
+    
+    def alerts_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.alerts_command, update, context)
+    
+    def livematches_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.livematches_command, update, context)
+    
+    def proximosjogoslol_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.proximosjogoslol_command, update, context)
+    
+    def forcescan_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.forcescan_command, update, context)
+    
+    def performance_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.performance_command, update, context)
+    
+    def history_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.history_command, update, context)
+    
+    def odds_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.odds_command, update, context)
+    
+    def units_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.units_command, update, context)
+    
+    def filtrarligas_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.filtrarligas_command, update, context)
+    
+    def timesfavoritos_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.timesfavoritos_command, update, context)
+    
+    def statuslol_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.statuslol_command, update, context)
+    
+    def comandos_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.comandos_command, update, context)
+    
+    def help_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.help_command, update, context)
 
 def run_flask_app():
     """Executa Flask em thread separada (apenas para health check)"""
@@ -4197,36 +4209,38 @@ def check_single_instance():
             import msvcrt
             lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
 
-            # Verificar se arquivo existe e está em uso
+            # Verificar se arquivo existe
             if os.path.exists(lock_file):
                 try:
-                    # Tentar abrir em modo exclusivo
+                    # Tentar abrir em modo exclusivo para testar se está em uso
                     lock_fd = open(lock_file, 'r+')
-                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1) # Tenta travar sem bloquear
-                    # Se chegou aqui, conseguiu travar, então não estava em uso por outro.
-                    # Precisamos liberar e remover para que a nova instância crie o seu.
-                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1) # Testa se está travado
+                    # Se chegou aqui, conseguiu travar, então não estava em uso
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1) # Libera
                     lock_fd.close()
                     os.remove(lock_file) # Remove o lock antigo
-                except (IOError, OSError): # Se falhar ao travar, significa que outro processo tem o lock
+                    logger.info("🧹 Lock antigo removido (não estava em uso)")
+                except (IOError, OSError): 
+                    # Se falhar ao travar, significa que outro processo tem o lock
                     logger.error("❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO! (Windows - msvcrt lock)")
                     logger.error("🛑 Pare a outra instância antes de continuar")
                     return None
 
-            # Criar novo arquivo de lock e travá-lo
+            # Criar novo arquivo de lock
             lock_fd = open(lock_file, 'w')
             lock_fd.write(str(os.getpid()))
             lock_fd.flush()
-            # Tentar travar o arquivo criado pela instância atual
+            
+            # Tentar travar o arquivo criado
             try:
                 msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
                 logger.info("🔒 Lock de instância única adquirido (Windows)")
                 return lock_fd # Retorna o file descriptor para mantê-lo aberto e travado
             except (IOError, OSError):
-                lock_fd.close() # Não conseguiu travar, fechar e falhar
-                logger.error("❌ Não foi possível adquirir lock no Windows, mesmo após remover o antigo.")
+                # Se falhar mesmo após criar novo arquivo, há problema
+                lock_fd.close()
+                logger.error("❌ Não foi possível adquirir lock no Windows após criar novo arquivo.")
                 return None
-
 
         except ImportError:
             # Fallback - verificação simples por arquivo
@@ -4269,8 +4283,14 @@ def check_single_instance():
         return None
 
 def main():
-    """Função principal"""
+    """Função principal que configura e executa o bot v13 Ultra Avançado"""
     try:
+        # Variável para evitar erros de linting no bloco finally
+        lock_fd_or_status = None
+        
+        # Verificação precose de conflitos
+        early_conflict_check()
+
         logger.info("🎮 INICIANDO BOT LOL V3 - SISTEMA DE UNIDADES PROFISSIONAL")
         logger.info("=" * 60)
         logger.info("🎲 Sistema de Unidades: PADRÃO DE GRUPOS PROFISSIONAIS")
@@ -4279,11 +4299,13 @@ def main():
         logger.info("🎯 Critérios: 65%+ confiança, 5%+ EV mínimo")
         logger.info("=" * 60)
 
-        # Verificar instância única
-        lock_fd_or_status = check_single_instance() # Nome da variável alterado para clareza
-        if lock_fd_or_status is None:
-            logger.error("🛑 ABORTANDO: Outra instância já está rodando")
-            sys.exit(1)
+        # Verificar instância única - TEMPORARIAMENTE DESABILITADO PARA TESTE
+        # lock_fd_or_status = check_single_instance() # Nome da variável alterado para clareza
+        # if lock_fd_or_status is None:
+        #     logger.error("🛑 ABORTANDO: Outra instância já está rodando")
+        #     sys.exit(1)
+        
+        logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA TESTE")
 
         # Verificar e limpar conflitos do Telegram ANTES de inicializar
         async def pre_check_telegram_conflicts():
@@ -4603,6 +4625,7 @@ def main():
                 logger.info("🏠 Ambiente local detectado - Usando polling")
 
                 # Iniciar Flask em thread separada
+                import threading  # Import necessário
                 flask_thread = threading.Thread(target=run_flask_app, daemon=True)
                 flask_thread.start()
                 logger.info(f"🌐 Health check rodando na porta {PORT}")
@@ -4978,6 +5001,7 @@ def main():
                 # Modo Local - Polling v13
                 logger.info("🏠 Ambiente local v13 detectado - Usando polling")
 
+                import threading  # Import necessário
                 flask_thread = threading.Thread(target=run_flask_app, daemon=True)
                 flask_thread.start()
                 logger.info(f"🌐 Health check rodando na porta {PORT}")
