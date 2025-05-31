@@ -4185,6 +4185,13 @@ def check_single_instance():
     """Verifica se é a única instância rodando"""
     import tempfile
 
+    # Detectar se está rodando no Railway
+    is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
+    
+    if is_railway:
+        logger.info("🚀 MODO RAILWAY: Pulando verificação de instância única")
+        return True  # No Railway, sempre permitir
+
     try:
         # Tentar importar fcntl (Unix/Linux)
         import fcntl
@@ -4202,84 +4209,8 @@ def check_single_instance():
 
         logger.info("🔒 Lock de instância única adquirido (Unix)")
         return lock_fd
-
-    except ImportError:
-        # Windows - usar método alternativo
-        try:
-            import msvcrt
-            lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
-
-            # Verificar se arquivo existe
-            if os.path.exists(lock_file):
-                try:
-                    # Tentar abrir em modo exclusivo para testar se está em uso
-                    lock_fd = open(lock_file, 'r+')
-                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1) # Testa se está travado
-                    # Se chegou aqui, conseguiu travar, então não estava em uso
-                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1) # Libera
-                    lock_fd.close()
-                    os.remove(lock_file) # Remove o lock antigo
-                    logger.info("🧹 Lock antigo removido (não estava em uso)")
-                except (IOError, OSError): 
-                    # Se falhar ao travar, significa que outro processo tem o lock
-                    logger.error("❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO! (Windows - msvcrt lock)")
-                    logger.error("🛑 Pare a outra instância antes de continuar")
-                    return None
-
-            # Criar novo arquivo de lock
-            lock_fd = open(lock_file, 'w')
-            lock_fd.write(str(os.getpid()))
-            lock_fd.flush()
-            
-            # Tentar travar o arquivo criado
-            try:
-                msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
-                logger.info("🔒 Lock de instância única adquirido (Windows)")
-                return lock_fd # Retorna o file descriptor para mantê-lo aberto e travado
-            except (IOError, OSError):
-                # Se falhar mesmo após criar novo arquivo, há problema
-                lock_fd.close()
-                logger.error("❌ Não foi possível adquirir lock no Windows após criar novo arquivo.")
-                return None
-
-        except ImportError:
-            # Fallback - verificação simples por arquivo
-            lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
-
-            if os.path.exists(lock_file):
-                # Verificar se processo ainda existe
-                try:
-                    with open(lock_file, 'r') as f:
-                        old_pid = int(f.read().strip())
-
-                    # Verificar se PID ainda está ativo
-                    try:
-                        os.kill(old_pid, 0)  # Não mata, só verifica
-                        logger.error("❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO!")
-                        logger.error(f"🛑 PID {old_pid} ainda ativo")
-                        return None
-                    except OSError:
-                        # Processo não existe mais, remover lock
-                        os.remove(lock_file)
-                        logger.info("🧹 Lock antigo removido (processo morto)")
-                except:
-                    # Arquivo corrompido, remover
-                    try: # Adicionado try-except para remoção
-                        os.remove(lock_file)
-                    except OSError:
-                        pass
-
-
-            # Criar novo lock
-            with open(lock_file, 'w') as f:
-                f.write(str(os.getpid()))
-
-            logger.info("🔒 Lock de instância única adquirido (Fallback)")
-            return True # Em fallback, só o arquivo existe, não há fd para manter
-
     except (IOError, OSError) as e:
-        logger.error(f"❌ OUTRA INSTÂNCIA JÁ ESTÁ RODANDO! Erro: {e}")
-        logger.error("🛑 Pare a outra instância antes de continuar")
+        logger.error(f"❌ Erro ao adquirir lock: {e}")
         return None
 
 def force_clean_telegram_session():
@@ -4337,7 +4268,7 @@ def main():
             logger.error("🛑 ABORTANDO: Outra instância já está rodando")
             sys.exit(1)
         
-        # logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA TESTE")
+        logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA RAILWAY")
 
         # Verificar e limpar conflitos do Telegram ANTES de inicializar
         logger.info("🔍 Verificando conflitos do Telegram...")
@@ -4363,7 +4294,7 @@ def main():
             logger.error("🛑 ABORTANDO: Outra instância já está rodando")
             sys.exit(1)
         
-        # logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA TESTE")
+        logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA RAILWAY")
 
         # Verificar e limpar conflitos do Telegram ANTES de inicializar
         async def pre_check_telegram_conflicts():
