@@ -4726,24 +4726,46 @@ def main():
                     logger = logging.getLogger(__name__)
                     
                     try:
-                        logger.info("📥 Webhook v13 recebeu mensagem")
+                        logger.info("📥 =========================")
+                        logger.info("📥 WEBHOOK V13 CHAMADO!")
+                        logger.info("📥 =========================")
+                        
                         from flask import request
                         import json
                         
+                        # Log detalhado do request
+                        logger.info(f"📥 Method: {request.method}")
+                        logger.info(f"📥 Headers: {dict(request.headers)}")
+                        logger.info(f"📥 URL: {request.url}")
+                        logger.info(f"📥 Remote addr: {request.remote_addr}")
+                        
                         # Obter dados JSON do Telegram
-                        data = request.get_json()
+                        try:
+                            data = request.get_json()
+                            logger.info(f"📥 Raw JSON data type: {type(data)}")
+                            logger.info(f"📥 Raw JSON data size: {len(str(data)) if data else 0} characters")
+                        except Exception as json_error:
+                            logger.error(f"❌ Erro ao obter JSON: {json_error}")
+                            return "JSON_ERROR", 400
+                            
                         if not data:
                             logger.warning("⚠️ Webhook v13: Dados vazios recebidos")
                             return "OK", 200
                         
-                        logger.info(f"📨 Dados recebidos: {json.dumps(data, indent=2)}")
+                        logger.info(f"📨 DADOS TELEGRAM RECEBIDOS:")
+                        logger.info(f"📨 {json.dumps(data, indent=2, ensure_ascii=False)}")
                         
                         # Processar update do Telegram usando o dispatcher v13 COM SUPORTE ASYNC
                         from telegram import Update
                         import asyncio
                         
-                        update = Update.de_json(data, updater.bot)
-                        
+                        try:
+                            update = Update.de_json(data, updater.bot)
+                            logger.info(f"✅ Update de_json criado: {type(update)}")
+                        except Exception as update_error:
+                            logger.error(f"❌ Erro ao criar Update: {update_error}")
+                            return "UPDATE_ERROR", 400
+
                         if update:
                             logger.info(f"✅ Update processado: tipo={type(update).__name__}")
                             
