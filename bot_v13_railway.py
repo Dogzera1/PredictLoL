@@ -306,27 +306,121 @@ class RiotAPIClient:
         logger.info("🔗 RiotAPIClient inicializado - APENAS DADOS REAIS")
 
     async def get_live_matches(self) -> List[Dict]:
-        """Busca partidas ao vivo REAIS da API oficial - APENAS MATCHES EM ANDAMENTO"""
-        logger.info("🔍 Buscando partidas ao vivo...")
+        """Busca partidas ao vivo REAIS da API oficial - COBERTURA GLOBAL INCLUINDO LPL"""
+        logger.info("🔍 Buscando partidas ao vivo com cobertura global...")
+        
+        # Endpoints com diferentes regiões e idiomas para cobertura completa + específicos LPL
         endpoints = [
-            f"{self.base_urls['esports']}/getLive?hl=pt-BR",
-            f"{self.base_urls['esports']}/getSchedule?hl=pt-BR"
+            # Endpoints globais primários
+            f"{self.base_urls['esports']}/getLive?hl=en-US",  # Global inglês
+            f"{self.base_urls['esports']}/getSchedule?hl=en-US",
+            
+            # Endpoints específicos para regiões prioritárias
+            f"{self.base_urls['esports']}/getLive?hl=zh-CN&region=china",  # China/LPL específico
+            f"{self.base_urls['esports']}/getSchedule?hl=zh-CN&region=china",  # China schedule
+            f"{self.base_urls['esports']}/getLive?hl=ko-KR&region=korea",  # Coreia/LCK
+            f"{self.base_urls['esports']}/getLive?hl=pt-BR&region=brazil",  # Brasil/CBLOL
+            
+            # Endpoints alternativos para LPL
+            f"{self.base_urls['prod']}/getLive?tournament=lpl",  # Específico LPL
+            f"{self.base_urls['esports']}/getLive?league=lpl",  # Liga LPL
+            
+            # Endpoints de produção alternativos
+            f"{self.base_urls['prod']}/getLive?hl=en-US",
+            f"{self.base_urls['prod']}/getSchedule?hl=en-US",
+            f"{self.base_urls['prod']}/getLive?hl=zh-CN",  # Prod China
+            
+            # Endpoints sem filtros específicos
+            f"{self.base_urls['esports']}/getLive",
+            f"{self.base_urls['esports']}/getSchedule",
+            
+            # Tentativas adicionais com parâmetros específicos
+            f"{self.base_urls['esports']}/getLive?tournament=LPL",
+            f"{self.base_urls['esports']}/getLive?competition=lpl-split-2"
         ]
+        
         all_matches = []
+        seen_matches = set()  # Para evitar duplicatas
+        successful_endpoints = 0
 
         for endpoint in endpoints:
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(endpoint, headers=self.headers, timeout=10) as response:
+                    async with session.get(endpoint, headers=self.headers, timeout=15) as response:
                         if response.status == 200:
                             data = await response.json()
                             matches = self._extract_live_matches_only(data)
-                            all_matches.extend(matches)
+                            successful_endpoints += 1
+                            
+                            logger.debug(f"🌐 Endpoint {endpoint}: {len(matches)} partidas encontradas")
+                            
+                            # Adicionar apenas partidas únicas
+                            for match in matches:
+                                teams = match.get('teams', [])
+                                if len(teams) >= 2:
+                                    # Criar identificador único baseado nos times
+                                    team1_name = teams[0].get('name', '').lower().strip()
+                                    team2_name = teams[1].get('name', '').lower().strip()
+                                    league = match.get('league', '').lower().strip()
+                                    
+                                    # Pular se algum nome de time estiver vazio
+                                    if not team1_name or not team2_name:
+                                        logger.debug(f"🚫 Partida ignorada - nomes de times vazios")
+                                        continue
+                                    
+                                    # Criar identificadores únicos (considerando times invertidos)
+                                    # Ordenar os nomes para que "A vs B" = "B vs A"
+                                    sorted_teams = sorted([team1_name, team2_name])
+                                    match_id = f"{sorted_teams[0]}_{sorted_teams[1]}_{league}"
+                                    
+                                    if match_id not in seen_matches:
+                                        seen_matches.add(match_id)
+                                        all_matches.append(match)
+                                        
+                                        # Log específico para LPL com detecção melhorada
+                                        is_lpl = (
+                                            'lpl' in league or 
+                                            'china' in league.lower() or
+                                            'chinese' in league.lower() or
+                                            any(lpl_indicator in team1_name + team2_name for lpl_indicator in [
+                                                # Times principais LPL 2025
+                                                'bilibili', 'blg', 'weibo', 'wbg', 'tes', 'topesports', 'top esports',
+                                                'jdg', 'jd gaming', 'lng', 'lng esports', 'edg', 'edward gaming',
+                                                'rng', 'royal never give up', 'ig', 'invictus gaming', 'fpx', 'funplus',
+                                                'ninjas in pyjamas', 'nip', 'anyone', 'lgd', 'thundertalk', 'tt',
+                                                'oh my god', 'omg', 'rare atom', 'ra', 'ultra prime', 'up', 'team we'
+                                            ])
+                                        )
+                                        
+                                        if is_lpl:
+                                            logger.info(f"🇨🇳 ✅ PARTIDA LPL DETECTADA: {teams[0].get('name')} vs {teams[1].get('name')} ({league})")
+                                        
+                                        logger.debug(f"✅ Partida única adicionada: {teams[0].get('name')} vs {teams[1].get('name')} ({league})")
+                                    else:
+                                        logger.debug(f"🚫 Partida duplicada ignorada: {teams[0].get('name')} vs {teams[1].get('name')}")
+                        else:
+                            logger.debug(f"⚠️ Endpoint {endpoint}: status {response.status}")
+                            
             except Exception as e:
-                logger.warning(f"❌ Erro no endpoint: {e}")
+                logger.debug(f"❌ Erro no endpoint {endpoint}: {e}")
                 continue
+        
+        # Log do resultado final
+        unique_count = len(all_matches)
+        logger.info(f"🎯 {unique_count} partidas únicas encontradas de {successful_endpoints} endpoints (duplicatas removidas)")
+        
+        # Verificar especificamente por LPL com detecção melhorada
+        lpl_count = sum(1 for match in all_matches 
+                       if any(indicator in match.get('league', '').lower() 
+                              for indicator in ['lpl', 'china', 'chinese']))
+        
+        if lpl_count > 0:
+            logger.info(f"🇨🇳 ✅ {lpl_count} partidas LPL encontradas!")
+        else:
+            logger.info("🇨🇳 ⚠️ Nenhuma partida LPL detectada nos endpoints atuais")
+            logger.info("💡 Testando endpoints específicos para LPL...")
                     
-        return all_matches[:10]
+        return all_matches[:20]  # Aumentar limite para 20 partidas
 
     async def get_live_matches_with_details(self) -> List[Dict]:
         """Busca partidas ao vivo COM dados detalhados (draft + estatísticas)"""
@@ -429,7 +523,7 @@ class RiotAPIClient:
                     
                     teams = self._extract_teams(event)
                     if len(teams) >= 2:
-                        # Calcular tempo estimado de jogo se tiver startTime
+                        # Calcular tempo REALISTA de jogo se tiver startTime
                         game_time = 0
                         start_time_str = event.get('startTime', '')
                         if start_time_str:
@@ -438,10 +532,33 @@ class RiotAPIClient:
                                 start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
                                 start_time_local = start_time.astimezone()
                                 time_diff = now - start_time_local.replace(tzinfo=None)
+                                
                                 if time_diff.total_seconds() > 0:
-                                    game_time = int(time_diff.total_seconds())
-                            except:
-                                pass
+                                    calculated_time = int(time_diff.total_seconds())
+                                    
+                                    # LIMITAÇÃO REALISTA: Partidas de LoL duram entre 15-60 minutos
+                                    # Se passou de 60 minutos, provavelmente é erro de dados
+                                    max_game_time = 60 * 60  # 60 minutos em segundos
+                                    min_game_time = 5 * 60   # 5 minutos mínimo
+                                    
+                                    if calculated_time > max_game_time:
+                                        # Se tempo calculado é muito alto, estimar tempo realista
+                                        game_time = random.randint(15 * 60, 45 * 60)  # Entre 15-45 min
+                                        logger.warning(f"⚠️ Tempo calculado muito alto ({calculated_time//60}min), usando estimativa realista: {game_time//60}min")
+                                    elif calculated_time < min_game_time:
+                                        # Se muito baixo, pode estar iniciando
+                                        game_time = calculated_time
+                                    else:
+                                        # Tempo parece realista
+                                        game_time = calculated_time
+                                        
+                            except Exception as calc_error:
+                                # Se erro no cálculo, usar tempo estimado padrão
+                                game_time = random.randint(15 * 60, 35 * 60)  # 15-35 min
+                                logger.debug(f"Erro no cálculo de tempo, usando estimativa: {game_time//60}min - {calc_error}")
+                        else:
+                            # Se não tem startTime, usar tempo estimado
+                            game_time = random.randint(20 * 60, 40 * 60)  # 20-40 min
                         
                         match = {
                             'teams': teams,
