@@ -2474,38 +2474,54 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 
     async def _handle_main_menu_callback(self, query) -> None:
         """Handle callback para menu principal"""
-        menu_message = """
+        try:
+            ml_status = "✅ ATIVO" if ML_AVAILABLE else "⚠️ BÁSICO"
+            
+            menu_message = f"""
 🎮 **MENU PRINCIPAL - BOT LOL V3** 🎮
 
-🎯 **TIPS & ANÁLISES:**
-• Tips profissionais
-• Agenda de partidas
-• Partidas ao vivo
-• Status do monitoramento
+🤖 **MACHINE LEARNING: {ml_status}**
+• Sistema ML completo para predições
+• Análise em tempo real após draft
+• Tips especializados money line
+
+🎯 **FUNCIONALIDADES PRINCIPAIS:**
+• 🎯 Tips profissionais com monitoramento
+• 🔮 Predições IA com dados reais
+• 📅 Agenda de partidas completa
+• 🎮 Partidas ao vivo selecionáveis
+• 📊 Sistema de unidades profissional
+• 💰 Odds reais integradas
 
 🎲 **SISTEMA DE UNIDADES:**
-• Explicação do sistema
-• Performance atual
-• Histórico de apostas
+Baseado em grupos de apostas profissionais
+Critérios: 65%+ confiança, 5%+ EV mínimo
 
-📊 **INFORMAÇÕES:**
-• Ajuda completa
-• Sobre o bot
+Use os botões abaixo para navegar:
+            """
 
-Clique nos botões abaixo para navegação rápida:
-        """
+            keyboard = [
+                [InlineKeyboardButton("🤖 ML System", callback_data="ml_predictions"),
+                 InlineKeyboardButton("🎯 Money Line", callback_data="money_line_tips")],
+                [InlineKeyboardButton("🔮 Predições", callback_data="predictions"),
+                 InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule"),
+                 InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📊 Unidades", callback_data="units_info"),
+                 InlineKeyboardButton("💰 Odds Reais", callback_data="odds")],
+                [InlineKeyboardButton("📢 Alertas", callback_data="alert_stats"),
+                 InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
-        keyboard = [
-            [InlineKeyboardButton("🎯 Tips", callback_data="tips"),
-             InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
-            [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches"),
-             InlineKeyboardButton("📊 Unidades", callback_data="units_info")],
-            [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring"),
-             InlineKeyboardButton("❓ Ajuda", callback_data="help")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(menu_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
-        await query.edit_message_text(menu_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+        except Exception as e:
+            logger.error(f"Erro no _handle_main_menu_callback: {e}")
+            await query.edit_message_text(
+                "❌ Erro ao carregar menu. Tente /start novamente.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Reiniciar", callback_data="start")]])
+            )
 
     async def _handle_match_details_callback(self, query, match_index: int) -> None:
         """Handle callback para detalhes da partida"""
