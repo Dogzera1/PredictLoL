@@ -229,13 +229,13 @@ Olá, {user.first_name}\\!
 • 📈 Monitoramento 24/7
 
 **📋 Comandos Disponíveis:**
-• `/help` \\- Lista completa de comandos
-• `/status` \\- Status do sistema
-• `/subscribe` \\- Configurar alertas
-• `/stats` \\- Suas estatísticas
-• `/mystats` \\- Estatísticas detalhadas
+• `/help` \\\\ Lista completa de comandos
+• `/status` \\\\ Status do sistema
+• `/subscribe` \\\\ Configurar alertas
+• `/stats` \\\\ Suas estatísticas
+• `/mystats` \\\\ Estatísticas detalhadas
 
-""" + (f"**👑 Comandos Admin:**\n• `/admin` - Painel administrativo\n• `/system` - Status completo\n• `/force` - Forçar scan" if is_admin else "") + """
+""" + (f"**👑 Comandos Admin:**\\n• `/admin` \\\\ Painel administrativo\\n• `/system` \\\\ Status completo\\n• `/force` \\\\ Forçar scan" if is_admin else "") + """
 
 ⚡ **Powered by Machine Learning \\+ Algoritmos Heurísticos**
 🔥 **Deploy: Railway \\| Status: ONLINE**"""
@@ -263,12 +263,12 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
 
 **📋 Comandos Básicos:**
 • `/start` \\- Iniciar e ver menu principal
-• `/help` \\- Esta ajuda
-• `/status` \\- Status do sistema e estatísticas
-• `/stats` \\- Suas estatísticas pessoais
-• `/subscribe` \\- Configurar tipos de alerta
-• `/unsubscribe` \\- Cancelar alertas
-• `/mystats` \\- Histórico detalhado
+• `/help` \\\\ Esta ajuda
+• `/status` \\\\ Status do sistema e estatísticas
+• `/stats` \\\\ Suas estatísticas pessoais
+• `/subscribe` \\\\ Configurar tipos de alerta
+• `/unsubscribe` \\\\ Cancelar alertas
+• `/mystats` \\\\ Histórico detalhado
 
 **🔔 Tipos de Subscrição:**
 • **Todas as Tips** \\- Recebe todas as tips geradas
@@ -293,13 +293,13 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
             help_message += """
 
 **👑 Comandos Administrativos:**
-• `/admin` \\- Painel administrativo completo
-• `/system` \\- Status detalhado do sistema
-• `/force` \\- Forçar scan de partidas
-• `/tasks` \\- Gerenciar tarefas agendadas
-• `/health` \\- Health check completo
-• `/logs` \\- Logs recentes do sistema
-• `/restart` \\- Reiniciar componentes
+• `/admin` \\\\ Painel administrativo completo
+• `/system` \\\\ Status detalhado do sistema
+• `/force` \\\\ Forçar scan de partidas
+• `/tasks` \\\\ Gerenciar tarefas agendadas
+• `/health` \\\\ Health check completo
+• `/logs` \\\\ Logs recentes do sistema
+• `/restart` \\\\ Reiniciar componentes
 
 **🔧 Controle Total:**
 • Monitoramento em tempo real
@@ -492,11 +492,11 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
 • Comandos admin: {self.stats.admin_commands}
 
 ⚡ **Controles disponíveis via comandos:**
-• `/system` \\- Status detalhado
-• `/force` \\- Forçar scan
-• `/tasks` \\- Gerenciar tarefas
-• `/health` \\- Health check
-• `/restart` \\- Reiniciar sistemas"""
+• `/system` \\\\ Status detalhado
+• `/force` \\\\ Forçar scan
+• `/tasks` \\\\ Gerenciar tarefas
+• `/health` \\\\ Health check
+• `/restart` \\\\ Reiniciar sistemas"""
         
         await update.message.reply_text(
             admin_message,

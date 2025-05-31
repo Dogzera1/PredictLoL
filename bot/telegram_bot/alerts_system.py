@@ -532,10 +532,10 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 • 🎯 Gestão profissional de risco
 
 **Comandos disponíveis:**
-/subscribe \\- Configurar notificações
-/status \\- Ver status do sistema
-/mystats \\- Suas estatísticas
-/help \\- Ajuda completa
+/subscribe \\\\ Configurar notificações
+/status \\\\ Ver status do sistema
+/mystats \\\\ Suas estatísticas
+/help \\\\ Ajuda completa
 
 🔥 **Subscreva\\-se para receber tips profissionais\\!**"""
         
@@ -615,24 +615,24 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 
     async def _handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /help"""
-        help_message = """🆘 **AJUDA \\- Bot LoL V3 Ultra Avançado**
+        help_message = """🆘 **AJUDA \\\\ Bot LoL V3 Ultra Avançado**
 
 **🎯 O que é este bot?**
 Sistema profissional de tips para League of Legends que combina Machine Learning com análise em tempo real para gerar recomendações de apostas de alta qualidade\\.
 
 **📋 Comandos:**
-• `/start` \\- Iniciar e registrar\\-se
-• `/subscribe` \\- Configurar notificações
-• `/unsubscribe` \\- Cancelar subscrição
-• `/status` \\- Status do sistema
-• `/mystats` \\- Suas estatísticas
-• `/help` \\- Esta ajuda
+• `/start` \\\\ Iniciar e registrar\\-se
+• `/subscribe` \\\\ Configurar notificações
+• `/unsubscribe` \\\\ Cancelar subscrição
+• `/status` \\\\ Status do sistema
+• `/mystats` \\\\ Suas estatísticas
+• `/help` \\\\ Esta ajuda
 
 **🔔 Tipos de Subscrição:**
-• **Todas as Tips** \\- Recebe todas as tips geradas
-• **Alto Valor** \\- Apenas tips com EV \\> 10%
-• **Alta Confiança** \\- Apenas tips com confiança \\> 80%
-• **Premium** \\- Tips exclusivas \\(EV \\> 15% e confiança \\> 85%\\)
+• **Todas as Tips** \\\\ Recebe todas as tips geradas
+• **Alto Valor** \\\\ Apenas tips com EV \\> 10%
+• **Alta Confiança** \\\\ Apenas tips com confiança \\> 80%
+• **Premium** \\\\ Tips exclusivas \\(EV \\> 15% e confiança \\> 85%\\)
 
 **💡 Como funciona:**
 1\\. Sistema monitora partidas ao vivo a cada 3 minutos
