@@ -4282,6 +4282,43 @@ def check_single_instance():
         logger.error("🛑 Pare a outra instância antes de continuar")
         return None
 
+def force_clean_telegram_session():
+    """Força a limpeza completa da sessão do Telegram"""
+    import requests
+    import time
+    
+    try:
+        # Remover webhook múltiplas vezes para garantir
+        for attempt in range(3):
+            try:
+                response = requests.post(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook", 
+                                       json={"drop_pending_updates": True}, timeout=10)
+                logger.info(f"🧹 Tentativa {attempt + 1}/3 - Webhook removido: {response.json()}")
+                time.sleep(2)
+            except Exception as e:
+                logger.warning(f"⚠️ Erro na tentativa {attempt + 1} de limpeza: {e}")
+        
+        # Aguardar para garantir que o Telegram processou
+        logger.info("⏳ Aguardando 10 segundos para o Telegram liberar a sessão...")
+        time.sleep(10)
+        
+        # Verificar se ainda há webhook ativo
+        try:
+            response = requests.get(f"https://api.telegram.org/bot{TOKEN}/getWebhookInfo", timeout=10)
+            webhook_info = response.json().get('result', {})
+            if webhook_info.get('url'):
+                logger.warning(f"⚠️ Webhook ainda ativo: {webhook_info['url']}")
+            else:
+                logger.info("✅ Nenhum webhook ativo - sessão limpa")
+        except Exception as e:
+            logger.warning(f"⚠️ Erro ao verificar webhook: {e}")
+            
+        return True
+    except Exception as e:
+        logger.error(f"❌ Erro na limpeza forçada: {e}")
+        return False
+
+
 def main():
     """Função principal que configura e executa o bot v13 Ultra Avançado"""
     try:
@@ -4293,19 +4330,40 @@ def main():
 
         logger.info("🎮 INICIANDO BOT LOL V3 - SISTEMA DE UNIDADES PROFISSIONAL")
         logger.info("=" * 60)
+        
+        # Verificar instância única - REABILITADO PARA RAILWAY
+        lock_fd_or_status = check_single_instance() # Nome da variável alterado para clareza
+        if lock_fd_or_status is None:
+            logger.error("🛑 ABORTANDO: Outra instância já está rodando")
+            sys.exit(1)
+        
+        # logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA TESTE")
+
+        # Verificar e limpar conflitos do Telegram ANTES de inicializar
+        logger.info("🔍 Verificando conflitos do Telegram...")
+        
+        logger.info("🎲 Sistema de Unidades: PADRÃO DE GRUPOS PROFISSIONAIS")
+
+        # LIMPEZA FORÇADA PARA ELIMINAR CONFLITOS
+        logger.info("🧹 INICIANDO LIMPEZA FORÇADA DA SESSÃO DO TELEGRAM...")
+        if force_clean_telegram_session():
+            logger.info("✅ Limpeza forçada concluída com sucesso")
+        else:
+            logger.warning("⚠️ Limpeza forçada falhou - continuando mesmo assim")
+        
         logger.info("🎲 Sistema de Unidades: PADRÃO DE GRUPOS PROFISSIONAIS")
         logger.info("📊 Baseado em: Confiança + EV + Tier da Liga")
         logger.info("⚡ Sem Kelly Criterion - Sistema simplificado")
         logger.info("🎯 Critérios: 65%+ confiança, 5%+ EV mínimo")
         logger.info("=" * 60)
 
-        # Verificar instância única - TEMPORARIAMENTE DESABILITADO PARA TESTE
-        # lock_fd_or_status = check_single_instance() # Nome da variável alterado para clareza
-        # if lock_fd_or_status is None:
-        #     logger.error("🛑 ABORTANDO: Outra instância já está rodando")
-        #     sys.exit(1)
+        # Verificar instância única - REABILITADO PARA RAILWAY
+        lock_fd_or_status = check_single_instance() # Nome da variável alterado para clareza
+        if lock_fd_or_status is None:
+            logger.error("🛑 ABORTANDO: Outra instância já está rodando")
+            sys.exit(1)
         
-        logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA TESTE")
+        # logger.info("⚠️ VERIFICAÇÃO DE INSTÂNCIA ÚNICA DESABILITADA PARA TESTE")
 
         # Verificar e limpar conflitos do Telegram ANTES de inicializar
         async def pre_check_telegram_conflicts():
