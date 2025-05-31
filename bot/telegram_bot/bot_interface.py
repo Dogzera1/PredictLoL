@@ -649,7 +649,7 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
 • Última tip: {self._format_time_ago(health.last_tip_time)}
 • Último erro: {health.last_error or 'Nenhum'}
 
-{'✅ **Sistema 100% operacional\\!**' if health.is_healthy else '⚠️ **Problemas detectados\\!**'}"""
+""" + ("✅ **Sistema 100% operacional\\!**" if health.is_healthy else "⚠️ **Problemas detectados\\!**")
             
         except Exception as e:
             health_message = f"❌ **Erro no health check:**\n\n`{str(e)}`"
