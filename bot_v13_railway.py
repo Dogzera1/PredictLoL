@@ -4091,6 +4091,75 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
             except:
                 pass
 
+    def _run_async_command_sync(self, async_method, update: Update, context) -> None:
+        """Função auxiliar para executar comandos async de forma síncrona para v13"""
+        import asyncio
+        
+        # Log do comando que está sendo executado
+        command_name = async_method.__name__ if hasattr(async_method, '__name__') else str(async_method)
+        logger.info(f"🔄 _run_async_command_sync: Executando {command_name}")
+        
+        try:
+            # Verificar se já existe um loop rodando
+            try:
+                current_loop = asyncio.get_running_loop()
+                logger.info(f"⚠️ Loop async já rodando, criando thread separada para {command_name}")
+                
+                # Se já há um loop, criar thread separada
+                import threading
+                import queue
+                
+                result_queue = queue.Queue()
+                
+                def thread_function():
+                    try:
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        new_loop.run_until_complete(async_method(update, context))
+                        new_loop.close()
+                        result_queue.put(("success", None))
+                        logger.info(f"✅ Comando {command_name} executado com sucesso em thread")
+                    except Exception as e:
+                        result_queue.put(("error", e))
+                        logger.error(f"❌ Erro no comando {command_name} em thread: {e}")
+                
+                thread = threading.Thread(target=thread_function)
+                thread.start()
+                thread.join(timeout=30)  # Timeout de 30s
+                
+                # Verificar resultado
+                try:
+                    status, error = result_queue.get_nowait()
+                    if status == "error":
+                        raise error
+                except queue.Empty:
+                    logger.error(f"❌ Timeout no comando {command_name}")
+                    raise TimeoutError(f"Comando {command_name} demorou mais que 30s")
+                    
+            except RuntimeError:
+                # Não há loop rodando, podemos criar um
+                logger.info(f"🔄 Criando novo loop para {command_name}")
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(async_method(update, context))
+                loop.close()
+                logger.info(f"✅ Comando {command_name} executado com sucesso")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro no comando {command_name}: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            
+            # Tentar responder ao usuário com erro
+            try:
+                user_name = update.effective_user.first_name if update.effective_user else "Usuário"
+                error_message = f"❌ Erro no comando {command_name}\n\n👋 {user_name}, tente novamente em alguns segundos."
+                
+                update.message.reply_text(error_message)
+                logger.info(f"📤 Mensagem de erro enviada para comando {command_name}")
+            except Exception as reply_error:
+                logger.error(f"❌ Não foi possível enviar mensagem de erro: {reply_error}")
+
 def run_flask_app():
     """Executa Flask em thread separada (apenas para health check)"""
     # Não executar se webhook estiver ativo
@@ -4678,31 +4747,79 @@ def main():
                         if update:
                             logger.info(f"✅ Update processado: tipo={type(update).__name__}")
                             
+                            # VERIFICAR SE É UM COMANDO E LOGAR DETALHES
+                            if update.message and update.message.text:
+                                command_text = update.message.text
+                                user_id = update.message.from_user.id if update.message.from_user else "Unknown"
+                                chat_id = update.message.chat_id if update.message.chat else "Unknown"
+                                user_name = update.message.from_user.first_name if update.message.from_user and update.message.from_user.first_name else "Unknown"
+                                
+                                logger.info(f"📨 COMANDO DETECTADO: '{command_text}' de user {user_name} ({user_id}) no chat {chat_id}")
+                                
+                                # Verificar se é um comando específico
+                                if command_text.startswith('/start'):
+                                    logger.info("🎮 COMANDO /START DETECTADO! Processando...")
+                                elif command_text.startswith('/test'):
+                                    logger.info("🧪 COMANDO /TEST DETECTADO! Processando...")
+                                elif command_text.startswith('/menu'):
+                                    logger.info("📋 COMANDO /MENU DETECTADO! Processando...")
+                                elif command_text.startswith('/tips'):
+                                    logger.info("🎯 COMANDO /TIPS DETECTADO! Processando...")
+                                else:
+                                    logger.info(f"💬 Outro comando detectado: {command_text}")
+                            elif update.callback_query:
+                                callback_data = update.callback_query.data
+                                user_id = update.callback_query.from_user.id if update.callback_query.from_user else "Unknown"
+                                logger.info(f"🔘 CALLBACK DETECTADO: '{callback_data}' de user {user_id}")
+                            else:
+                                logger.info("📝 Update recebido sem comando ou callback")
+                            
                             # CORREÇÃO: Executar em loop async para v13
                             def run_async_handler():
                                 try:
+                                    logger.info("🔄 Iniciando processamento do update...")
                                     # Verificar se já existe um loop
                                     loop = asyncio.get_event_loop()
                                     if loop.is_running():
                                         # Se o loop já está rodando, criar tarefa
                                         import threading
                                         def async_task():
+                                            logger.info("🧵 Criando thread separada para processar update...")
                                             new_loop = asyncio.new_event_loop()
                                             asyncio.set_event_loop(new_loop)
                                             try:
+                                                logger.info("⚙️ Executando dispatcher.process_update...")
                                                 dispatcher.process_update(update)
+                                                logger.info("✅ Update processado com sucesso via thread!")
+                                            except Exception as process_error:
+                                                logger.error(f"❌ Erro no process_update (thread): {process_error}")
+                                                import traceback
+                                                logger.error(f"❌ Traceback thread: {traceback.format_exc()}")
                                             finally:
                                                 new_loop.close()
                                         
                                         thread = threading.Thread(target=async_task)
                                         thread.start()
                                         thread.join(timeout=30)  # Timeout de 30s
+                                        logger.info("✅ Thread finalizada")
                                     else:
                                         # Se não há loop, usar run
+                                        logger.info("⚙️ Executando dispatcher.process_update diretamente...")
                                         dispatcher.process_update(update)
-                                except:
+                                        logger.info("✅ Update processado diretamente!")
+                                except Exception as handler_error:
+                                    logger.error(f"❌ Erro no run_async_handler: {handler_error}")
+                                    import traceback
+                                    logger.error(f"❌ Traceback handler: {traceback.format_exc()}")
                                     # Fallback: processar de forma síncrona
-                                    dispatcher.process_update(update)
+                                    try:
+                                        logger.info("🔄 Tentando fallback síncrono...")
+                                        dispatcher.process_update(update)
+                                        logger.info("✅ Fallback síncrono funcionou!")
+                                    except Exception as fallback_error:
+                                        logger.error(f"❌ Fallback síncrono falhou: {fallback_error}")
+                                        import traceback
+                                        logger.error(f"❌ Traceback fallback: {traceback.format_exc()}")
                             
                             run_async_handler()
                         else:
