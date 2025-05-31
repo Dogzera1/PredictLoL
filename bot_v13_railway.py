@@ -2407,8 +2407,6 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
                 keyboard.append([InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")])
                 keyboard.append([InlineKeyboardButton("🏠 Menu", callback_data="main_menu")])
 
-                self.cache_timestamp = datetime.now()
-
             else:
                 message = """
 🎮 **NENHUMA PARTIDA AO VIVO** 🎮
@@ -3845,6 +3843,88 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
         else:
             await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
 
+    async def comandos_command(self, update: Update, context) -> None:
+        """Comando /comandos - Lista todos os comandos disponíveis"""
+        message = f"""
+📋 **TODOS OS COMANDOS DISPONÍVEIS** 📋
+
+🏠 **COMANDOS PRINCIPAIS:**
+• `/start` - Iniciar o bot e ver boas-vindas
+• `/menu` - Menu principal interativo
+• `/comandos` - Esta lista de comandos
+• `/help` - Alias para /comandos
+
+🎯 **SISTEMA DE TIPS:**
+• `/tips` - Gerar tips profissionais LoL
+• `/performance` - Estatísticas de performance
+• `/history` - Histórico de tips geradas
+• `/units` - Informações sobre sistema de unidades
+
+🔴 **PARTIDAS AO VIVO:**
+• `/live` - Partidas ao vivo com análise
+• `/livematches` - Alias melhorado para /live
+
+📅 **AGENDA DE PARTIDAS:**
+• `/schedule` - Agenda semanal de jogos
+• `/proximosjogoslol` - Alias para /schedule
+
+🔮 **PREDIÇÕES E ANÁLISES:**
+• `/predictions` - Predições com IA/ML
+• `/odds` - Odds atuais das casas de apostas
+
+📢 **SISTEMA DE ALERTAS:**
+• `/alerts` - Configurar alertas automáticos
+• `/monitoring` - Status do monitoramento
+
+⚙️ **CONFIGURAÇÕES PESSOAIS:**
+• `/meubankroll [valor]` - Definir seu bankroll
+• `/meuriscoperfil [perfil]` - Perfil de risco (conservador/moderado/agressivo)
+• `/minhasconfiguracoes` - Ver suas configurações
+• `/filtrosnotificacao [min_units] [min_ev]` - Filtros de tips
+
+🎮 **FILTROS AVANÇADOS:**
+• `/filtrarligas [liga1] [liga2]` - Filtrar ligas específicas
+• `/timesfavoritos [time1], [time2]` - Definir times favoritos
+
+🔧 **ADMINISTRAÇÃO:**
+• `/statuslol` - Status completo do sistema
+• `/forcescan` - Scan manual forçado (admin)
+
+💡 **EXEMPLOS DE USO:**
+• `/meubankroll 500` - Define bankroll de R$ 500
+• `/meuriscoperfil conservador` - Perfil conservador
+• `/filtrarligas LPL LCK` - Apenas LPL e LCK
+• `/timesfavoritos T1, Gen.G, LOUD` - Times favoritos
+• `/filtrosnotificacao 1.5 8` - Mín. 1.5u e 8% EV
+
+📊 **LIGAS DISPONÍVEIS:**
+• `LPL` - Liga chinesa
+• `LCK` - Liga coreana
+• `LEC` - Liga europeia
+• `LCS` - Liga americana
+• `CBLOL` - Liga brasileira
+• `Worlds` - Mundial
+• `MSI` - Mid-Season Invitational
+
+🎯 **PERFIS DE RISCO:**
+• `conservador` - Máx 3 unidades, +5% confiança
+• `moderado` - Máx 5 unidades, critérios padrão
+• `agressivo` - Máx 6 unidades, -3% confiança
+
+⭐ **TOTAL: {len([cmd for cmd in message.split('•') if cmd.strip().startswith('/')])} COMANDOS DISPONÍVEIS**
+
+💡 **Para ajuda específica, digite o comando sem parâmetros**
+        """
+        
+        if TELEGRAM_VERSION == "v20+":
+            await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+
+    async def help_command(self, update: Update, context) -> None:
+        """Comando /help - Alias para /comandos"""
+        await self.comandos_command(update, context)
+
 def run_flask_app():
     """Executa Flask em thread separada (apenas para health check)"""
     # Não executar se webhook estiver ativo
@@ -4181,6 +4261,8 @@ def main():
             application.add_handler(CommandHandler("filtrarligas", bot.filtrarligas_command))
             application.add_handler(CommandHandler("timesfavoritos", bot.timesfavoritos_command))
             application.add_handler(CommandHandler("statuslol", bot.statuslol_command))
+            application.add_handler(CommandHandler("comandos", bot.comandos_command))
+            application.add_handler(CommandHandler("help", bot.help_command))
             
             application.add_handler(CallbackQueryHandler(bot.callback_handler))
 
@@ -4367,7 +4449,7 @@ def main():
             # Contar handlers corretamente
             total_handlers = sum(len(handlers_list) for group, handlers_list in dispatcher.handlers.items()) # Corrigido para iterar sobre items
             logger.info(f"✅ {total_handlers} handlers registrados no dispatcher v13")
-            logger.info(f"📋 Comandos disponíveis: /start, /menu, /tips, /live, /schedule, /monitoring, /predictions, /alerts")
+            logger.info(f"📋 Comandos disponíveis: /start, /menu, /tips, /live, /schedule, /monitoring, /predictions, /alerts, /meubankroll, /meuriscoperfil, /minhasconfiguracoes, /filtrosnotificacao, /livematches, /proximosjogoslol, /forcescan, /performance, /history, /odds, /units, /filtrarligas, /timesfavoritos, /statuslol, /comandos, /help")
 
             if is_railway:
                 # Modo Railway - Webhook v13
@@ -4390,26 +4472,35 @@ def main():
                     logger = logging.getLogger(__name__)
                     
                     try:
-                        logger.info("🔷 DEBUG: Webhook_v13 iniciado")
+                        logger.info("📥 Webhook v13 recebeu mensagem")
                         from flask import request
-                        logger.info(f"🔷 DEBUG: Request method={request.method}, path={request.path}")
-                        logger.info(f"🔷 DEBUG: Request headers={dict(request.headers)}")
-                        logger.info(f"🔷 DEBUG: Request content_type={request.content_type}")
+                        import json
                         
-                        # Tentar obter dados
-                        try:
-                            data = request.get_data()
-                            logger.info(f"🔷 DEBUG: Raw data length={len(data) if data else 0}")
-                        except Exception as data_error:
-                            logger.error(f"🔷 DEBUG: Erro ao obter raw data: {data_error}")
+                        # Obter dados JSON do Telegram
+                        data = request.get_json()
+                        if not data:
+                            logger.warning("⚠️ Webhook v13: Dados vazios recebidos")
+                            return "OK", 200
                         
-                        logger.info("🔷 DEBUG: Retornando OK")
+                        logger.info(f"📨 Dados recebidos: {json.dumps(data, indent=2)}")
+                        
+                        # Processar update do Telegram usando o dispatcher v13
+                        from telegram import Update
+                        update = Update.de_json(data, updater.bot)
+                        
+                        if update:
+                            logger.info(f"✅ Update processado: tipo={type(update).__name__}")
+                            # Processar update no dispatcher
+                            dispatcher.process_update(update)
+                        else:
+                            logger.warning("⚠️ Update não pôde ser processado")
+                        
                         return "OK", 200
                         
                     except Exception as e:
-                        logger.error(f"🔷 DEBUG: Erro na função webhook: {e}")
+                        logger.error(f"❌ Erro no webhook v13: {e}")
                         import traceback
-                        logger.error(f"🔷 DEBUG: Traceback: {traceback.format_exc()}")
+                        logger.error(f"❌ Traceback: {traceback.format_exc()}")
                         return "ERROR", 500
 
                 logger.info("🔷 DEBUG: Rota webhook_v13 definida com sucesso!")
