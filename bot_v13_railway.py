@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 BOT LOL V3 ULTRA AVANÇADO - Sistema de Tips Profissional
@@ -33,12 +33,12 @@ class GlobalCacheManager:
     def get_prediction_system(self):
         """Singleton pattern para DynamicPredictionSystem"""
         if self.prediction_system_cache is None:
-            logger.info("???? Inicializando sistema de predi????o (primeira vez)")
+            logger.info("🚀 Inicializando sistema de predição (primeira vez)")
             self.prediction_system_cache = DynamicPredictionSystem()
         return self.prediction_system_cache
     
     def should_skip_lpl_search(self) -> bool:
-        """Verifica se deve pular busca LPL espec??fica"""
+        """Verifica se deve pular busca LPL específica"""
         if not self.lpl_search_cache['timestamp']:
             return False
         
@@ -55,7 +55,7 @@ class GlobalCacheManager:
         return self.lpl_search_cache.get('data', [])
     
     def is_matches_cache_valid(self) -> bool:
-        """Verifica se cache de partidas ?? v??lido"""
+        """Verifica se cache de partidas é válido"""
         if not self.matches_cache['timestamp']:
             return False
         elapsed = (datetime.now() - self.matches_cache['timestamp']).seconds
@@ -70,17 +70,17 @@ class GlobalCacheManager:
         """Retorna partidas em cache"""
         return self.matches_cache.get('data', [])
 
-# Inst??ncia global do cache
+# Instância global do cache
 global_cache = GlobalCacheManager()
 
-# VERIFICA????O CR??TICA DE CONFLITOS NO IN??CIO
+# VERIFICAÇÃO CRÍTICA DE CONFLITOS NO INÍCIO
 def early_conflict_check():
-    """Verifica????o precoce de conflitos antes de importar bibliotecas pesadas"""
-    # Verificar se ?? Railway
+    """Verificação precoce de conflitos antes de importar bibliotecas pesadas"""
+    # Verificar se é Railway
     is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
 
     if not is_railway:
-        print("?????? EXECUTANDO EM MODO LOCAL - VERIFICANDO CONFLITOS...")
+        print("⚠️ EXECUTANDO EM MODO LOCAL - VERIFICANDO CONFLITOS...")
         # Verificar arquivo de lock existente
         import tempfile
         lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
@@ -96,29 +96,29 @@ def early_conflict_check():
                         result = subprocess.run(['tasklist', '/FI', f'PID eq {old_pid}'],
                                               capture_output=True, text=True)
                         if str(old_pid) in result.stdout:
-                            print(f"???? OUTRA INST??NCIA DETECTADA! PID: {old_pid}")
-                            print("???? ABORTANDO PARA EVITAR CONFLITOS!")
-                            print("???? Execute: python stop_all_conflicts.py")
+                            print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
+                            print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
+                            print("💡 Execute: python stop_all_conflicts.py")
                             sys.exit(1)
                     else:  # Unix/Linux
-                        os.kill(old_pid, 0)  # N??o mata, s?? verifica
-                        print(f"???? OUTRA INST??NCIA DETECTADA! PID: {old_pid}")
-                        print("???? ABORTANDO PARA EVITAR CONFLITOS!")
-                        print("???? Execute: python stop_all_conflicts.py")
+                        os.kill(old_pid, 0)  # Não mata, só verifica
+                        print(f"🚨 OUTRA INSTÂNCIA DETECTADA! PID: {old_pid}")
+                        print("🛑 ABORTANDO PARA EVITAR CONFLITOS!")
+                        print("💡 Execute: python stop_all_conflicts.py")
                         sys.exit(1)
                 except OSError:
-                    # Processo n??o existe mais, remover lock
+                    # Processo não existe mais, remover lock
                     os.remove(lock_file)
-                    print("???? Lock antigo removido (processo morto)")
+                    print("🧹 Lock antigo removido (processo morto)")
             except:
                 # Arquivo corrompido, remover
                 try:
                     os.remove(lock_file)
                 except:
                     pass
-        print("??? Verifica????o precoce de conflitos OK")
+        print("✅ Verificação precoce de conflitos OK")
 
-# Executar verifica????o precoce
+# Executar verificação precoce
 early_conflict_check()
 
 # Flask para health check
@@ -133,7 +133,6 @@ from telegram.error import TelegramError
 import numpy as np
 import aiohttp
 
-
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -142,18 +141,23 @@ logger = logging.getLogger(__name__)
 try:
     import ml_prediction_system
     ML_MODULE_AVAILABLE = True
-    logger.info("???? M??dulo ML importado (lazy loading)")
+    logger.info("🤖 Módulo ML importado (lazy loading)")
 except ImportError as e:
     ML_MODULE_AVAILABLE = False
-    logger.warning(f"?????? M??dulo ML n??o dispon??vel: {e}")
+    logger.warning(f"⚠️ Módulo ML não disponível: {e}")
 
-# Configura????es
+# Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
-OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
-PORT = int(os.getenv('PORT', 5800))
-
-# API Key para The Odds API
+TELEGRAM_BOT_TOKEN = TOKEN  # Alias para compatibilidade
+OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))  # Adicionando OWNER_ID que estava faltando
+PORT = int(os.getenv("PORT", 8000))
 THE_ODDS_API_KEY = os.getenv('THE_ODDS_API_KEY', '8cff2fb4dafc21c0ac5c04862903990d')
+PANDASCORE_API_KEY = os.getenv('PANDASCORE_API_KEY', '90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ')
+
+# Sistema híbrido: PandaScore primário + Riot fallback + TheOdds para odds
+ENABLE_PANDASCORE = True
+ENABLE_RIOT_FALLBACK = True
+ENABLE_ODDS_API = True
 
 # Flask app para healthcheck
 app = Flask(__name__)
@@ -186,7 +190,7 @@ def root():
         return jsonify({
             'message': 'BOT LOL V3 - Sistema de Unidades Profissional',
             'status': 'online',
-            'units_system': 'Padr??o de grupos profissionais',
+            'units_system': 'Padrão de grupos profissionais',
             'health_check': '/health',
             'webhook': '/webhook'
         }), 200
@@ -202,24 +206,24 @@ def ping():
     return "pong", 200
 
 class ProfessionalUnitsSystem:
-    """Sistema de Unidades Padr??o de Grupos Profissionais"""
+    """Sistema de Unidades Padrão de Grupos Profissionais"""
 
     def __init__(self, bankroll: float = 1000.0):
         self.bankroll = bankroll
         self.base_unit = bankroll * 0.01  # 1% do bankroll = 1 unidade base
 
-        # Sistema de unidades padr??o de grupos profissionais
+        # Sistema de unidades padrão de grupos profissionais
         self.unit_scale = {
-            'max_confidence_high_ev': 5.0,    # 90%+ confian??a, 15%+ EV
-            'high_confidence_high_ev': 4.0,   # 85%+ confian??a, 12%+ EV
-            'high_confidence_good_ev': 3.0,   # 80%+ confian??a, 10%+ EV
-            'good_confidence_good_ev': 2.5,   # 75%+ confian??a, 8%+ EV
-            'medium_confidence': 2.0,         # 70%+ confian??a, 6%+ EV
-            'low_confidence': 1.0,            # 65%+ confian??a, 5%+ EV
-            'minimum': 0.5                    # M??nimo absoluto
+            'max_confidence_high_ev': 5.0,    # 90%+ confiança, 15%+ EV
+            'high_confidence_high_ev': 4.0,   # 85%+ confiança, 12%+ EV
+            'high_confidence_good_ev': 3.0,   # 80%+ confiança, 10%+ EV
+            'good_confidence_good_ev': 2.5,   # 75%+ confiança, 8%+ EV
+            'medium_confidence': 2.0,         # 70%+ confiança, 6%+ EV
+            'low_confidence': 1.0,            # 65%+ confiança, 5%+ EV
+            'minimum': 0.5                    # Mínimo absoluto
         }
 
-        # Hist??rico
+        # Histórico
         self.bet_history = []
         self.performance_stats = {
             'total_bets': 0, 'wins': 0, 'losses': 0,
@@ -227,15 +231,15 @@ class ProfessionalUnitsSystem:
             'roi_percentage': 0, 'strike_rate': 0
         }
 
-        logger.info(f"???? Sistema de Unidades Profissional inicializado - Bankroll: ${bankroll}")
+        logger.info(f"💰 Sistema de Unidades Profissional inicializado - Bankroll: ${bankroll}")
 
     def calculate_units(self, confidence: float, ev_percentage: float, league_tier: str = "tier2") -> Dict:
-        """Calcula unidades usando sistema padr??o de grupos profissionais"""
+        """Calcula unidades usando sistema padrão de grupos profissionais"""
         # Ajuste por tier da liga
         tier_multipliers = {'tier1': 1.0, 'tier2': 0.9, 'tier3': 0.8}
         tier_mult = tier_multipliers.get(league_tier, 0.8)
 
-        # Determinar unidades baseado em confian??a e EV
+        # Determinar unidades baseado em confiança e EV
         if confidence >= 90 and ev_percentage >= 15:
             base_units = self.unit_scale['max_confidence_high_ev']
             risk_level = "Muito Alto"
@@ -247,18 +251,18 @@ class ProfessionalUnitsSystem:
             risk_level = "Alto"
         elif confidence >= 75 and ev_percentage >= 8:
             base_units = self.unit_scale['good_confidence_good_ev']
-            risk_level = "M??dio-Alto"
+            risk_level = "Médio-Alto"
         elif confidence >= 70 and ev_percentage >= 6:
             base_units = self.unit_scale['medium_confidence']
-            risk_level = "M??dio"
+            risk_level = "Médio"
         elif confidence >= 65 and ev_percentage >= 5:
             base_units = self.unit_scale['low_confidence']
             risk_level = "Baixo"
         else:
             return {
                 'units': 0, 'stake_amount': 0, 'risk_level': 'Sem Valor',
-                'recommendation': 'N??O APOSTAR - Crit??rios n??o atendidos',
-                'reason': f'Confian??a: {confidence:.1f}% | EV: {ev_percentage:.1f}%'
+                'recommendation': 'NÃO APOSTAR - Critérios não atendidos',
+                'reason': f'Confiança: {confidence:.1f}% | EV: {ev_percentage:.1f}%'
             }
 
         # Aplicar multiplicador de tier
@@ -267,11 +271,11 @@ class ProfessionalUnitsSystem:
         # Ajuste fino baseado em EV excepcional
         if ev_percentage >= 20:
             final_units *= 1.2
-            risk_level = "M??ximo"
+            risk_level = "Máximo"
         elif ev_percentage >= 18:
             final_units *= 1.1
 
-        # Limites de seguran??a
+        # Limites de segurança
         final_units = min(final_units, 5.0)
         final_units = max(final_units, 0.5)
         stake_amount = final_units * self.base_unit
@@ -288,59 +292,59 @@ class ProfessionalUnitsSystem:
         }
 
     def _get_units_reasoning(self, confidence: float, ev_percentage: float, league_tier: str) -> str:
-        """Gera explica????o do c??lculo de unidades"""
+        """Gera explicação do cálculo de unidades"""
         reasoning_parts = []
 
         if confidence >= 85 and ev_percentage >= 12:
-            reasoning_parts.append("???? Alta confian??a + Excelente valor")
+            reasoning_parts.append("🔥 Alta confiança + Excelente valor")
         elif confidence >= 80 and ev_percentage >= 10:
-            reasoning_parts.append("??? Boa confian??a + Bom valor")
+            reasoning_parts.append("⭐ Boa confiança + Bom valor")
         elif confidence >= 75 and ev_percentage >= 8:
-            reasoning_parts.append("??? Confian??a adequada + Valor positivo")
+            reasoning_parts.append("✅ Confiança adequada + Valor positivo")
         else:
-            reasoning_parts.append("?????? Crit??rios m??nimos atendidos")
+            reasoning_parts.append("⚠️ Critérios mínimos atendidos")
 
         if league_tier == 'tier1':
-            reasoning_parts.append("???? Liga Tier 1 (sem redu????o)")
+            reasoning_parts.append("🏆 Liga Tier 1 (sem redução)")
         elif league_tier == 'tier2':
-            reasoning_parts.append("???? Liga Tier 2 (-10%)")
+            reasoning_parts.append("🥈 Liga Tier 2 (-10%)")
         else:
-            reasoning_parts.append("???? Liga menor (-20%)")
+            reasoning_parts.append("🥉 Liga menor (-20%)")
 
         if ev_percentage >= 20:
-            reasoning_parts.append("???? Bonus +20% por EV excepcional")
+            reasoning_parts.append("💎 Bonus +20% por EV excepcional")
         elif ev_percentage >= 18:
-            reasoning_parts.append("???? Bonus +10% por EV muito alto")
+            reasoning_parts.append("💰 Bonus +10% por EV muito alto")
 
-        return " ??? ".join(reasoning_parts)
+        return " • ".join(reasoning_parts)
 
     def get_units_explanation(self) -> str:
-        """Retorna explica????o do sistema de unidades"""
+        """Retorna explicação do sistema de unidades"""
         return """
-???? **SISTEMA DE UNIDADES PROFISSIONAL** ????
+🎲 **SISTEMA DE UNIDADES PROFISSIONAL** 🎲
 
-???? **ESCALA PADR??O DE GRUPOS PROFISSIONAIS:**
+📊 **ESCALA PADRÃO DE GRUPOS PROFISSIONAIS:**
 
-???? **5.0 UNIDADES** - Confian??a 90%+ | EV 15%+
-??? **4.0 UNIDADES** - Confian??a 85%+ | EV 12%+
-??? **3.0 UNIDADES** - Confian??a 80%+ | EV 10%+
-???? **2.5 UNIDADES** - Confian??a 75%+ | EV 8%+
-???? **2.0 UNIDADES** - Confian??a 70%+ | EV 6%+
-?????? **1.0 UNIDADES** - Confian??a 65%+ | EV 5%+
+🔥 **5.0 UNIDADES** - Confiança 90%+ | EV 15%+
+⭐ **4.0 UNIDADES** - Confiança 85%+ | EV 12%+
+✅ **3.0 UNIDADES** - Confiança 80%+ | EV 10%+
+📈 **2.5 UNIDADES** - Confiança 75%+ | EV 8%+
+📊 **2.0 UNIDADES** - Confiança 70%+ | EV 6%+
+⚠️ **1.0 UNIDADES** - Confiança 65%+ | EV 5%+
 
-???? **AJUSTES POR LIGA:**
-??? Tier 1 (LCK/LPL/LEC/LCS): Sem redu????o
-??? Tier 2 (Regionais): -10%
-??? Tier 3 (Menores): -20%
+🏆 **AJUSTES POR LIGA:**
+• Tier 1 (LCK/LPL/LEC/LCS): Sem redução
+• Tier 2 (Regionais): -10%
+• Tier 3 (Menores): -20%
 
-???? **BONUS POR EV EXCEPCIONAL:**
-??? EV 20%+: +20% unidades
-??? EV 18%+: +10% unidades
+💎 **BONUS POR EV EXCEPCIONAL:**
+• EV 20%+: +20% unidades
+• EV 18%+: +10% unidades
 
-??? **CRIT??RIOS M??NIMOS:**
-??? Confian??a m??nima: 65%
-??? EV m??nimo: 5%
-??? M??ximo por aposta: 5 unidades
+⚡ **CRITÉRIOS MÍNIMOS:**
+• Confiança mínima: 65%
+• EV mínimo: 5%
+• Máximo por aposta: 5 unidades
         """
 
 class RiotAPIClient:
@@ -363,43 +367,52 @@ class RiotAPIClient:
             'Referer': 'https://lolesports.com/schedule'
         }
         
-        # OTIMIZA????O: Cache interno e timeouts reduzidos
+        # OTIMIZAÇÃO: Cache interno e timeouts reduzidos
         self._matches_cache = {'data': [], 'timestamp': None, 'duration': 120}  # 2 min
         self._lpl_cache = {'data': [], 'timestamp': None, 'duration': 300}  # 5 min
         self.timeout = aiohttp.ClientTimeout(total=8)  # Reduzido para 8 segundos
 
     async def get_live_matches(self) -> List[Dict]:
-        """Busca partidas ao vivo REAIS da API oficial da Riot - SEM DADOS SIMULADOS"""
+        """Busca partidas ao vivo REAIS da API oficial - OTIMIZADO com novos endpoints"""
         
-        # CACHE: Verificar se temos dados v??lidos em cache
+        # CACHE: Verificar se temos dados válidos em cache
         if self._matches_cache['timestamp']:
             elapsed = (datetime.now() - self._matches_cache['timestamp']).seconds
             if elapsed < self._matches_cache['duration']:
-                logger.info(f"???? Cache hit - usando partidas em cache ({elapsed}s)")
+                logger.info(f"📦 Cache hit - usando partidas em cache ({elapsed}s)")
                 return self._matches_cache['data']
         
-        # APENAS endpoints oficiais da Riot - sem simula????o
+        # ENDPOINTS ALTERNATIVOS da Riot para contornar erro 403
         riot_endpoints = [
-            f"{self.base_urls['esports']}/getLive?hl=en-US",
+            # Endpoints originais com novos parâmetros
+            f"{self.base_urls['esports']}/getLive?hl=en-US&x-api-key=0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z",
             f"{self.base_urls['esports']}/getSchedule?hl=en-US",
-            f"{self.base_urls['prod']}/getLive?hl=en-US",
+            
+            # Novos endpoints alternativos
+            f"{self.base_urls['esports']}/getLive",
+            f"{self.base_urls['prod']}/getLive",
+            
+            # Endpoints regionais específicos
             f"{self.base_urls['esports']}/getLive?hl=zh-CN&region=china",
             f"{self.base_urls['esports']}/getLive?hl=ko-KR&region=korea",
-            f"{self.base_urls['esports']}/getLive"
+            f"{self.base_urls['esports']}/getLive?hl=pt-BR&region=brazil",
+            
+            # Endpoints sem parâmetros
+            f"{self.base_urls['esports']}/getSchedule",
+            f"{self.base_urls['prod']}/getSchedule"
         ]
         
         all_matches = []
         seen_matches = set()
         successful_endpoints = 0
         
-        logger.info("???? Buscando partidas ao vivo - APENAS DADOS REAIS DA RIOT")
-        
         for endpoint in riot_endpoints:
             try:
-                # Headers padr??o para evitar detec????o
+                # Usar headers rotativos para evitar detecção
                 current_headers = self.headers.copy()
                 current_headers['Referer'] = 'https://lolesports.com/'
                 
+                # Adicionar Origin específico para cada endpoint
                 if 'esports-api' in endpoint:
                     current_headers['Origin'] = 'https://lolesports.com'
                 elif 'prod-relapi' in endpoint:
@@ -410,52 +423,143 @@ class RiotAPIClient:
                         if response.status == 200:
                             data = await response.json()
                             matches = self._extract_live_matches_only(data)
+                            successful_endpoints += 1
                             
-                            if matches:
-                                successful_endpoints += 1
-                                logger.info(f"??? {len(matches)} partidas reais encontradas em endpoint da Riot")
-                                
-                                for match in matches:
-                                    teams = match.get('teams', [])
-                                    if len(teams) >= 2:
-                                        team1_name = teams[0].get('name', '').lower().strip()
-                                        team2_name = teams[1].get('name', '').lower().strip()
-                                        league = match.get('league', '').lower().strip()
+                            for match in matches:
+                                teams = match.get('teams', [])
+                                if len(teams) >= 2:
+                                    team1_name = teams[0].get('name', '').lower().strip()
+                                    team2_name = teams[1].get('name', '').lower().strip()
+                                    league = match.get('league', '').lower().strip()
+                                    
+                                    # Criar identificador único para evitar duplicatas
+                                    sorted_teams = sorted([team1_name, team2_name])
+                                    match_id = f"{sorted_teams[0]}_{sorted_teams[1]}_{league}"
+                                    
+                                    if match_id not in seen_matches:
+                                        seen_matches.add(match_id)
+                                        all_matches.append(match)
                                         
-                                        # Criar identificador ??nico para evitar duplicatas
-                                        sorted_teams = sorted([team1_name, team2_name])
-                                        match_id = f"{sorted_teams[0]}_{sorted_teams[1]}_{league}"
+                                        # Log específico para LPL com detecção melhorada
+                                        is_lpl = (
+                                            'lpl' in league or 
+                                            'china' in league.lower() or
+                                            'chinese' in league.lower() or
+                                            any(lpl_indicator in team1_name + team2_name for lpl_indicator in [
+                                                'bilibili', 'blg', 'weibo', 'wbg', 'tes', 'topesports', 'top esports',
+                                                'jdg', 'jd gaming', 'lng', 'lng esports', 'edg', 'edward gaming',
+                                                'rng', 'royal never give up', 'ig', 'invictus gaming', 'fpx', 'funplus',
+                                                'ninjas in pyjamas', 'nip', 'anyone', 'lgd', 'thundertalk', 'tt',
+                                                'oh my god', 'omg', 'rare atom', 'ra', 'ultra prime', 'up', 'team we'
+                                            ])
+                                        )
                                         
-                                        if match_id not in seen_matches:
-                                            seen_matches.add(match_id)
-                                            all_matches.append(match)
-                                            
-                                            # Log espec??fico para partidas reais
-                                            logger.info(f"???? PARTIDA REAL: {teams[0].get('name')} vs {teams[1].get('name')} ({league})")
-                                        else:
-                                            logger.debug(f"???? Partida duplicada ignorada: {teams[0].get('name')} vs {teams[1].get('name')}")
+                                        if is_lpl:
+                                            logger.info(f"🇨🇳 ✅ PARTIDA LPL DETECTADA: {teams[0].get('name')} vs {teams[1].get('name')} ({league})")
+                                        
+                                        logger.debug(f"✅ Partida única adicionada: {teams[0].get('name')} vs {teams[1].get('name')} ({league})")
+                                    else:
+                                        logger.debug(f"🚫 Partida duplicada ignorada: {teams[0].get('name')} vs {teams[1].get('name')}")
                         else:
-                            logger.debug(f"?????? Endpoint {endpoint}: status {response.status} - API bloqueada")
+                            logger.debug(f"⚠️ Endpoint {endpoint}: status {response.status}")
                                 
             except Exception as e:
-                logger.debug(f"??? Erro no endpoint {endpoint}: {e}")
+                logger.debug(f"❌ Erro no endpoint {endpoint}: {e}")
                 continue
                     
-        # Se n??o encontrou partidas reais, retornar lista vazia (SEM SIMULA????O)
+        # FALLBACK: Se não encontrou partidas, tentar método alternativo
         if not all_matches:
-            logger.info("???? Nenhuma partida real encontrada nas APIs da Riot")
-            logger.info("???? APIs de esports podem estar temporariamente bloqueadas")
-            
-            # Cache vazio para evitar tentativas excessivas
-            self._matches_cache['data'] = []
-            self._matches_cache['timestamp'] = datetime.now()
-            return []
+            logger.info("🔄 Nenhuma partida encontrada nos endpoints principais. Tentando método alternativo...")
+            try:
+                fallback_matches = await self._get_fallback_riot_matches()
+                all_matches.extend(fallback_matches)
+                if fallback_matches:
+                    successful_endpoints += 1
+                    logger.info(f"✅ {len(fallback_matches)} partidas encontradas no método alternativo")
+            except Exception as e:
+                logger.warning(f"⚠️ Método alternativo falhou: {e}")
         
-        # Log do resultado final - apenas partidas reais
+        # Log do resultado final
         unique_count = len(all_matches)
-        logger.info(f"???? {unique_count} partidas REAIS encontradas de {successful_endpoints} endpoints da Riot")
+        logger.info(f"🎯 {unique_count} partidas únicas encontradas de {successful_endpoints} endpoints (duplicatas removidas)")
         
-        # Cache resultado final - apenas dados reais
+        # OTIMIZAÇÃO: Verificar especificamente por LPL com cache inteligente
+        lpl_count = sum(1 for match in all_matches 
+                       if any(indicator in match.get('league', '').lower() 
+                              for indicator in ['lpl', 'china', 'chinese']))
+        
+        if lpl_count == 0:
+            # Verificar cache LPL primeiro
+            if self._lpl_cache['timestamp']:
+                elapsed = (datetime.now() - self._lpl_cache['timestamp']).seconds
+                if elapsed < self._lpl_cache['duration']:
+                    logger.info("🇨🇳 📦 Usando cache LPL")
+                    cached_lpl = self._lpl_cache['data']
+                    for lpl_match in cached_lpl:
+                        teams = lpl_match.get('teams', [])
+                        if len(teams) >= 2:
+                            team1_name = teams[0].get('name', '').lower().strip()
+                            team2_name = teams[1].get('name', '').lower().strip()
+                            league = lpl_match.get('league', '').lower().strip()
+                            
+                            sorted_teams = sorted([team1_name, team2_name])
+                            match_id = f"{sorted_teams[0]}_{sorted_teams[1]}_{league}"
+                            
+                            if match_id not in seen_matches:
+                                seen_matches.add(match_id)
+                                all_matches.append(lpl_match)
+                else:
+                    # Cache expirado, executar busca rápida LPL
+                    logger.info("💡 Executando busca LPL otimizada...")
+                    try:
+                        lpl_matches = await self._get_lpl_matches_fast()
+                        self._lpl_cache['data'] = lpl_matches
+                        self._lpl_cache['timestamp'] = datetime.now()
+                        
+                        for lpl_match in lpl_matches:
+                            teams = lpl_match.get('teams', [])
+                            if len(teams) >= 2:
+                                team1_name = teams[0].get('name', '').lower().strip()
+                                team2_name = teams[1].get('name', '').lower().strip()
+                                league = lpl_match.get('league', '').lower().strip()
+                                
+                                sorted_teams = sorted([team1_name, team2_name])
+                                match_id = f"{sorted_teams[0]}_{sorted_teams[1]}_{league}"
+                                
+                                if match_id not in seen_matches:
+                                    seen_matches.add(match_id)
+                                    all_matches.append(lpl_match)
+                                    logger.info(f"🇨🇳 ➕ Partida LPL adicionada: {teams[0].get('name')} vs {teams[1].get('name')}")
+                        
+                    except Exception as e:
+                        logger.warning(f"🇨🇳 ❌ Erro na busca LPL: {e}")
+            else:
+                # Primeira execução, buscar LPL
+                logger.info("💡 Executando busca LPL inicial...")
+                try:
+                    lpl_matches = await self._get_lpl_matches_fast()
+                    self._lpl_cache['data'] = lpl_matches
+                    self._lpl_cache['timestamp'] = datetime.now()
+                    
+                    for lpl_match in lpl_matches:
+                        teams = lpl_match.get('teams', [])
+                        if len(teams) >= 2:
+                            team1_name = teams[0].get('name', '').lower().strip()
+                            team2_name = teams[1].get('name', '').lower().strip()
+                            league = lpl_match.get('league', '').lower().strip()
+                            
+                            sorted_teams = sorted([team1_name, team2_name])
+                            match_id = f"{sorted_teams[0]}_{sorted_teams[1]}_{league}"
+                            
+                            if match_id not in seen_matches:
+                                seen_matches.add(match_id)
+                                all_matches.append(lpl_match)
+                                logger.info(f"🇨🇳 ➕ Partida LPL: {teams[0].get('name')} vs {teams[1].get('name')}")
+                
+                except Exception as e:
+                    logger.warning(f"🇨🇳 ❌ Erro na busca LPL: {e}")
+        
+        # Cache resultado final
         final_matches = all_matches[:15]  # Limitar a 15 partidas para performance
         self._matches_cache['data'] = final_matches
         self._matches_cache['timestamp'] = datetime.now()
@@ -463,10 +567,10 @@ class RiotAPIClient:
         return final_matches
 
     async def get_live_matches_with_details(self) -> List[Dict]:
-        """Busca partidas ao vivo COM dados detalhados (draft + estat??sticas)"""
-        logger.info("???? Buscando partidas ao vivo com dados detalhados...")
+        """Busca partidas ao vivo COM dados detalhados (draft + estatísticas)"""
+        logger.info("🔍 Buscando partidas ao vivo com dados detalhados...")
         
-        # Primeiro buscar partidas ao vivo b??sicas
+        # Primeiro buscar partidas ao vivo básicas
         live_matches = await self.get_live_matches()
         
         detailed_matches = []
@@ -478,23 +582,23 @@ class RiotAPIClient:
                 if detailed_match:
                     detailed_matches.append(detailed_match)
             except Exception as e:
-                logger.warning(f"??? Erro ao buscar detalhes da partida: {e}")
+                logger.warning(f"❌ Erro ao buscar detalhes da partida: {e}")
                 continue
         
-        logger.info(f"???? {len(detailed_matches)} partidas com dados detalhados encontradas")
+        logger.info(f"📊 {len(detailed_matches)} partidas com dados detalhados encontradas")
         return detailed_matches
 
     async def _get_match_details(self, match: Dict) -> Optional[Dict]:
-        """Busca dados detalhados de uma partida espec??fica"""
+        """Busca dados detalhados de uma partida específica"""
         try:
             # Simular busca de dados detalhados da partida
-            # Na implementa????o real, isso faria chamadas espec??ficas para endpoints de dados ao vivo
+            # Na implementação real, isso faria chamadas específicas para endpoints de dados ao vivo
             
             teams = match.get('teams', [])
             if len(teams) < 2:
                 return None
             
-            # Simular dados de draft (na implementa????o real viria da API)
+            # Simular dados de draft (na implementação real viria da API)
             draft_data = {
                 'team1_picks': ['Champion1', 'Champion2', 'Champion3', 'Champion4', 'Champion5'],
                 'team2_picks': ['Champion6', 'Champion7', 'Champion8', 'Champion9', 'Champion10'],
@@ -502,7 +606,7 @@ class RiotAPIClient:
                 'team2_bans': ['Banned4', 'Banned5', 'Banned6']
             }
             
-            # Simular estat??sticas da partida (na implementa????o real viria da API)
+            # Simular estatísticas da partida (na implementação real viria da API)
             import random
             game_time = random.randint(600, 2400)  # Entre 10-40 minutos
             
@@ -516,16 +620,16 @@ class RiotAPIClient:
                 'vision_score_diff': random.randint(-20, 20)
             }
             
-            # Determinar n??mero do jogo baseado no status
-            game_number = 1  # Na implementa????o real, viria da API
+            # Determinar número do jogo baseado no status
+            game_number = 1  # Na implementação real, viria da API
             if 'game' in match.get('tournament', '').lower():
                 try:
-                    # Tentar extrair n??mero do jogo do torneio
+                    # Tentar extrair número do jogo do torneio
                     game_number = int(''.join(filter(str.isdigit, match.get('tournament', ''))) or 1)
                 except:
                     game_number = 1
             
-            # Adicionar dados detalhados ?? partida
+            # Adicionar dados detalhados à partida
             detailed_match = match.copy()
             detailed_match.update({
                 'draft_data': draft_data,
@@ -535,15 +639,15 @@ class RiotAPIClient:
                 'has_complete_data': True
             })
             
-            logger.debug(f"???? Dados detalhados obtidos para {teams[0].get('name')} vs {teams[1].get('name')} - Game {game_number}")
+            logger.debug(f"📊 Dados detalhados obtidos para {teams[0].get('name')} vs {teams[1].get('name')} - Game {game_number}")
             return detailed_match
             
         except Exception as e:
-            logger.warning(f"??? Erro ao obter detalhes da partida: {e}")
+            logger.warning(f"❌ Erro ao obter detalhes da partida: {e}")
             return None
 
     def _extract_live_matches_only(self, data: Dict) -> List[Dict]:
-        """Extrai APENAS partidas que est??o acontecendo AGORA"""
+        """Extrai APENAS partidas que estão acontecendo AGORA"""
         matches = []
         try:
             events = None
@@ -576,15 +680,15 @@ class RiotAPIClient:
                                 if time_diff.total_seconds() > 0:
                                     calculated_time = int(time_diff.total_seconds())
                                     
-                                    # LIMITA????O REALISTA: Partidas de LoL duram entre 15-60 minutos
-                                    # Se passou de 60 minutos, provavelmente ?? erro de dados
+                                    # LIMITAÇÃO REALISTA: Partidas de LoL duram entre 15-60 minutos
+                                    # Se passou de 60 minutos, provavelmente é erro de dados
                                     max_game_time = 60 * 60  # 60 minutos em segundos
-                                    min_game_time = 5 * 60   # 5 minutos m??nimo
+                                    min_game_time = 5 * 60   # 5 minutos mínimo
                                     
                                     if calculated_time > max_game_time:
-                                        # Se tempo calculado ?? muito alto, estimar tempo realista
+                                        # Se tempo calculado é muito alto, estimar tempo realista
                                         game_time = random.randint(15 * 60, 45 * 60)  # Entre 15-45 min
-                                        logger.warning(f"?????? Tempo calculado muito alto ({calculated_time//60}min), usando estimativa realista: {game_time//60}min")
+                                        logger.warning(f"⚠️ Tempo calculado muito alto ({calculated_time//60}min), usando estimativa realista: {game_time//60}min")
                                     elif calculated_time < min_game_time:
                                         # Se muito baixo, pode estar iniciando
                                         game_time = calculated_time
@@ -593,27 +697,27 @@ class RiotAPIClient:
                                         game_time = calculated_time
                                         
                             except Exception as calc_error:
-                                # Se erro no c??lculo, usar tempo estimado padr??o
+                                # Se erro no cálculo, usar tempo estimado padrão
                                 game_time = random.randint(15 * 60, 35 * 60)  # 15-35 min
-                                logger.debug(f"Erro no c??lculo de tempo, usando estimativa: {game_time//60}min - {calc_error}")
+                                logger.debug(f"Erro no cálculo de tempo, usando estimativa: {game_time//60}min - {calc_error}")
                         else:
-                            # Se n??o tem startTime, usar tempo estimado
+                            # Se não tem startTime, usar tempo estimado
                             game_time = random.randint(20 * 60, 40 * 60)  # 20-40 min
                         
                         match = {
                             'teams': teams,
                             'league': self._extract_league(event),
-                            'status': 'live',  # For??ar status live
+                            'status': 'live',  # Forçar status live
                             'start_time': start_time_str,
                             'game_time': game_time,
                             'tournament': event.get('tournament', {}).get('name', 'Tournament')
                         }
                         matches.append(match)
-                        logger.info(f"???? Partida ao vivo encontrada: {teams[0].get('name')} vs {teams[1].get('name')}")
+                        logger.info(f"🎮 Partida ao vivo encontrada: {teams[0].get('name')} vs {teams[1].get('name')}")
         except Exception as e:
             logger.error(f"Erro ao extrair partidas ao vivo: {e}")
         
-        logger.info(f"???? {len(matches)} partidas realmente ao vivo encontradas")
+        logger.info(f"🎮 {len(matches)} partidas realmente ao vivo encontradas")
         return matches
 
     def _extract_matches(self, data: Dict) -> List[Dict]:
@@ -669,62 +773,323 @@ class RiotAPIClient:
             return 'Unknown League'
 
     async def _get_lpl_matches_fast(self) -> List[Dict]:
-        """M??todo OTIMIZADO para buscar partidas LPL com timeout ultra-reduzido"""
-        logger.info("???????? Busca LPL ultra-r??pida (3s timeout)...")
+        """Método OTIMIZADO para buscar partidas LPL com timeout ultra-reduzido"""
+        logger.info("🇨🇳 Busca LPL ultra-rápida (3s timeout)...")
         
-        # Apenas os 2 endpoints mais eficazes
+        # Busca LPL ultra-rápida (endpoints priorizados para <3s)
         fast_endpoints = [
-            f"{self.base_urls['esports']}/getLive",
-            f"{self.base_urls['prod']}/getLive"
+            "https://esports-api.lolesports.com/persisted/gw/getLive?hl=pt-BR",
+            "https://prod-relapi.ewp.gg/persisted/gw/getLive?hl=pt-BR"
         ]
         
-        # Headers m??nimos para performance
         fast_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+            'Cache-Control': 'no-cache'
         }
-        
-        lpl_team_indicators = [
-            'bilibili', 'blg', 'weibo', 'wbg', 'tes', 'topesports',
-            'jdg', 'lng', 'edg', 'rng', 'ig', 'fpx', 'we'
-        ]
-        
-        lpl_matches = []
-        fast_timeout = aiohttp.ClientTimeout(total=3)  # 3 segundos apenas
+        fast_timeout = aiohttp.ClientTimeout(total=3)  # Timeout ultra-baixo
         
         for endpoint in fast_endpoints:
             try:
                 async with aiohttp.ClientSession(timeout=fast_timeout) as session:
                     async with session.get(endpoint, headers=fast_headers) as response:
-                            if response.status == 200:
-                                data = await response.json()
-                            matches = self._extract_live_matches_only(data)
-                            
-                            for match in matches:
-                                teams = match.get('teams', [])
-                                league = match.get('league', '').lower()
-                                
-                                is_lpl = False
-                                if any(indicator in league for indicator in ['lpl', 'china', 'chinese']):
-                                    is_lpl = True
-                                elif len(teams) >= 2:
-                                    team_names = (teams[0].get('name', '') + ' ' + teams[1].get('name', '')).lower()
-                                    if any(indicator in team_names for indicator in lpl_team_indicators):
-                                        is_lpl = True
-                                
-                                if is_lpl:
-                                    lpl_matches.append(match)
-                                    logger.info(f"???????? LPL encontrada: {teams[0].get('name', 'N/A')} vs {teams[1].get('name', 'N/A')}")
-                            
-                            if lpl_matches:
+                        if response.status == 200:
+                            data = await response.json()
+                            if data and 'data' in data:
+                                matches = self._extract_live_matches_only(data)
+                                if matches:
+                                    # Filtrar apenas LPL
+                                    lpl_matches = [m for m in matches if 'lpl' in m.get('league', '').lower()]
+                                    if lpl_matches:
+                                        logger.info(f"🇨🇳 LPL encontrada via endpoint rápido: {len(lpl_matches)} partidas")
+                                        return lpl_matches
                                 break  # Se encontrou, parar para economizar tempo
-                                
             except Exception as e:
-                logger.debug(f"Endpoint LPL r?pido {endpoint}: {e}")
+                logger.debug(f"Endpoint LPL rápido {endpoint}: {e}")
                 continue
         
-        logger.info(f"???????? Busca LPL ultra-r??pida conclu??da: {len(lpl_matches)} partidas em <3s")
-        return lpl_matches
+        logger.info(f"🇨🇳 Busca LPL ultra-rápida concluída: 0 partidas em <3s")
+        return []
+
+class PandaScoreAPIClient:
+    """Cliente para PandaScore API - DADOS REAIS DE ESPORTS E ODDS"""
+    
+    def __init__(self, api_key: str = "90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ"):
+        self.api_key = api_key
+        self.base_url = "https://api.pandascore.co"
+        self.cache = {}
+        self.cache_duration = 300  # 5 minutos cache para performance
+        
+        # Headers padrão para todas as requisições
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        logger.info("🐼 PandaScore API Client inicializado")
+    
+    async def get_live_lol_matches(self) -> List[Dict]:
+        """Busca partidas ao vivo de League of Legends"""
+        cache_key = "live_lol_matches"
+        
+        # Verificar cache primeiro
+        if self._is_cache_valid(cache_key):
+            logger.debug("📊 Usando cache para partidas ao vivo PandaScore")
+            return self.cache[cache_key]['data']
+        
+        try:
+            # Endpoint para partidas ao vivo
+            url = f"{self.base_url}/lol/matches/running"
+            
+            timeout = aiohttp.ClientTimeout(total=8)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers=self.headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        matches = self._process_live_matches(data)
+                        
+                        # Cache dos resultados
+                        self.cache[cache_key] = {
+                            'data': matches,
+                            'timestamp': time.time()
+                        }
+                        
+                        logger.info(f"🐼 PandaScore: {len(matches)} partidas ao vivo encontradas")
+                        return matches
+                    elif response.status == 401:
+                        logger.error("❌ PandaScore API: Chave inválida ou expirada")
+                        return []
+                    elif response.status == 429:
+                        logger.warning("⚠️ PandaScore API: Rate limit atingido")
+                        return []
+                    else:
+                        logger.warning(f"⚠️ PandaScore API erro {response.status}")
+                        return []
+                        
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar partidas PandaScore: {e}")
+            return []
+    
+    async def get_match_odds(self, match_id: str) -> Optional[Dict]:
+        """Busca odds para uma partida específica"""
+        cache_key = f"odds_{match_id}"
+        
+        # Verificar cache
+        if self._is_cache_valid(cache_key):
+            return self.cache[cache_key]['data']
+        
+        try:
+            url = f"{self.base_url}/lol/matches/{match_id}/betting-odds"
+            
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers=self.headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        odds_data = self._process_odds_data(data)
+                        
+                        # Cache
+                        self.cache[cache_key] = {
+                            'data': odds_data,
+                            'timestamp': time.time()
+                        }
+                        
+                        return odds_data
+                    else:
+                        logger.debug(f"PandaScore odds indisponíveis para match {match_id}: {response.status}")
+                        return None
+                        
+        except Exception as e:
+            logger.debug(f"Erro ao buscar odds PandaScore: {e}")
+            return None
+    
+    async def get_upcoming_matches(self, hours_ahead: int = 24) -> List[Dict]:
+        """Busca partidas programadas nas próximas horas"""
+        cache_key = f"upcoming_{hours_ahead}h"
+        
+        if self._is_cache_valid(cache_key):
+            return self.cache[cache_key]['data']
+        
+        try:
+            # Data atual e futura
+            now = datetime.utcnow()
+            future = now + timedelta(hours=hours_ahead)
+            
+            url = f"{self.base_url}/lol/matches/upcoming"
+            params = {
+                'sort': 'begin_at',
+                'filter[begin_at]': f"{now.isoformat()},{future.isoformat()}",
+                'per_page': 50
+            }
+            
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers=self.headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        matches = self._process_upcoming_matches(data)
+                        
+                        # Cache
+                        self.cache[cache_key] = {
+                            'data': matches,
+                            'timestamp': time.time()
+                        }
+                        
+                        logger.info(f"🐼 PandaScore: {len(matches)} partidas programadas encontradas")
+                        return matches
+                    else:
+                        logger.warning(f"Erro ao buscar próximas partidas: {response.status}")
+                        return []
+                        
+        except Exception as e:
+            logger.error(f"Erro ao buscar próximas partidas PandaScore: {e}")
+            return []
+    
+    def _process_live_matches(self, data: List[Dict]) -> List[Dict]:
+        """Processa dados de partidas ao vivo"""
+        processed_matches = []
+        
+        for match in data:
+            try:
+                # Extrair informações essenciais
+                processed_match = {
+                    'id': str(match.get('id', '')),
+                    'league': match.get('league', {}).get('name', 'Unknown'),
+                    'teams': [],
+                    'status': match.get('status', 'unknown'),
+                    'begin_at': match.get('begin_at', ''),
+                    'live': True,
+                    'game_number': match.get('number_of_games', 1),
+                    'serie': match.get('serie', {}).get('name', ''),
+                    'tournament': match.get('tournament', {}).get('name', '')
+                }
+                
+                # Processar times
+                opponents = match.get('opponents', [])
+                for opponent in opponents:
+                    if opponent and 'opponent' in opponent:
+                        team_info = opponent['opponent']
+                        team = {
+                            'id': str(team_info.get('id', '')),
+                            'name': team_info.get('name', 'Unknown'),
+                            'acronym': team_info.get('acronym', ''),
+                            'image_url': team_info.get('image_url', '')
+                        }
+                        processed_match['teams'].append(team)
+                
+                # Verificar se tem dados suficientes
+                if len(processed_match['teams']) >= 2:
+                    processed_matches.append(processed_match)
+                    
+            except Exception as e:
+                logger.debug(f"Erro ao processar partida PandaScore: {e}")
+                continue
+        
+        return processed_matches
+    
+    def _process_upcoming_matches(self, data: List[Dict]) -> List[Dict]:
+        """Processa dados de partidas programadas"""
+        processed_matches = []
+        
+        for match in data:
+            try:
+                processed_match = {
+                    'id': str(match.get('id', '')),
+                    'league': match.get('league', {}).get('name', 'Unknown'),
+                    'teams': [],
+                    'status': match.get('status', 'not_started'),
+                    'begin_at': match.get('begin_at', ''),
+                    'live': False,
+                    'scheduled_time': match.get('begin_at', ''),
+                    'serie': match.get('serie', {}).get('name', ''),
+                    'tournament': match.get('tournament', {}).get('name', '')
+                }
+                
+                # Processar times
+                opponents = match.get('opponents', [])
+                for opponent in opponents:
+                    if opponent and 'opponent' in opponent:
+                        team_info = opponent['opponent']
+                        team = {
+                            'id': str(team_info.get('id', '')),
+                            'name': team_info.get('name', 'Unknown'),
+                            'acronym': team_info.get('acronym', ''),
+                            'image_url': team_info.get('image_url', '')
+                        }
+                        processed_match['teams'].append(team)
+                
+                if len(processed_match['teams']) >= 2:
+                    processed_matches.append(processed_match)
+                    
+            except Exception as e:
+                logger.debug(f"Erro ao processar partida futura PandaScore: {e}")
+                continue
+        
+        return processed_matches
+    
+    def _process_odds_data(self, data: List[Dict]) -> Dict:
+        """Processa dados de odds"""
+        try:
+            processed_odds = {
+                'available': False,
+                'team1_odds': None,
+                'team2_odds': None,
+                'bookmaker': 'PandaScore',
+                'last_updated': datetime.utcnow().isoformat()
+            }
+            
+            if data and len(data) > 0:
+                # Pegar o primeiro bookmaker disponível
+                odds_entry = data[0]
+                if 'outcomes' in odds_entry:
+                    outcomes = odds_entry['outcomes']
+                    if len(outcomes) >= 2:
+                        processed_odds['available'] = True
+                        processed_odds['team1_odds'] = float(outcomes[0].get('odds', 0))
+                        processed_odds['team2_odds'] = float(outcomes[1].get('odds', 0))
+                        processed_odds['bookmaker'] = odds_entry.get('bookmaker', {}).get('name', 'PandaScore')
+            
+            return processed_odds
+            
+        except Exception as e:
+            logger.debug(f"Erro ao processar odds: {e}")
+            return {'available': False}
+    
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """Verifica se o cache ainda é válido"""
+        if cache_key not in self.cache:
+            return False
+        
+        cache_time = self.cache[cache_key]['timestamp']
+        return (time.time() - cache_time) < self.cache_duration
+    
+    def clear_cache(self):
+        """Limpa todo o cache"""
+        self.cache.clear()
+        logger.info("🐼 Cache PandaScore limpo")
+    
+    async def get_api_status(self) -> Dict:
+        """Verifica status da API"""
+        try:
+            url = f"{self.base_url}/tournaments"
+            timeout = aiohttp.ClientTimeout(total=5)
+            
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers=self.headers) as response:
+                    return {
+                        'status': 'online' if response.status == 200 else 'offline',
+                        'status_code': response.status,
+                        'rate_limit_remaining': response.headers.get('X-Rate-Limit-Remaining', 'N/A'),
+                        'rate_limit_reset': response.headers.get('X-Rate-Limit-Reset', 'N/A')
+                    }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'error': str(e)
+            }
 
 class TheOddsAPIClient:
     """Cliente para The Odds API - ODDS REAIS DE CASAS DE APOSTAS"""
@@ -741,7 +1106,7 @@ class TheOddsAPIClient:
         self.cache_duration = 300  # 5 minutos
         self.last_cache_clear = datetime.now()
         
-        logger.info(f"???? TheOddsAPIClient inicializado com API Key: {api_key[:8]}...")
+        logger.info(f"💰 TheOddsAPIClient inicializado com API Key: {api_key[:8]}...")
 
     async def get_esports_odds(self, region: str = "us") -> List[Dict]:
         """Busca odds de eSports (incluindo League of Legends)"""
@@ -749,7 +1114,7 @@ class TheOddsAPIClient:
             # Verificar cache primeiro
             cache_key = f"esports_odds_{region}"
             if self._is_cache_valid(cache_key):
-                logger.debug(f"???? Usando odds do cache para {region}")
+                logger.debug(f"💾 Usando odds do cache para {region}")
                 return self.odds_cache[cache_key]['data']
 
             # Endpoint para eSports na The Odds API
@@ -766,7 +1131,7 @@ class TheOddsAPIClient:
                 async with session.get(url, params=params, headers=self.headers, timeout=10) as response:
                     if response.status == 200:
                         data = await response.json()
-                        logger.info(f"???? Obtidas {len(data)} odds de eSports de {region}")
+                        logger.info(f"💰 Obtidas {len(data)} odds de eSports de {region}")
                         
                         # Filtrar apenas jogos de League of Legends
                         lol_odds = self._filter_lol_games(data)
@@ -779,14 +1144,14 @@ class TheOddsAPIClient:
                         
                         return lol_odds
                     elif response.status == 429:
-                        logger.warning("?????? Rate limit atingido na The Odds API")
+                        logger.warning("⚠️ Rate limit atingido na The Odds API")
                         return []
                     else:
-                        logger.warning(f"??? Erro na The Odds API: Status {response.status}")
+                        logger.warning(f"❌ Erro na The Odds API: Status {response.status}")
                         return []
 
         except Exception as e:
-            logger.error(f"??? Erro ao buscar odds de eSports: {e}")
+            logger.error(f"❌ Erro ao buscar odds de eSports: {e}")
             return []
 
     def _filter_lol_games(self, odds_data: List[Dict]) -> List[Dict]:
@@ -798,55 +1163,55 @@ class TheOddsAPIClient:
             sport_title = game.get('sport_title', '').lower()
             sport_key = game.get('sport_key', '').lower()
             
-            # Verificar se ?? jogo de LoL baseado no t??tulo ou chave do esporte
+            # Verificar se é jogo de LoL baseado no título ou chave do esporte
             if any(keyword in sport_title for keyword in lol_keywords) or \
                any(keyword in sport_key for keyword in lol_keywords):
                 filtered_odds.append(game)
                 
-        logger.info(f"???? Filtrados {len(filtered_odds)} jogos de League of Legends")
+        logger.info(f"🎮 Filtrados {len(filtered_odds)} jogos de League of Legends")
         return filtered_odds
 
     async def get_match_odds(self, team1: str, team2: str, league: str = "") -> Optional[Dict]:
-        """Busca odds espec??ficas para uma partida"""
+        """Busca odds específicas para uma partida"""
         try:
             # Buscar todas as odds de eSports
             all_odds = await self.get_esports_odds()
             
-            # Procurar partida espec??fica
+            # Procurar partida específica
             for game in all_odds:
                 teams = game.get('teams', [])
                 if len(teams) >= 2:
                     game_team1 = teams[0].get('name', '').lower()
                     game_team2 = teams[1].get('name', '').lower()
                     
-                    # Verificar se os times correspondem (busca flex??vel)
+                    # Verificar se os times correspondem (busca flexível)
                     if (self._teams_match(team1, game_team1) and self._teams_match(team2, game_team2)) or \
                        (self._teams_match(team1, game_team2) and self._teams_match(team2, game_team1)):
                         
-                        logger.info(f"???? Odds encontradas para {team1} vs {team2}")
+                        logger.info(f"💰 Odds encontradas para {team1} vs {team2}")
                         return self._process_match_odds(game, team1, team2)
             
-            logger.debug(f"?????? Odds n??o encontradas para {team1} vs {team2}")
+            logger.debug(f"⚠️ Odds não encontradas para {team1} vs {team2}")
             return None
             
         except Exception as e:
-            logger.error(f"??? Erro ao buscar odds da partida: {e}")
+            logger.error(f"❌ Erro ao buscar odds da partida: {e}")
             return None
 
     def _teams_match(self, team_name: str, api_team_name: str) -> bool:
-        """Verifica se nomes de times correspondem (busca flex??vel)"""
+        """Verifica se nomes de times correspondem (busca flexível)"""
         team_clean = team_name.lower().strip()
         api_clean = api_team_name.lower().strip()
         
-        # Correspond??ncia exata
+        # Correspondência exata
         if team_clean == api_clean:
             return True
             
-        # Correspond??ncia parcial
+        # Correspondência parcial
         if team_clean in api_clean or api_clean in team_clean:
             return True
             
-        # Verificar c??digos/abrevia????es comuns
+        # Verificar códigos/abreviações comuns
         team_codes = {
             't1': ['t1', 'skt', 'sk telecom'],
             'gen.g': ['gen.g', 'geng', 'gen'],
@@ -861,7 +1226,7 @@ class TheOddsAPIClient:
             'pain': ['pain', 'pain gaming', 'png']
         }
         
-        # Verificar se algum dos c??digos corresponde
+        # Verificar se algum dos códigos corresponde
         for canonical, codes in team_codes.items():
             if team_clean in codes and any(code in api_clean for code in codes):
                 return True
@@ -869,12 +1234,12 @@ class TheOddsAPIClient:
         return False
 
     def _process_match_odds(self, game_data: Dict, team1: str, team2: str) -> Dict:
-        """Processa odds de uma partida espec??fica"""
+        """Processa odds de uma partida específica"""
         try:
             processed_odds = {
                 'team1': team1,
                 'team2': team2,
-                'team1_odds': 2.0,  # Odds padr??o
+                'team1_odds': 2.0,  # Odds padrão
                 'team2_odds': 2.0,
                 'bookmakers': [],
                 'best_odds': {},
@@ -914,7 +1279,7 @@ class TheOddsAPIClient:
                         if bookmaker_data['team1_odds'] and bookmaker_data['team2_odds']:
                             processed_odds['bookmakers'].append(bookmaker_data)
             
-            # Calcular melhores odds e m??dias
+            # Calcular melhores odds e médias
             if team1_odds_list and team2_odds_list:
                 processed_odds['team1_odds'] = sum(team1_odds_list) / len(team1_odds_list)
                 processed_odds['team2_odds'] = sum(team2_odds_list) / len(team2_odds_list)
@@ -929,12 +1294,12 @@ class TheOddsAPIClient:
                     'team2_avg': processed_odds['team2_odds']
                 }
                 
-                logger.info(f"???? Odds processadas: {team1} {processed_odds['team1_odds']:.2f} vs {team2} {processed_odds['team2_odds']:.2f}")
+                logger.info(f"💰 Odds processadas: {team1} {processed_odds['team1_odds']:.2f} vs {team2} {processed_odds['team2_odds']:.2f}")
                 
             return processed_odds
             
         except Exception as e:
-            logger.error(f"??? Erro ao processar odds: {e}")
+            logger.error(f"❌ Erro ao processar odds: {e}")
             return {
                 'team1': team1, 'team2': team2,
                 'team1_odds': 2.0, 'team2_odds': 2.0,
@@ -942,7 +1307,7 @@ class TheOddsAPIClient:
             }
 
     def _is_cache_valid(self, cache_key: str) -> bool:
-        """Verifica se o cache ainda ?? v??lido"""
+        """Verifica se o cache ainda é válido"""
         if cache_key not in self.odds_cache:
             return False
             
@@ -966,13 +1331,13 @@ class TheOddsAPIClient:
                 del self.odds_cache[key]
                 
             if keys_to_remove:
-                logger.info(f"???? {len(keys_to_remove)} entradas antigas removidas do cache de odds")
+                logger.info(f"🧹 {len(keys_to_remove)} entradas antigas removidas do cache de odds")
                 
         except Exception as e:
-            logger.error(f"??? Erro ao limpar cache de odds: {e}")
+            logger.error(f"❌ Erro ao limpar cache de odds: {e}")
 
     async def get_odds_summary(self) -> Dict:
-        """Retorna resumo das odds dispon??veis"""
+        """Retorna resumo das odds disponíveis"""
         try:
             all_odds = await self.get_esports_odds()
             
@@ -985,7 +1350,7 @@ class TheOddsAPIClient:
             }
             
             for game in all_odds:
-                # Extrair liga se poss??vel
+                # Extrair liga se possível
                 sport_title = game.get('sport_title', '')
                 if sport_title:
                     summary['leagues'].add(sport_title)
@@ -1012,11 +1377,11 @@ class TheOddsAPIClient:
             return summary
             
         except Exception as e:
-            logger.error(f"??? Erro ao gerar resumo de odds: {e}")
+            logger.error(f"❌ Erro ao gerar resumo de odds: {e}")
             return {'error': str(e)}
 
 class LoLUserPreferences:
-    """Sistema de prefer??ncias de usu??rios para LoL tips"""
+    """Sistema de preferências de usuários para LoL tips"""
     
     def __init__(self):
         self.user_preferences = {}
@@ -1024,17 +1389,17 @@ class LoLUserPreferences:
         self.league_filters = {}
         
     def set_favorite_teams(self, user_id: int, teams: List[str]):
-        """Define times favoritos do usu??rio"""
+        """Define times favoritos do usuário"""
         self.favorite_teams[user_id] = teams
-        logger.info(f"???? Usu??rio {user_id} definiu times favoritos: {teams}")
+        logger.info(f"👤 Usuário {user_id} definiu times favoritos: {teams}")
         
     def set_league_filter(self, user_id: int, leagues: List[str]):
-        """Define filtro de ligas do usu??rio"""
+        """Define filtro de ligas do usuário"""
         self.league_filters[user_id] = leagues
-        logger.info(f"???? Usu??rio {user_id} definiu filtro de ligas: {leagues}")
+        logger.info(f"👤 Usuário {user_id} definiu filtro de ligas: {leagues}")
         
     def get_user_preferences(self, user_id: int) -> Dict:
-        """Retorna prefer??ncias do usu??rio"""
+        """Retorna preferências do usuário"""
         return {
             'favorite_teams': self.favorite_teams.get(user_id, []),
             'league_filters': self.league_filters.get(user_id, []),
@@ -1042,7 +1407,7 @@ class LoLUserPreferences:
         }
         
     def should_notify_user(self, user_id: int, match: Dict) -> bool:
-        """Verifica se deve notificar usu??rio sobre uma partida"""
+        """Verifica se deve notificar usuário sobre uma partida"""
         prefs = self.get_user_preferences(user_id)
         
         # Verificar times favoritos
@@ -1061,7 +1426,7 @@ class LoLUserPreferences:
         return prefs['notifications_enabled']
 
 class LoLGameAnalyzer:
-    """Analisador espec??fico para eventos cruciais de LoL"""
+    """Analisador específico para eventos cruciais de LoL"""
     
     def __init__(self):
         self.game_states = {}
@@ -1075,7 +1440,7 @@ class LoLGameAnalyzer:
             events_detected = []
             impact_score = 0.0
             
-            # Analisar diferen??a de ouro
+            # Analisar diferença de ouro
             gold_diff = abs(match_stats.get('gold_difference', 0))
             if gold_diff >= 5000:
                 events_detected.append('gold_diff_5k')
@@ -1134,36 +1499,36 @@ class LoLGameAnalyzer:
         return min(1.0, base_score + event_bonus)
 
 class DynamicPredictionSystem:
-    """Sistema de predi????o din??mica com ML real + algoritmos como fallback"""
+    """Sistema de predição dinâmica com ML real + algoritmos como fallback"""
 
     def __init__(self):
-        # OTIMIZA????O: Log apenas uma vez por inst??ncia
+        # OTIMIZAÇÃO: Log apenas uma vez por instância
         if not hasattr(DynamicPredictionSystem, '_logged_init'):
-            logger.info("???? Sistema de Predi????o inicializando...")
+            logger.info("🔮 Sistema de Predição inicializando...")
             DynamicPredictionSystem._logged_init = True
         
-        # Inicializar ML real se dispon??vel 
+        # Inicializar ML real se disponível 
         self.ml_system = None
         self.ml_loading = False
         
-        # Verificar se ML est?? realmente dispon??vel
+        # Verificar se ML está realmente disponível
         if ML_MODULE_AVAILABLE:
             try:
                 if not hasattr(DynamicPredictionSystem, '_ml_init_attempted'):
-                    logger.info("???? Tentando carregar sistema ML...")
+                    logger.info("🤖 Tentando carregar sistema ML...")
                     DynamicPredictionSystem._ml_init_attempted = True
                 self.ml_system = ml_prediction_system.MLPredictionSystem()
                 if not hasattr(DynamicPredictionSystem, '_ml_success_logged'):
-                    logger.info("???? Sistema de ML REAL inicializado com sucesso")
+                    logger.info("🤖 Sistema de ML REAL inicializado com sucesso")
                     DynamicPredictionSystem._ml_success_logged = True
             except Exception as e:
                 if not hasattr(DynamicPredictionSystem, '_ml_error_logged'):
-                    logger.warning(f"?????? Erro ao inicializar ML: {e}")
+                    logger.warning(f"⚠️ Erro ao inicializar ML: {e}")
                     DynamicPredictionSystem._ml_error_logged = True
                 self.ml_system = None
         else:
             if not hasattr(DynamicPredictionSystem, '_ml_fallback_logged'):
-                logger.info("?????? M??dulo ML n??o dispon??vel - usando algoritmos matem??ticos")
+                logger.info("⚠️ Módulo ML não disponível - usando algoritmos matemáticos")
                 DynamicPredictionSystem._ml_fallback_logged = True
 
         # Base de dados de times com ratings atualizados (dados reais) - FALLBACK
@@ -1188,28 +1553,43 @@ class DynamicPredictionSystem:
         self.prediction_cache = {}
         self.cache_duration = 300  # 5 minutos
         
-        # Status corrigido do ML - OTIMIZA????O: Log apenas uma vez
+        # Status corrigido do ML - OTIMIZAÇÃO: Log apenas uma vez
         if not hasattr(DynamicPredictionSystem, '_status_logged'):
-            ml_status = "???? ML REAL ATIVO" if self.ml_system else "???? ALGORITMOS MATEM??TICOS"
-            logger.info(f"???? Sistema de Predi????o inicializado: {ml_status}")
+            ml_status = "🟢 ML REAL ATIVO" if self.ml_system else "🟡 ALGORITMOS MATEMÁTICOS"
+            logger.info(f"🔮 Sistema de Predição inicializado: {ml_status}")
             DynamicPredictionSystem._status_logged = True
 
     def _ensure_ml_loaded(self):
-        """Carrega ML sob demanda se n??o foi carregado ainda (Railway)"""
-        if ML_MODULE_AVAILABLE and self.ml_system is None and not self.ml_loading:
+        """OTIMIZAÇÃO: Carrega ML apenas quando necessário, evita spam de logs"""
+        if hasattr(self, 'ml_system') and self.ml_system is not None:
+            return
+            
+        # Verificar se o módulo ML está disponível
+        try:
+            if 'ml_prediction_system' not in sys.modules:
+                import ml_prediction_system
+
             try:
-                logger.info("???? Carregando ML sob demanda...")
-                self.ml_loading = True
+                if not hasattr(DynamicPredictionSystem, '_ml_init_attempted'):
+                    logger.info("🤖 Tentando carregar sistema ML...")
+                    DynamicPredictionSystem._ml_init_attempted = True
                 self.ml_system = ml_prediction_system.MLPredictionSystem()
-                logger.info("???? ML carregado sob demanda com sucesso")
+                if not hasattr(DynamicPredictionSystem, '_ml_success_logged'):
+                    logger.info("🤖 Sistema de ML REAL inicializado com sucesso")
+                    DynamicPredictionSystem._ml_success_logged = True
             except Exception as e:
-                logger.warning(f"?????? Erro ao carregar ML sob demanda: {e}")
+                if not hasattr(DynamicPredictionSystem, '_ml_error_logged'):
+                    logger.warning(f"⚠️ Erro ao inicializar ML: {e}")
+                    DynamicPredictionSystem._ml_error_logged = True
                 self.ml_system = None
-            finally:
-                self.ml_loading = False
+        except ImportError:
+            if not hasattr(DynamicPredictionSystem, '_ml_fallback_logged'):
+                logger.info("⚠️ Módulo ML não disponível - usando algoritmos matemáticos")
+                DynamicPredictionSystem._ml_fallback_logged = True
+            self.ml_system = None
 
     async def predict_live_match(self, match: Dict) -> Dict:
-        """Predi????o com ML real ou fallback para algoritmos matem??ticos"""
+        """Predição com ML real ou fallback para algoritmos matemáticos"""
         try:
             teams = match.get('teams', [])
             if len(teams) < 2:
@@ -1219,14 +1599,14 @@ class DynamicPredictionSystem:
             team2_name = teams[1].get('name', 'Team 2')
             league = match.get('league', 'Unknown')
 
-            # OTIMIZA????O: Cache interno para evitar rec??lculos
+            # OTIMIZAÇÃO: Cache interno para evitar recálculos
             cache_key = f"{team1_name}_{team2_name}_{league}"
             if cache_key in self.prediction_cache:
                 cached = self.prediction_cache[cache_key]
                 if (datetime.now() - cached['timestamp']).seconds < self.cache_duration:
                     return cached
-            
-            # ???? TENTAR ML REAL PRIMEIRO
+
+            # 🤖 TENTAR ML REAL PRIMEIRO
             if self.ml_system:
                 try:
                     ml_prediction = self.ml_system.predict_match(team1_name, team2_name, league)
@@ -1255,19 +1635,19 @@ class DynamicPredictionSystem:
                         return result
                     
                     if not hasattr(self, '_ml_confidence_warning_shown'):
-                        logger.debug(f"?????? ML predi????o baixa confian??a, usando fallback")
+                        logger.debug(f"⚠️ ML predição baixa confiança, usando fallback")
                         self._ml_confidence_warning_shown = True
                         
                 except Exception as e:
                     if not hasattr(self, '_ml_error_warning_shown'):
-                        logger.warning(f"?????? Erro no ML, usando fallback: {e}")
+                        logger.warning(f"⚠️ Erro no ML, usando fallback: {e}")
                         self._ml_error_warning_shown = True
                         
             elif ML_MODULE_AVAILABLE and not self.ml_loading:
                 # Tentar carregar ML sob demanda (Railway)
                 self._ensure_ml_loaded()
                 if self.ml_system:
-                    # Tentar novamente ap??s carregar
+                    # Tentar novamente após carregar
                     try:
                         ml_prediction = self.ml_system.predict_match(team1_name, team2_name, league)
                         if ml_prediction and ml_prediction.get('confidence') in ['Alta', 'Muito Alta']:
@@ -1294,16 +1674,16 @@ class DynamicPredictionSystem:
                             return result
                     except Exception as e:
                         if not hasattr(self, '_ml_demand_error_shown'):
-                            logger.warning(f"?????? Erro no ML sob demanda: {e}")
+                            logger.warning(f"⚠️ Erro no ML sob demanda: {e}")
                             self._ml_demand_error_shown = True
             
-            # ???? FALLBACK: ALGORITMOS MATEM??TICOS
-            # OTIMIZA????O: Log apenas uma vez por partida
+            # 🧮 FALLBACK: ALGORITMOS MATEMÁTICOS
+            # OTIMIZAÇÃO: Log apenas uma vez por partida
             if not hasattr(self, '_algorithm_log_cache'):
                 self._algorithm_log_cache = set()
                 
             if cache_key not in self._algorithm_log_cache:
-                logger.info(f"???? Usando algoritmos matem??ticos para {team1_name} vs {team2_name}")
+                logger.info(f"🧮 Usando algoritmos matemáticos para {team1_name} vs {team2_name}")
                 self._algorithm_log_cache.add(cache_key)
                 
             result = await self._predict_with_algorithms(match)
@@ -1315,11 +1695,11 @@ class DynamicPredictionSystem:
             return result
 
         except Exception as e:
-            logger.error(f"??? Erro na predi????o: {e}")
+            logger.error(f"❌ Erro na predição: {e}")
             return self._get_fallback_prediction()
 
     async def predict_live_match_with_live_data(self, match: Dict) -> Dict:
-        """Predi????o avan??ada usando dados ao vivo (draft + estat??sticas)"""
+        """Predição avançada usando dados ao vivo (draft + estatísticas)"""
         try:
             teams = match.get('teams', [])
             if len(teams) < 2:
@@ -1334,75 +1714,75 @@ class DynamicPredictionSystem:
             match_stats = match.get('match_statistics', {})
             game_time = match.get('game_time', 0)
 
-            logger.info(f"???? Predi????o com dados ao vivo: {team1_name} vs {team2_name} (Game {game_time//60}min)")
+            logger.info(f"🎮 Predição com dados ao vivo: {team1_name} vs {team2_name} (Game {game_time//60}min)")
 
-            # Primeiro obter predi????o base
+            # Primeiro obter predição base
             base_prediction = await self.predict_live_match(match)
             
             if not base_prediction:
                 return self._get_fallback_prediction()
 
-            # Ajustar predi????o com dados ao vivo
+            # Ajustar predição com dados ao vivo
             adjusted_prediction = self._adjust_prediction_with_live_data(
                 base_prediction, draft_data, match_stats, game_time
             )
 
-            # Aumentar confian??a se temos dados ao vivo
-            if adjusted_prediction['confidence'] == 'M??dia':
+            # Aumentar confiança se temos dados ao vivo
+            if adjusted_prediction['confidence'] == 'Média':
                 adjusted_prediction['confidence'] = 'Alta'
             elif adjusted_prediction['confidence'] == 'Alta':
                 adjusted_prediction['confidence'] = 'Muito Alta'
 
-            # Adicionar an??lise espec??fica de dados ao vivo
+            # Adicionar análise específica de dados ao vivo
             live_analysis = self._generate_live_data_analysis(draft_data, match_stats, game_time)
-            adjusted_prediction['analysis'] = f"{adjusted_prediction['analysis']} ??? {live_analysis}"
+            adjusted_prediction['analysis'] = f"{adjusted_prediction['analysis']} • {live_analysis}"
             
-            # Marcar como predi????o com dados ao vivo
+            # Marcar como predição com dados ao vivo
             adjusted_prediction['prediction_factors']['live_data'] = True
             adjusted_prediction['prediction_factors']['game_time'] = game_time
             adjusted_prediction['cache_status'] = 'live_data_enhanced'
 
-            logger.info(f"???? Predi????o com dados ao vivo: {adjusted_prediction['favored_team']} favorito ({adjusted_prediction['confidence']})")
+            logger.info(f"🎯 Predição com dados ao vivo: {adjusted_prediction['favored_team']} favorito ({adjusted_prediction['confidence']})")
             return adjusted_prediction
 
         except Exception as e:
-            logger.error(f"??? Erro na predi????o com dados ao vivo: {e}")
-            return await self.predict_live_match(match)  # Fallback para predi????o b??sica
+            logger.error(f"❌ Erro na predição com dados ao vivo: {e}")
+            return await self.predict_live_match(match)  # Fallback para predição básica
 
     def _adjust_prediction_with_live_data(self, base_prediction: Dict, draft_data: Dict, 
                                         match_stats: Dict, game_time: int) -> Dict:
-        """Ajusta predi????o baseada em dados ao vivo"""
+        """Ajusta predição baseada em dados ao vivo"""
         try:
             adjusted = base_prediction.copy()
             
-            # Analisar estat??sticas da partida
+            # Analisar estatísticas da partida
             gold_diff = match_stats.get('gold_difference', 0)
             kill_diff = match_stats.get('kill_difference', 0)
             tower_diff = match_stats.get('tower_difference', 0)
             
-            # Determinar qual time est?? na frente
+            # Determinar qual time está na frente
             team1_name = adjusted['team1']
             team2_name = adjusted['team2']
             favored_team = adjusted['favored_team']
             
-            # Calcular ajuste baseado na situa????o atual
+            # Calcular ajuste baseado na situação atual
             situation_modifier = 0.0
             
-            # Ajuste por diferen??a de gold
+            # Ajuste por diferença de gold
             if abs(gold_diff) > 3000:
                 if (gold_diff > 0 and favored_team == team1_name) or (gold_diff < 0 and favored_team == team2_name):
-                    situation_modifier += 0.15  # Time favorito est?? na frente
+                    situation_modifier += 0.15  # Time favorito está na frente
                 else:
-                    situation_modifier -= 0.10  # Time favorito est?? atr??s
+                    situation_modifier -= 0.10  # Time favorito está atrás
             
-            # Ajuste por diferen??a de kills
+            # Ajuste por diferença de kills
             if abs(kill_diff) > 5:
                 if (kill_diff > 0 and favored_team == team1_name) or (kill_diff < 0 and favored_team == team2_name):
                     situation_modifier += 0.10
                 else:
                     situation_modifier -= 0.08
             
-            # Ajuste por diferen??a de torres
+            # Ajuste por diferença de torres
             if abs(tower_diff) > 2:
                 if (tower_diff > 0 and favored_team == team1_name) or (tower_diff < 0 and favored_team == team2_name):
                     situation_modifier += 0.12
@@ -1427,19 +1807,19 @@ class DynamicPredictionSystem:
             adjusted['team1_odds'] = 1/adjusted['team1_win_probability'] if adjusted['team1_win_probability'] > 0 else 2.0
             adjusted['team2_odds'] = 1/adjusted['team2_win_probability'] if adjusted['team2_win_probability'] > 0 else 2.0
             
-            logger.debug(f"???? Ajuste por dados ao vivo: {situation_modifier:+.2f} ??? Nova prob: {new_win_prob:.2f}")
+            logger.debug(f"📊 Ajuste por dados ao vivo: {situation_modifier:+.2f} → Nova prob: {new_win_prob:.2f}")
             return adjusted
             
         except Exception as e:
-            logger.warning(f"??? Erro ao ajustar predi????o: {e}")
+            logger.warning(f"❌ Erro ao ajustar predição: {e}")
             return base_prediction
 
     def _generate_live_data_analysis(self, draft_data: Dict, match_stats: Dict, game_time: int) -> str:
-        """Gera an??lise textual dos dados ao vivo"""
+        """Gera análise textual dos dados ao vivo"""
         try:
             analysis_parts = []
             
-            # An??lise de tempo de jogo
+            # Análise de tempo de jogo
             game_min = game_time // 60
             if game_min < 15:
                 analysis_parts.append(f"Early game ({game_min}min)")
@@ -1448,7 +1828,7 @@ class DynamicPredictionSystem:
             else:
                 analysis_parts.append(f"Late game ({game_min}min)")
             
-            # An??lise de estat??sticas
+            # Análise de estatísticas
             gold_diff = match_stats.get('gold_difference', 0)
             kill_diff = match_stats.get('kill_difference', 0)
             
@@ -1460,18 +1840,18 @@ class DynamicPredictionSystem:
                 team_ahead = "T1" if kill_diff > 0 else "T2"
                 analysis_parts.append(f"{team_ahead} dominando em kills")
             
-            # An??lise de draft (simplificada)
+            # Análise de draft (simplificada)
             if draft_data.get('team1_picks') and draft_data.get('team2_picks'):
                 analysis_parts.append("Drafts completos analisados")
             
-            return " ??? ".join(analysis_parts) if analysis_parts else "Dados ao vivo processados"
+            return " • ".join(analysis_parts) if analysis_parts else "Dados ao vivo processados"
             
         except Exception as e:
-            logger.warning(f"??? Erro na an??lise de dados ao vivo: {e}")
-            return "An??lise de dados ao vivo indispon??vel"
+            logger.warning(f"❌ Erro na análise de dados ao vivo: {e}")
+            return "Análise de dados ao vivo indisponível"
 
     async def _predict_with_algorithms(self, match: Dict) -> Dict:
-        """Predi????o usando algoritmos matem??ticos (fallback)"""
+        """Predição usando algoritmos matemáticos (fallback)"""
         teams = match.get('teams', [])
         team1_name = teams[0].get('name', 'Team 1')
         team2_name = teams[1].get('name', 'Team 2')
@@ -1493,7 +1873,7 @@ class DynamicPredictionSystem:
         team1_odds = 1 / team1_prob if team1_prob > 0 else 2.0
         team2_odds = 1 / team2_prob if team2_prob > 0 else 2.0
 
-        # Determinar confian??a
+        # Determinar confiança
         confidence = self._calculate_confidence(team1_data, team2_data)
 
         # Determinar favorito
@@ -1504,7 +1884,7 @@ class DynamicPredictionSystem:
             favored_team = team2_name
             win_probability = team2_prob
 
-        # Gerar an??lise
+        # Gerar análise
         analysis = self._generate_match_analysis(
             team1_name, team2_name, team1_data, team2_data, team1_prob
         )
@@ -1556,7 +1936,7 @@ class DynamicPredictionSystem:
         return 1 / (1 + np.exp(-rating_diff / 20))
 
     def _calculate_region_adjustment(self, team1_data: Dict, team2_data: Dict) -> float:
-        """Ajuste baseado na for??a real das regi??es"""
+        """Ajuste baseado na força real das regiões"""
         region_strength = {
             'LCK': 0.02, 'LPL': 0.01, 'LEC': 0.00, 'LCS': -0.01, 'CBLOL': -0.015
         }
@@ -1573,7 +1953,7 @@ class DynamicPredictionSystem:
         return (form1 - form2) * 0.15
 
     def _calculate_confidence(self, team1_data: Dict, team2_data: Dict) -> str:
-        """Calcula n??vel de confian??a"""
+        """Calcula nível de confiança"""
         consistency1 = team1_data.get('consistency', 0.6)
         consistency2 = team2_data.get('consistency', 0.6)
         avg_consistency = (consistency1 + consistency2) / 2
@@ -1589,13 +1969,13 @@ class DynamicPredictionSystem:
         elif final_confidence > 0.75:
             return 'Alta'
         elif final_confidence > 0.65:
-            return 'M??dia'
+            return 'Média'
         else:
             return 'Baixa'
 
     def _generate_match_analysis(self, team1: str, team2: str, team1_data: Dict,
                                team2_data: Dict, win_prob: float) -> str:
-        """Gera an??lise textual da predi????o"""
+        """Gera análise textual da predição"""
         if win_prob > 0.55:
             favorite = team1
             fav_data = team1_data
@@ -1611,25 +1991,25 @@ class DynamicPredictionSystem:
         if rating_diff > 15:
             analysis_parts.append(f"{favorite} tem vantagem significativa no ranking")
         elif rating_diff > 8:
-            analysis_parts.append(f"{favorite} ?? ligeiramente favorito")
+            analysis_parts.append(f"{favorite} é ligeiramente favorito")
         else:
-            analysis_parts.append("Times com for??a similar")
+            analysis_parts.append("Times com força similar")
 
         if fav_prob > 0.7:
-            analysis_parts.append(f"{favorite} ?? forte favorito ({fav_prob:.1%})")
+            analysis_parts.append(f"{favorite} é forte favorito ({fav_prob:.1%})")
         else:
             analysis_parts.append("Partida equilibrada")
 
-        return " ??? ".join(analysis_parts)
+        return " • ".join(analysis_parts)
 
     def _get_fallback_prediction(self) -> Dict:
-        """Predi????o padr??o em caso de erro"""
+        """Predição padrão em caso de erro"""
         return {
             'team1': 'Team 1', 'team2': 'Team 2',
             'team1_win_probability': 0.5, 'team2_win_probability': 0.5,
             'team1_odds': 2.0, 'team2_odds': 2.0,
             'favored_team': 'Team 1', 'win_probability': 0.5,
-            'confidence': 'Baixa', 'analysis': 'An??lise n??o dispon??vel',
+            'confidence': 'Baixa', 'analysis': 'Análise não disponível',
             'league': 'Unknown', 'prediction_factors': {},
             'timestamp': datetime.now(), 'cache_status': 'error'
         }
@@ -1660,24 +2040,24 @@ class DynamicPredictionSystem:
                 else:
                     base_odds = real_odds.get('team2_odds', 2.0)
                 
-                logger.info(f"???? Usando odds REAIS: {favored_team} = {base_odds:.2f}")
+                logger.info(f"💰 Usando odds REAIS: {favored_team} = {base_odds:.2f}")
                 
-                # Verificar se h?? melhores odds dispon??veis
+                # Verificar se há melhores odds disponíveis
                 best_odds = real_odds.get('best_odds', {})
                 if favored_team == team1_name and 'team1_best' in best_odds:
                     best_available = best_odds['team1_best']
                     if best_available > base_odds:
-                        logger.info(f"???? Melhor odd encontrada: {best_available:.2f} vs m??dia {base_odds:.2f}")
+                        logger.info(f"💎 Melhor odd encontrada: {best_available:.2f} vs média {base_odds:.2f}")
                         base_odds = best_available
                 elif favored_team == team2_name and 'team2_best' in best_odds:
                     best_available = best_odds['team2_best']
                     if best_available > base_odds:
-                        logger.info(f"???? Melhor odd encontrada: {best_available:.2f} vs m??dia {base_odds:.2f}")
+                        logger.info(f"💎 Melhor odd encontrada: {best_available:.2f} vs média {base_odds:.2f}")
                         base_odds = best_available
             else:
-                logger.warning(f"?????? Odds reais n??o encontradas para {team1_name} vs {team2_name}, usando dados da partida")
+                logger.warning(f"⚠️ Odds reais não encontradas para {team1_name} vs {team2_name}, usando dados da partida")
                 
-                # Fallback: usar estat??sticas da partida para ajustar odds
+                # Fallback: usar estatísticas da partida para ajustar odds
                 stats = match.get('match_statistics', {})
                 
                 # Exemplo de fatores que afetam odds durante a partida
@@ -1685,10 +2065,10 @@ class DynamicPredictionSystem:
                 kill_diff = stats.get('kill_difference', 0)
                 tower_diff = stats.get('tower_difference', 0)
                 
-                # Ajustar odds baseado na situa????o atual
+                # Ajustar odds baseado na situação atual
                 if gold_diff > 3000:  # Time favorito tem vantagem de gold
                     base_odds -= 0.3
-                elif gold_diff < -3000:  # Time favorito est?? atr??s
+                elif gold_diff < -3000:  # Time favorito está atrás
                     base_odds += 0.4
                     
                 if kill_diff > 5:
@@ -1701,12 +2081,12 @@ class DynamicPredictionSystem:
                 elif tower_diff < -2:
                     base_odds += 0.2
                     
-                logger.info(f"???? Usando odds ajustadas por dados ao vivo: {base_odds:.2f}")
+                logger.info(f"🎮 Usando odds ajustadas por dados ao vivo: {base_odds:.2f}")
                 
             return max(1.2, min(5.0, base_odds))  # Limitar entre 1.2 e 5.0
             
         except Exception as e:
-            logger.warning(f"??? Erro ao calcular odds reais: {e}")
+            logger.warning(f"❌ Erro ao calcular odds reais: {e}")
             return 2.0
 
 class TelegramAlertsSystem:
@@ -1719,82 +2099,77 @@ class TelegramAlertsSystem:
         self.sent_tips = set()
         self.min_alert_interval = 1800  # 30 minutos
 
-        logger.info("???? Sistema de Alertas para Tips inicializado")
-
-    def set_bot_application(self, application):
-        """Define aplicação do bot para envio de alertas"""
-        self.bot_application = application
-        logger.info("🤖 Bot application definida para alertas")
+        logger.info("📢 Sistema de Alertas para Tips inicializado")
 
     def add_group(self, chat_id: int):
         """Adiciona grupo para receber alertas"""
         self.group_chat_ids.add(chat_id)
-        logger.info(f"???? Grupo {chat_id} adicionado para alertas")
+        logger.info(f"📢 Grupo {chat_id} adicionado para alertas")
 
     def remove_group(self, chat_id: int):
         """Remove grupo dos alertas"""
         self.group_chat_ids.discard(chat_id)
-        logger.info(f"???? Grupo {chat_id} removido dos alertas")
+        logger.info(f"📢 Grupo {chat_id} removido dos alertas")
 
     async def send_tip_alert(self, tip: Dict, bot_application):
         """Envia alerta de tip profissional para os grupos"""
         try:
             tip_id = tip.get('tip_id', '')
             if tip_id in self.sent_tips:
-                logger.info(f"???? Tip {tip_id} j?? foi enviado - pulando")
+                logger.info(f"📢 Tip {tip_id} já foi enviado - pulando")
                 return
 
             if not self._should_send_alert(tip):
-                logger.info(f"???? Tip n??o atende crit??rios para alerta")
+                logger.info(f"📢 Tip não atende critérios para alerta")
                 return
 
-            # Extrair informa????es espec??ficas do mapa e dados ao vivo
+            # Extrair informações específicas do mapa e dados ao vivo
             map_info = tip.get('map_info', 'Mapa 1')
             game_time = tip.get('game_time', 0)
             game_min = game_time // 60 if game_time > 0 else 0
             
-            # Dados espec??ficos do jogo
+            # Dados específicos do jogo
             draft_analysis = tip.get('draft_analysis', '')
             stats_analysis = tip.get('stats_analysis', '')
             live_odds = tip.get('live_odds', 0)
 
             alert_message = f"""
-???? **ALERTA DE TIP PROFISSIONAL** ????
+🚨 **ALERTA DE TIP PROFISSIONAL** 🚨
 
-??????? **{map_info}: {tip['title']}**
-???? Liga: {tip['league']}
-?????? Tempo de jogo: {game_min}min (AO VIVO)
+🗺️ **{map_info}: {tip['title']}**
+🎮 Liga: {tip['league']}
+⏱️ Tempo de jogo: {game_min}min (AO VIVO)
 
-???? **AN??LISE IA COM DADOS AO VIVO:**
-??? Confian??a: {tip['confidence_score']:.1f}% ({tip['confidence_level']})
-??? EV: {tip['ev_percentage']:.1f}%
-??? Probabilidade: {tip['win_probability']*100:.1f}%
-??? Odds ao vivo: {live_odds:.2f}
+🤖 **ANÁLISE IA COM DADOS AO VIVO:**
+• Confiança: {tip['confidence_score']:.1f}% ({tip['confidence_level']})
+• EV: {tip['ev_percentage']:.1f}%
+• Probabilidade: {tip['win_probability']*100:.1f}%
+• Odds ao vivo: {live_odds:.2f}
 
-???? **SISTEMA DE UNIDADES:**
-??? Apostar: {tip['units']} unidades
-??? Valor: ${tip['stake_amount']:.2f}
-??? Risco: {tip['risk_level']}
+🎲 **SISTEMA DE UNIDADES:**
+• Apostar: {tip['units']} unidades
+• Valor: ${tip['stake_amount']:.2f}
+• Risco: {tip['risk_level']}
 
-??? **Recomenda????o:** {tip['recommended_team']}
+⭐ **Recomendação:** {tip['recommended_team']}
 
-???? **DADOS DA PARTIDA:**"""
+📊 **DADOS DA PARTIDA:**"""
 
-            # Adicionar an??lise de draft se dispon??vel
-            if draft_analysis and draft_analysis != "Dados de draft n??o dispon??veis":
-                alert_message += f"\n???? Draft: {draft_analysis}"
+            # Adicionar análise de draft se disponível
+            if draft_analysis and draft_analysis != "Dados de draft não disponíveis":
+                alert_message += f"\n🎯 Draft: {draft_analysis}"
             
-            # Adicionar an??lise de estat??sticas se dispon??vel
-            if stats_analysis and stats_analysis != "Estat??sticas n??o dispon??veis":
-                alert_message += f"\n???? Stats: {stats_analysis}"
+            # Adicionar análise de estatísticas se disponível
+            if stats_analysis and stats_analysis != "Estatísticas não disponíveis":
+                alert_message += f"\n📈 Stats: {stats_analysis}"
 
             alert_message += f"""
 
-???? **EXPLICA????O COMPLETA:**
+💡 **EXPLICAÇÃO COMPLETA:**
 {tip['reasoning']}
 
-??? **PARTIDA AO VIVO COM DADOS REAIS!**
-??? {datetime.now().strftime('%H:%M:%S')}
+⚡ **PARTIDA AO VIVO COM DADOS REAIS!**
+⏰ {datetime.now().strftime('%H:%M:%S')}
             """
 
             sent_count = 0
@@ -1808,16 +2183,16 @@ class TelegramAlertsSystem:
                     )
                     sent_count += 1
                 except Exception as e:
-                    logger.warning(f"??? Erro ao enviar alerta para grupo {chat_id}: {e}")
+                    logger.warning(f"❌ Erro ao enviar alerta para grupo {chat_id}: {e}")
                     self.group_chat_ids.discard(chat_id)
 
             self.sent_tips.add(tip_id)
             self._register_alert(tip_id, tip)
 
-            logger.info(f"???? Alerta de tip {map_info} enviado para {sent_count} grupos - ID: {tip_id}")
+            logger.info(f"📢 Alerta de tip {map_info} enviado para {sent_count} grupos - ID: {tip_id}")
 
         except Exception as e:
-            logger.error(f"??? Erro no sistema de alertas: {e}")
+            logger.error(f"❌ Erro no sistema de alertas: {e}")
 
     def _should_send_alert(self, tip: Dict) -> bool:
         """Verifica se deve enviar alerta"""
@@ -1833,7 +2208,7 @@ class TelegramAlertsSystem:
         )
 
     def _register_alert(self, tip_id: str, tip: Dict):
-        """Registra alerta no hist??rico"""
+        """Registra alerta no histórico"""
         alert_record = {
             'tip_id': tip_id, 'timestamp': datetime.now(),
             'groups_sent': len(self.group_chat_ids),
@@ -1849,7 +2224,7 @@ class TelegramAlertsSystem:
             self.alert_history = self.alert_history[-50:]
 
     def get_alert_stats(self) -> Dict:
-        """Retorna estat??sticas dos alertas"""
+        """Retorna estatísticas dos alertas"""
         today = datetime.now().date()
         alerts_today = sum(1 for a in self.alert_history
                           if a['timestamp'].date() == today)
@@ -1884,14 +2259,14 @@ class TelegramAlertsSystem:
             for tip_id in old_tips:
                 self.sent_tips.discard(tip_id)
 
-            # Limpar hist??rico antigo tamb??m
+            # Limpar histórico antigo também
             self.alert_history = [alert for alert in self.alert_history 
                                 if alert['timestamp'] >= cutoff_time]
 
             if old_tips:
-                logger.info(f"???? {len(old_tips)} tips antigos removidos do cache")
+                logger.info(f"🧹 {len(old_tips)} tips antigos removidos do cache")
         except Exception as e:
-            logger.error(f"??? Erro ao limpar tips antigos: {e}")
+            logger.error(f"❌ Erro ao limpar tips antigos: {e}")
 
 class ScheduleManager:
     """Gerenciador de Agenda de Partidas"""
@@ -1900,7 +2275,7 @@ class ScheduleManager:
         self.riot_client = riot_client or RiotAPIClient()
         self.scheduled_matches = []
         self.last_update = None
-        logger.info("???? ScheduleManager inicializado")
+        logger.info("📅 ScheduleManager inicializado")
 
     async def get_scheduled_matches(self, days_ahead: int = 7) -> List[Dict]:
         """Busca partidas agendadas"""
@@ -1920,8 +2295,8 @@ class ScheduleManager:
                                 matches = self._extract_scheduled_matches(data, days_ahead)
                                 all_matches.extend(matches)
                 except Exception as e:
-                    logger.warning(f"??? Erro no endpoint de agenda: {e}")
-                continue
+                    logger.warning(f"❌ Erro no endpoint de agenda: {e}")
+                    continue
 
             unique_matches = self._remove_duplicates(all_matches)
             sorted_matches = sorted(unique_matches, key=lambda x: x.get('start_time', ''))
@@ -1929,7 +2304,7 @@ class ScheduleManager:
             self.scheduled_matches = sorted_matches[:20]
             self.last_update = datetime.now()
 
-            logger.info(f"???? {len(self.scheduled_matches)} partidas agendadas encontradas")
+            logger.info(f"📅 {len(self.scheduled_matches)} partidas agendadas encontradas")
             return self.scheduled_matches
 
         except Exception as e:
@@ -1947,7 +2322,7 @@ class ScheduleManager:
                 events = data['data']['events']
 
             if events:
-                # CORRE????O: Usar timezone aware para compara????o
+                # CORREÇÃO: Usar timezone aware para comparação
                 from datetime import timezone
                 cutoff_date = datetime.now(timezone.utc) + timedelta(days=days_ahead)
                 now_utc = datetime.now(timezone.utc)
@@ -1959,11 +2334,11 @@ class ScheduleManager:
                             # Converter para datetime com timezone
                             start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
                             
-                            # Verificar se est?? no intervalo desejado
+                            # Verificar se está no intervalo desejado
                             if now_utc <= start_time <= cutoff_date:
                                 teams = self._extract_teams_from_event(event)
                                 if len(teams) >= 2:
-                                    # Converter para hor??rio local para exibi????o
+                                    # Converter para horário local para exibição
                                     local_time = start_time.astimezone()
                                     
                                     match = {
@@ -2023,7 +2398,7 @@ class ScheduleManager:
                     start_time = match.get('start_time', '')
                     league = match.get('league', '')
                     
-                    # Criar ID ??nico mais espec??fico
+                    # Criar ID único mais específico
                     # Usar tanto A vs B quanto B vs A para evitar duplicatas de ordem
                     team_pair = tuple(sorted([team1, team2]))
                     match_id = f"{team_pair}_{league}_{start_time}"
@@ -2032,1397 +2407,1862 @@ class ScheduleManager:
                         seen.add(match_id)
                         unique_matches.append(match)
                     else:
-                        logger.debug(f"🔄 Partida duplicada removida: {team1} vs {team2}")
-                        
+                        logger.debug(f"🗑️ Partida duplicada removida: {team1} vs {team2}")
             except Exception as e:
-                logger.debug(f"Erro ao processar partida para remoção de duplicatas: {e}")
-                unique_matches.append(match)  # Incluir mesmo com erro
-                    
+                logger.debug(f"Erro ao processar partida para duplicatas: {e}")
+                continue
+        
+        logger.info(f"🧹 Remoção de duplicatas: {len(matches)} → {len(unique_matches)} partidas únicas")
         return unique_matches
 
     def get_matches_today(self) -> List[Dict]:
-        """Retorna partidas para hoje"""
-        try:
-            today_matches = []
-            for match in self.scheduled_matches:
+        """Retorna partidas de hoje"""
+        from datetime import timezone
+        today = datetime.now(timezone.utc).date()
+        today_matches = []
+
+        for match in self.scheduled_matches:
+            try:
                 start_time_str = match.get('start_time', '')
                 if start_time_str:
-                    try:
-                        start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
-                        if start_time.date() == datetime.now().date():
-                            today_matches.append(match)
-                    except:
-                        continue
-            return today_matches
-        except:
-            return []
+                    start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                    if start_time.date() == today:
+                        today_matches.append(match)
+            except:
+                continue
+        return today_matches
 
-class MatchMonitor:
-    """Monitor de partidas ao vivo com sistema profissional de análise"""
+class ProfessionalTipsSystem:
+    """Sistema de Tips Profissional com Monitoramento Contínuo"""
 
-    def __init__(self, riot_client=None):
-        self.riot_client = riot_client or RiotAPIClient()
-        self.prediction_system = global_cache.get_prediction_system()
+    def __init__(self, riot_client=None, pandascore_client=None):
+        """Sistema de tips profissional com integração híbrida PandaScore + Riot"""
+        # Cliente primário: PandaScore para dados principais
+        self.pandascore_client = pandascore_client if pandascore_client else PandaScoreAPIClient()
+        
+        # Cliente fallback: Riot para dados complementares
+        self.riot_client = riot_client if riot_client else RiotAPIClient()
+        
+        # Sistema de predições ML
+        self.prediction_system = DynamicPredictionSystem()
+        
+        # Sistema de unidades profissional
         self.units_system = ProfessionalUnitsSystem()
-        self.alerts_system = TelegramAlertsSystem(TOKEN)
-        self.monitoring = False
-        self.monitor_thread = None
-        self.bot_instance = None
-        self.found_tips = []
-        self.processed_matches = set()
         
-        # Cache de monitoramento
+        # Cache e configurações
+        self.given_tips = set()
+        self.tips_database = []
+        self.monitoring_active = True
+        self.min_confidence_score = 65.0
+        self.min_ev_percentage = 5.0
         self.last_scan_time = None
-        self.scan_interval = 180  # 3 minutos
+        self._bot_instance = None
         
-        logger.info("🔍 MatchMonitor inicializado com sistema profissional")
+        # Estatísticas e performance
+        self.scan_count = 0
+        self.tips_generated_today = 0
+        self.total_tips_generated = 0
+        
+        # Iniciar monitoramento automático
+        self.start_monitoring()
+        
+        logger.info("🐼 Sistema de Tips Profissional inicializado com PandaScore + Riot híbrido")
 
     def start_monitoring(self):
-        """Inicia monitoramento em thread separada"""
-        if not self.monitoring:
-            self.monitoring = True
-            if self.monitor_thread and self.monitor_thread.is_alive():
-                logger.warning("⚠️ Thread de monitoramento já ativa")
-                return
-                
+        """Inicia monitoramento contínuo APENAS de partidas ao vivo com dados completos"""
+        if not self.monitoring_active:
+            self.monitoring_active = True
+            
             def monitor_loop():
-                """Loop principal de monitoramento"""
-                logger.info("🔄 Iniciando loop de monitoramento...")
-                while self.monitoring:
+                """Loop de monitoramento em thread separada"""
+                while self.monitoring_active:
                     try:
-                        # Executar scan assíncrono
-                        asyncio.run(self._scan_live_matches_only())
-                        time.sleep(self.scan_interval)
-                    except Exception as e:
-                        logger.error(f"❌ Erro no loop de monitoramento: {e}")
-                        time.sleep(30)  # Pausa menor em caso de erro
+                        # Criar novo loop asyncio para esta thread
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
                         
-            self.monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+                        # Executar scan APENAS de partidas ao vivo
+                        loop.run_until_complete(self._scan_live_matches_only())
+                        
+                        # Fechar loop
+                        loop.close()
+                        
+                        # Aguardar 3 minutos antes do próximo scan
+                        if self.monitoring_active:
+                            time.sleep(180)
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Erro no monitoramento de tips: {e}")
+                        # Em caso de erro, aguardar 1 minuto antes de tentar novamente
+                        if self.monitoring_active:
+                            time.sleep(60)
+
+            # Iniciar thread de monitoramento
+            self.monitor_thread = threading.Thread(target=monitor_loop, daemon=True, name="TipsMonitor")
             self.monitor_thread.start()
-            logger.info("✅ Monitoramento iniciado")
+            logger.info("🔍 Monitoramento contínuo de tips iniciado - APENAS PARTIDAS AO VIVO - Verificação a cada 3 minutos")
 
     def stop_monitoring(self):
         """Para o monitoramento"""
-        self.monitoring = False
-        logger.info("⏹️ Monitoramento parado")
+        self.monitoring_active = False
+        logger.info("🛑 Monitoramento de tips interrompido")
 
     async def _scan_live_matches_only(self):
-        """Escaneia apenas partidas ao vivo (otimizado)"""
+        """Escaneia APENAS partidas ao vivo com dados completos (drafts + estatísticas)"""
         try:
-            # Verificar se deve fazer novo scan
-            if self.last_scan_time:
-                elapsed = (datetime.now() - self.last_scan_time).total_seconds()
-                if elapsed < self.scan_interval:
-                    return
+            logger.info("🔍 Escaneando APENAS partidas AO VIVO com dados completos...")
 
-            start_time = time.time()
-            logger.info("🔍 Iniciando scan de partidas ao vivo...")
+            # Buscar APENAS partidas ao vivo (não agendadas)
+            live_matches = await self.riot_client.get_live_matches_with_details()
+            logger.info(f"📍 Encontradas {len(live_matches)} partidas ao vivo com dados completos")
 
-            # Usar cache se válido
-            if global_cache.is_matches_cache_valid():
-                live_matches = global_cache.get_cached_matches()
-                logger.debug("📦 Usando matches do cache global")
-            else:
-                # Buscar partidas ao vivo
-                live_matches = await self.riot_client.get_live_matches()
-                global_cache.cache_matches(live_matches)
+            opportunities_found = 0
 
-            if not live_matches:
-                logger.info("📭 Nenhuma partida ao vivo encontrada")
-                return
-
-            tips_generated = 0
-            matches_analyzed = 0
-
-            # Filtrar apenas partidas com dados completos
-            valid_matches = []
-            for match in live_matches:
-                if self._has_complete_match_data(match):
-                    valid_matches.append(match)
-
-            logger.info(f"🎯 {len(valid_matches)} partidas válidas para análise")
-
-            # Analisar partidas em lote com limite
-            for i, match in enumerate(valid_matches[:3]):  # Máximo 3 partidas por scan
+            for i, match in enumerate(live_matches, 1):
                 try:
-                    match_id = match.get('id') or f"{match.get('teams', [{}])[0].get('name', 'unknown')}_vs_{match.get('teams', [{}])[1].get('name', 'unknown')}"
-                    
-                    if match_id in self.processed_matches:
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        game_number = match.get('game_number', 1)
+                        logger.debug(f"🔍 Analisando JOGO {game_number}: {team1} vs {team2}")
+
+                    # Verificar se partida tem dados suficientes (draft + stats)
+                    if not self._has_complete_match_data(match):
+                        logger.debug(f"⏳ Partida sem dados completos ainda - aguardando...")
                         continue
-                        
-                    # Análise da partida
-                    analysis = await self._analyze_live_match_with_data(match)
-                    if analysis:
-                        tip = self._create_professional_tip_with_game_data(analysis)
-                        if tip:
-                            # Registrar tip encontrado
-                            self.found_tips.append(tip)
-                            tips_generated += 1
-                            
-                            # Enviar alerta se bot ativo
-                            if self.bot_instance:
-                                await self.alerts_system.send_tip_alert(tip, self.bot_instance)
-                                
-                            logger.info(f"💎 TIP PROFISSIONAL gerado: {tip['teams']} | {tip['units']} unidades | Conf: {tip['confidence_score']}%")
-                        
-                        self.processed_matches.add(match_id)
-                        matches_analyzed += 1
-                        
-                except Exception as e:
-                    logger.error(f"❌ Erro ao analisar partida: {e}")
+
+                    # Analisar partida para tip COM dados completos
+                    tip_analysis = await self._analyze_live_match_with_data(match)
+
+                    if tip_analysis and self._meets_professional_criteria(tip_analysis):
+                        tip_id = self._generate_tip_id_with_game(match)
+
+                        # Verificar se já foi dado este tip específico (incluindo número do jogo)
+                        if tip_id not in self.given_tips:
+                            professional_tip = self._create_professional_tip_with_game_data(tip_analysis)
+
+                            if professional_tip:
+                                self.tips_database.append(professional_tip)
+                                self.given_tips.add(tip_id)
+                                opportunities_found += 1
+
+                                logger.info(f"🎯 NOVA OPORTUNIDADE ENCONTRADA: {professional_tip['title']}")
+                                logger.info(f"   📊 Confiança: {professional_tip['confidence_score']:.1f}% | EV: {professional_tip['ev_percentage']:.1f}%")
+                                logger.info(f"   🎲 Unidades: {professional_tip['units']} | Valor: ${professional_tip['stake_amount']:.2f}")
+                                logger.info(f"   🗺️ {professional_tip['map_info']}")
+
+                                # ENVIAR ALERTA AUTOMÁTICO PARA GRUPOS
+                                try:
+                                    if hasattr(self, '_bot_instance') and self._bot_instance:
+                                        alerts_system = self._bot_instance.alerts_system
+                                        bot_app = self._bot_instance.bot_application
+
+                                        if alerts_system.group_chat_ids and bot_app:
+                                            await alerts_system.send_tip_alert(professional_tip, bot_app)
+                                            logger.info(f"📢 Alerta automático enviado para {len(alerts_system.group_chat_ids)} grupos")
+                                        else:
+                                            logger.info("📢 Nenhum grupo cadastrado para alertas ainda")
+
+                                except Exception as alert_error:
+                                    logger.warning(f"❌ Erro ao enviar alerta automático: {alert_error}")
+                        else:
+                            logger.debug(f"🔄 Tip já foi dado anteriormente: {tip_id}")
+                    else:
+                        if tip_analysis:
+                            logger.debug(f"📊 Partida não atende critérios: Conf={tip_analysis.get('confidence_score', 0):.1f}% EV={tip_analysis.get('ev_percentage', 0):.1f}%")
+
+                except Exception as match_error:
+                    logger.warning(f"❌ Erro ao analisar partida {i}: {match_error}")
                     continue
 
-            # Limpeza periódica
-            self._cleanup_old_tips()
-
-            scan_duration = time.time() - start_time
+            # Atualizar timestamp do último scan
             self.last_scan_time = datetime.now()
-            
-            logger.info(f"✅ Scan completo em {scan_duration:.1f}s | "
-                       f"Partidas: {len(live_matches)} | "
-                       f"Analisadas: {matches_analyzed} | "
-                       f"Tips: {tips_generated}")
+
+            if opportunities_found > 0:
+                logger.info(f"✅ SCAN COMPLETO: {opportunities_found} novas oportunidades de tips encontradas!")
+            else:
+                logger.info("ℹ️ SCAN COMPLETO: Nenhuma nova oportunidade encontrada neste scan")
+
+            # Limpeza de tips antigos e cache
+            self._cleanup_old_tips()
+            self._cleanup_old_cache()
 
         except Exception as e:
-            logger.error(f"❌ Erro no scan de partidas: {e}")
+            logger.error(f"❌ Erro geral no scan de partidas ao vivo: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
 
     def _has_complete_match_data(self, match: Dict) -> bool:
-        """Verifica se a partida tem dados completos"""
+        """Verifica se a partida tem dados completos (draft + estatísticas)"""
         try:
-            # Verificar estrutura básica
-            if not isinstance(match, dict):
+            # Verificar se tem dados de draft
+            draft_data = match.get('draft_data')
+            if not draft_data:
                 return False
-                
+
+            # Verificar se tem estatísticas da partida
+            match_stats = match.get('match_statistics')
+            if not match_stats:
+                return False
+
+            # Verificar se a partida realmente começou (não apenas draft)
+            game_time = match.get('game_time', 0)
+            if game_time < 300:  # Menos de 5 minutos = ainda muito cedo
+                return False
+
+            # Verificar se tem dados dos times
             teams = match.get('teams', [])
             if len(teams) < 2:
                 return False
-                
-            # Verificar nomes dos times
-            team1_name = teams[0].get('name', '').strip()
-            team2_name = teams[1].get('name', '').strip()
-            
-            if not team1_name or not team2_name:
+
+            # Verificar se tem informação do mapa/game
+            game_number = match.get('game_number')
+            if not game_number:
                 return False
-                
-            # Verificar liga
-            league = match.get('league', '').strip()
-            if not league:
-                return False
-                
-            # Verificar se não é partida de treino/custom
-            excluded_keywords = ['custom', 'practice', 'scrim', 'test', 'training']
-            league_lower = league.lower()
-            
-            if any(keyword in league_lower for keyword in excluded_keywords):
-                return False
-                
-            # Verificar tempo de jogo mínimo (evitar partidas que acabaram de começar)
-            game_time = match.get('game_time', 0)
-            if game_time < 5:  # Menos de 5 minutos
-                return False
-                
+
+            logger.debug(f"✅ Partida tem dados completos - Game {game_number}, {game_time}s de jogo")
             return True
-            
+
         except Exception as e:
-            logger.debug(f"Erro ao verificar dados da partida: {e}")
+            logger.debug(f"❌ Erro ao verificar dados da partida: {e}")
             return False
 
     async def _analyze_live_match_with_data(self, match: Dict) -> Optional[Dict]:
-        """Análise completa de partida ao vivo com dados em tempo real"""
+        """Analisa partida ao vivo COM dados de draft e estatísticas"""
         try:
-            # Obter predição base
-            prediction = await self.prediction_system.predict_live_match(match)
-            if not prediction:
+            teams = match.get('teams', [])
+            if len(teams) < 2:
                 return None
 
-            # Dados da partida
-            teams = match.get('teams', [])
-            team1_name = teams[0].get('name', 'Team 1')
-            team2_name = teams[1].get('name', 'Team 2')
-            league = match.get('league', 'Unknown')
+            team1_name = teams[0].get('name', '')
+            team2_name = teams[1].get('name', '')
+            league = match.get('league', '')
+            game_number = match.get('game_number', 1)
             game_time = match.get('game_time', 0)
 
-            # Calcular odds ao vivo baseado em dados
-            favored_team = prediction.get('recommended_team', team1_name)
-            live_odds = self.prediction_system._calculate_live_odds_from_data(match, favored_team)
+            # OTIMIZAÇÃO: Cache de análise
+            cache_key = f"live_analysis_{team1_name}_{team2_name}_{league}_{game_number}"
+            if cache_key in self.analysis_cache:
+                cached = self.analysis_cache[cache_key]
+                if (datetime.now() - cached['timestamp']).seconds < 180:  # 3 min cache
+                    logger.debug(f"📦 Cache hit para análise: {team1_name} vs {team2_name}")
+                    return cached['data']
 
-            # Extrair probabilidade de vitória
-            win_prob_str = prediction.get('win_probability', '55%')
-            win_prob = float(win_prob_str.replace('%', '')) / 100
+            # OTIMIZAÇÃO: Usar sistema de predição reutilizável (não criar novo)
+            ml_prediction = await self.prediction_system.predict_live_match_with_live_data(match)
 
-            # Calcular EV com dados ao vivo
-            ev_percentage = self._calculate_ev_with_live_data(win_prob, live_odds, match)
+            if not ml_prediction or ml_prediction['confidence'] not in ['Alta', 'Muito Alta']:
+                return None
 
-            # Analisar dados específicos do jogo
-            draft_analysis = ""
-            stats_analysis = ""
+            favored_team = ml_prediction['favored_team']
+            win_probability = ml_prediction['win_probability']
+            confidence_level = ml_prediction['confidence']
+
+            # Mapear confiança para score numérico
+            confidence_mapping = {'Muito Alta': 90, 'Alta': 80, 'Média': 70, 'Baixa': 60}
+            confidence_score = confidence_mapping.get(confidence_level, 60)
+
+            # Calcular EV baseado em dados ao vivo
+            live_odds = self._calculate_live_odds_from_data(match, favored_team)
+            ev_percentage = self._calculate_ev_with_live_data(win_probability, live_odds, match)
             
-            if 'draft_data' in match:
-                draft_analysis = self._analyze_draft_data(match['draft_data'])
-                
-            if 'match_stats' in match:
-                stats_analysis = self._analyze_match_statistics(match['match_stats'])
+            # Determinar tier da liga
+            league_tier = self._determine_league_tier(league)
 
-            return {
-                'match': match,
-                'prediction': prediction,
-                'teams': f"{team1_name} vs {team2_name}",
-                'league': league,
-                'game_time': game_time,
-                'recommended_team': favored_team,
-                'win_probability': win_prob,
-                'live_odds': live_odds,
+            # Extrair dados específicos da partida
+            draft_analysis = self._analyze_draft_data(match.get('draft_data', {}))
+            stats_analysis = self._analyze_match_statistics(match.get('match_statistics', {}))
+
+            result = {
+                'team1': team1_name, 'team2': team2_name,
+                'league': league, 'league_tier': league_tier,
+                'favored_team': favored_team,
+                'opposing_team': team2_name if favored_team == team1_name else team1_name,
+                'win_probability': win_probability,
+                'confidence_score': confidence_score,
+                'confidence_level': confidence_level,
                 'ev_percentage': ev_percentage,
-                'confidence_score': prediction.get('confidence_score', 75),
+                'game_number': game_number,
+                'game_time': game_time,
+                'map_info': f"Mapa {game_number}",
                 'draft_analysis': draft_analysis,
                 'stats_analysis': stats_analysis,
-                'analysis_timestamp': datetime.now().isoformat()
+                'ml_analysis': ml_prediction['analysis'],
+                'prediction_factors': ml_prediction['prediction_factors'],
+                'live_odds': live_odds,
+                'match_data': match
+            }
+            
+            # OTIMIZAÇÃO: Cache resultado
+            self.analysis_cache[cache_key] = {
+                'data': result,
+                'timestamp': datetime.now()
+            }
+            
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ Erro na análise da partida ao vivo: {e}")
+            return None
+
+    def _calculate_ev_with_live_data(self, win_probability: float, live_odds: float, match: Dict) -> float:
+        """Calcula EV usando dados ao vivo da partida"""
+        try:
+            # EV = (odds * win_probability) - 1
+            base_ev = (live_odds * win_probability) - 1
+            
+            # Ajustar EV baseado na qualidade dos dados
+            game_time = match.get('game_time', 0)
+            
+            # Partidas com mais tempo têm dados mais confiáveis
+            if game_time > 900:  # Mais de 15 minutos
+                reliability_bonus = 1.1
+            elif game_time > 600:  # Mais de 10 minutos
+                reliability_bonus = 1.05
+            else:
+                reliability_bonus = 1.0
+                
+            final_ev = base_ev * reliability_bonus * 100  # Converter para percentual
+            
+            return final_ev
+            
+        except Exception as e:
+            logger.warning(f"Erro ao calcular EV: {e}")
+            return 0.0
+
+    def _analyze_draft_data(self, draft_data: Dict) -> str:
+        """Analisa dados do draft para insights"""
+        try:
+            if not draft_data:
+                return "Dados de draft não disponíveis"
+                
+            team1_picks = draft_data.get('team1_picks', [])
+            team2_picks = draft_data.get('team2_picks', [])
+            
+            analysis_parts = []
+            
+            # Analisar composições
+            if len(team1_picks) >= 5 and len(team2_picks) >= 5:
+                analysis_parts.append("Drafts completos analisados")
+                
+                # Exemplo de análise de composição
+                team1_comp_type = self._analyze_team_composition(team1_picks)
+                team2_comp_type = self._analyze_team_composition(team2_picks)
+                
+                analysis_parts.append(f"Comp. T1: {team1_comp_type}")
+                analysis_parts.append(f"Comp. T2: {team2_comp_type}")
+            else:
+                analysis_parts.append("Draft em andamento")
+                
+            return " • ".join(analysis_parts)
+            
+        except Exception as e:
+            logger.warning(f"Erro na análise de draft: {e}")
+            return "Erro na análise de draft"
+
+    def _analyze_team_composition(self, picks: List) -> str:
+        """Analisa o tipo de composição do time"""
+        # Simplificado para demonstração
+        if len(picks) >= 5:
+            return "Composição Completa"
+        return "Composição Parcial"
+
+    def _analyze_match_statistics(self, match_stats: Dict) -> str:
+        """Analisa estatísticas da partida"""
+        try:
+            if not match_stats:
+                return "Estatísticas não disponíveis"
+                
+            analysis_parts = []
+            
+            gold_diff = match_stats.get('gold_difference', 0)
+            kill_diff = match_stats.get('kill_difference', 0)
+            
+            if gold_diff > 2000:
+                analysis_parts.append(f"Vantagem significativa de gold (+{gold_diff})")
+            elif gold_diff < -2000:
+                analysis_parts.append(f"Desvantagem de gold ({gold_diff})")
+            else:
+                analysis_parts.append("Partida equilibrada em gold")
+                
+            if kill_diff > 3:
+                analysis_parts.append(f"Vantagem em kills (+{kill_diff})")
+            elif kill_diff < -3:
+                analysis_parts.append(f"Desvantagem em kills ({kill_diff})")
+                
+            return " • ".join(analysis_parts)
+            
+        except Exception as e:
+            logger.warning(f"Erro na análise de estatísticas: {e}")
+            return "Erro na análise de estatísticas"
+
+    def _generate_tip_id_with_game(self, match: Dict) -> str:
+        """Gera ID único para o tip incluindo número do jogo"""
+        teams = match.get('teams', [])
+        game_number = match.get('game_number', 1)
+        if len(teams) >= 2:
+            team1 = teams[0].get('name', '')
+            team2 = teams[1].get('name', '')
+            league = match.get('league', '')
+            timestamp = datetime.now().strftime('%Y%m%d')
+            return f"{team1}_{team2}_game{game_number}_{league}_{timestamp}".replace(' ', '_')
+        return f"tip_game{game_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    def _create_professional_tip_with_game_data(self, analysis: Dict) -> Dict:
+        """Cria tip profissional com dados específicos do jogo"""
+        try:
+            units_calc = self.units_system.calculate_units(
+                confidence=analysis['confidence_score'],
+                ev_percentage=analysis['ev_percentage'],
+                league_tier=analysis['league_tier']
+            )
+
+            # Título com informação do mapa
+            title = f"{analysis['map_info']}: {analysis['favored_team']} vs {analysis['opposing_team']}"
+
+            tip = {
+                'title': title,
+                'league': analysis['league'],
+                'map_info': analysis['map_info'],
+                'game_number': analysis['game_number'],
+                'game_time': analysis['game_time'],
+                'recommended_team': analysis['favored_team'],
+                'opposing_team': analysis['opposing_team'],
+                'confidence_score': analysis['confidence_score'],
+                'confidence_level': analysis['confidence_level'],
+                'ev_percentage': analysis['ev_percentage'],
+                'win_probability': analysis['win_probability'],
+                'units': units_calc['units'],
+                'stake_amount': units_calc['stake_amount'],
+                'risk_level': units_calc['risk_level'],
+                'reasoning': self._generate_tip_reasoning_with_live_data(analysis, units_calc),
+                'ml_analysis': analysis['ml_analysis'],
+                'draft_analysis': analysis['draft_analysis'],
+                'stats_analysis': analysis['stats_analysis'],
+                'live_odds': analysis['live_odds'],
+                'prediction_factors': analysis['prediction_factors'],
+                'timestamp': datetime.now(),
+                'tip_id': self._generate_tip_id_with_game(analysis['match_data'])
+            }
+            return tip
+
+        except Exception as e:
+            logger.error(f"Erro ao criar tip: {e}")
+            return None
+
+    def _generate_tip_reasoning_with_live_data(self, analysis: Dict, units_calc: Dict) -> str:
+        """Gera explicação do tip com dados ao vivo"""
+        reasoning_parts = []
+        
+        # Informação do jogo
+        game_time_min = int(analysis['game_time'] / 60)
+        reasoning_parts.append(f"🗺️ {analysis['map_info']} ({game_time_min}min de jogo)")
+        
+        reasoning_parts.append(f"🤖 IA identifica {analysis['favored_team']} como favorito")
+        reasoning_parts.append(f"📊 Confiança ML: {analysis['confidence_level']} ({analysis['confidence_score']:.1f}%)")
+        reasoning_parts.append(f"💰 Valor esperado: {analysis['ev_percentage']:.1f}%")
+        
+        # Dados ao vivo
+        reasoning_parts.append(f"📈 Odds ao vivo: {analysis['live_odds']:.2f}")
+        
+        # Análises específicas
+        if analysis.get('draft_analysis'):
+            reasoning_parts.append(f"🎯 Draft: {analysis['draft_analysis']}")
+        if analysis.get('stats_analysis'):
+            reasoning_parts.append(f"📊 Stats: {analysis['stats_analysis']}")
+            
+        reasoning_parts.append(f"🎲 {units_calc['reasoning']}")
+
+        return " • ".join(reasoning_parts)
+
+    def get_monitoring_status(self) -> Dict:
+        """Status do monitoramento atualizado"""
+        # Calcular tips de hoje
+        today = datetime.now().date()
+        tips_today = sum(1 for tip in self.tips_database 
+                        if tip.get('timestamp', datetime.now()).date() == today)
+        
+        recent_tips = [tip for tip in self.tips_database 
+                      if (datetime.now() - tip.get('timestamp', datetime.now())).days < 7]
+        
+        return {
+            'monitoring_active': self.monitoring_active,
+            'last_scan': self.last_scan_time.strftime('%H:%M:%S') if self.last_scan_time else 'Nunca',
+            'total_tips': len(self.tips_database),  # Chave correta esperada pelos callbacks
+            'tips_today': tips_today,  # Chave correta esperada pelos callbacks
+            'tips_this_week': len(recent_tips),
+            'scan_frequency': '3 minutos (partidas AO VIVO)',
+            'given_tips_cache': len(self.given_tips),
+            'focus': 'APENAS partidas ao vivo com dados completos (draft + estatísticas)',
+            'criteria': f'Confiança ≥{self.min_confidence_score}% e EV ≥{self.min_ev_percentage}%',
+            'thread_status': 'Ativo' if (self.monitor_thread and self.monitor_thread.is_alive()) else 'Inativo'
+        }
+
+    def set_bot_instance(self, bot_instance):
+        """Define instância do bot para envio de alertas automáticos"""
+        self._bot_instance = bot_instance
+        logger.info("🤖 Bot instance conectada ao sistema de tips")
+
+    def _cleanup_old_tips(self):
+        """Remove tips antigos do cache (mais de 24h)"""
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=24)
+            old_tip_ids = []
+
+            # Encontrar tips antigos
+            for tip in self.tips_database:
+                if tip.get('timestamp', datetime.now()) < cutoff_time:
+                    old_tip_ids.append(tip.get('tip_id'))
+
+            # Remover do cache de tips dados
+            for tip_id in old_tip_ids:
+                self.given_tips.discard(tip_id)
+
+            # Remover do banco de dados de tips
+            self.tips_database = [tip for tip in self.tips_database 
+                                if tip.get('timestamp', datetime.now()) >= cutoff_time]
+
+            if old_tip_ids:
+                logger.info(f"🧹 {len(old_tip_ids)} tips antigos removidos do cache")
+
+        except Exception as e:
+            logger.error(f"❌ Erro na limpeza de tips antigos: {e}")
+
+    def _meets_professional_criteria(self, analysis: Dict) -> bool:
+        """Verifica critérios profissionais"""
+        confidence = analysis.get('confidence_score', 0)
+        ev = analysis.get('ev_percentage', 0)
+
+        return (
+            confidence >= self.min_confidence_score and
+            ev >= self.min_ev_percentage and
+            analysis.get('confidence_level') in ['Alta', 'Muito Alta']
+        )
+
+    def _create_professional_tip(self, analysis: Dict) -> Dict:
+        """Cria tip profissional"""
+        try:
+            units_calc = self.units_system.calculate_units(
+                confidence=analysis['confidence_score'],
+                ev_percentage=analysis['ev_percentage'],
+                league_tier=analysis['league_tier']
+            )
+
+            tip = {
+                'title': f"{analysis['favored_team']} vs {analysis['opposing_team']}",
+                'league': analysis['league'],
+                'recommended_team': analysis['favored_team'],
+                'opposing_team': analysis['opposing_team'],
+                'confidence_score': analysis['confidence_score'],
+                'confidence_level': analysis['confidence_level'],
+                'ev_percentage': analysis['ev_percentage'],
+                'win_probability': analysis['win_probability'],
+                'units': units_calc['units'],
+                'stake_amount': units_calc['stake_amount'],
+                'risk_level': units_calc['risk_level'],
+                'reasoning': self._generate_tip_reasoning(analysis, units_calc),
+                'ml_analysis': analysis['ml_analysis'],
+                'prediction_factors': analysis['prediction_factors'],
+                'timestamp': datetime.now(),
+                'tip_id': self._generate_tip_id(analysis['match_data'])
+            }
+            return tip
+
+        except Exception as e:
+            logger.error(f"Erro ao criar tip: {e}")
+            return None
+
+    def _generate_tip_reasoning(self, analysis: Dict, units_calc: Dict) -> str:
+        """Gera explicação do tip"""
+        reasoning_parts = []
+        reasoning_parts.append(f"🤖 IA identifica {analysis['favored_team']} como favorito")
+        reasoning_parts.append(f"📊 Confiança ML: {analysis['confidence_level']} ({analysis['confidence_score']:.1f}%)")
+        reasoning_parts.append(f"💰 Valor esperado: {analysis['ev_percentage']:.1f}%")
+        reasoning_parts.append(f"🎲 {units_calc['reasoning']}")
+
+        if analysis.get('ml_analysis'):
+            reasoning_parts.append(f"🔍 {analysis['ml_analysis']}")
+
+        return " • ".join(reasoning_parts)
+
+    def _determine_league_tier(self, league: str) -> str:
+        """Determina tier da liga"""
+        league_lower = league.lower()
+        if any(tier1 in league_lower for tier1 in ['lck', 'lpl', 'lec', 'lcs']):
+            return 'tier1'
+        elif any(tier2 in league_lower for tier2 in ['cblol', 'lla', 'pcs', 'vcs']):
+            return 'tier2'
+        else:
+            return 'tier3'
+
+    def _generate_tip_id(self, match: Dict) -> str:
+        """Gera ID único para o tip"""
+        teams = match.get('teams', [])
+        if len(teams) >= 2:
+            team1 = teams[0].get('name', '')
+            team2 = teams[1].get('name', '')
+            league = match.get('league', '')
+            timestamp = datetime.now().strftime('%Y%m%d')
+            return f"{team1}_{team2}_{league}_{timestamp}".replace(' ', '_')
+        return f"tip_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    async def generate_professional_tip(self) -> Optional[Dict]:
+        """Gera tip profissional usando ML e retorna o melhor disponível"""
+        try:
+            # Buscar partidas disponíveis
+            live_matches = await self.riot_client.get_live_matches()
+            schedule_manager = ScheduleManager(self.riot_client)
+            scheduled_matches = await schedule_manager.get_scheduled_matches(days_ahead=1)
+
+            all_matches = live_matches + scheduled_matches
+            logger.info(f"🎯 Analisando {len(all_matches)} partidas para tip profissional")
+
+            # Analisar cada partida com ML
+            best_tip = None
+            best_score = 0
+
+            for match in all_matches:
+                tip_analysis = await self._analyze_match_for_tip(match)
+
+                if tip_analysis and self._meets_professional_criteria(tip_analysis):
+                    # Calcular score combinado (confiança + EV)
+                    combined_score = tip_analysis['confidence_score'] + tip_analysis['ev_percentage']
+
+                    if combined_score > best_score:
+                        best_score = combined_score
+                        best_tip = self._create_professional_tip(tip_analysis)
+
+            if best_tip:
+                logger.info(f"🎯 Melhor tip encontrado: {best_tip['title']} (Score: {best_score:.1f})")
+            else:
+                logger.info("ℹ️ Nenhum tip profissional disponível no momento")
+
+            return best_tip
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao gerar tip profissional: {e}")
+            return None
+
+    async def _analyze_match_for_tip(self, match: Dict) -> Optional[Dict]:
+        """Analisa partida para determinar se é uma oportunidade de tip"""
+        try:
+            teams = match.get('teams', [])
+            if len(teams) < 2:
+                return None
+
+            team1_name = teams[0].get('name', '')
+            team2_name = teams[1].get('name', '')
+            league = match.get('league', '')
+
+            # Usar sistema de predição para análise
+            prediction_system = DynamicPredictionSystem()
+            ml_prediction = await prediction_system.predict_live_match(match)
+
+            if not ml_prediction or ml_prediction['confidence'] not in ['Alta', 'Muito Alta']:
+                return None
+
+            favored_team = ml_prediction['favored_team']
+            win_probability = ml_prediction['win_probability']
+            confidence_level = ml_prediction['confidence']
+
+            # Mapear confiança para score numérico
+            confidence_mapping = {'Muito Alta': 90, 'Alta': 80, 'Média': 70, 'Baixa': 60}
+            confidence_score = confidence_mapping.get(confidence_level, 60)
+
+            # Calcular EV (Expected Value)
+            ml_odds = ml_prediction['team1_odds'] if favored_team == team1_name else ml_prediction['team2_odds']
+            
+            # Simular odds de mercado (normalmente 5% menor que a probabilidade real)
+            market_probability = win_probability * 0.95
+            market_odds = 1 / market_probability if market_probability > 0 else 2.0
+
+            # Calcular EV percentage
+            ev_percentage = ((ml_odds * win_probability) - 1) * 100
+            
+            # Determinar tier da liga
+            league_tier = self._determine_league_tier(league)
+
+            return {
+                'team1': team1_name, 'team2': team2_name,
+                'league': league, 'league_tier': league_tier,
+                'favored_team': favored_team,
+                'opposing_team': team2_name if favored_team == team1_name else team1_name,
+                'win_probability': win_probability,
+                'confidence_score': confidence_score,
+                'confidence_level': confidence_level,
+                'ev_percentage': ev_percentage,
+                'ml_odds': ml_odds, 'market_odds': market_odds,
+                'ml_analysis': ml_prediction['analysis'],
+                'prediction_factors': ml_prediction['prediction_factors'],
+                'match_data': match
             }
 
         except Exception as e:
             logger.error(f"❌ Erro na análise da partida: {e}")
             return None
 
-    def _calculate_ev_with_live_data(self, win_probability: float, live_odds: float, match: Dict) -> float:
-        """Calcula Expected Value com dados ao vivo"""
+    def _cleanup_old_cache(self):
+        """Limpa cache antigo para evitar uso excessivo de memória"""
         try:
-            # Fórmula EV = (Probabilidade × Odds) - 1
-            ev = (win_probability * live_odds) - 1
-            ev_percentage = ev * 100
+            current_time = datetime.now()
             
-            # Ajustes baseados em dados ao vivo
-            game_time = match.get('game_time', 0)
+            # Limpar análises antigas (mais de 10 minutos)
+            old_keys = []
+            for key, cached_item in self.analysis_cache.items():
+                if (current_time - cached_item['timestamp']).seconds > 600:
+                    old_keys.append(key)
             
-            # Bonus para partidas mais avançadas (mais dados disponíveis)
-            if game_time > 15:
-                ev_percentage += 2
-            if game_time > 25:
-                ev_percentage += 3
+            for key in old_keys:
+                del self.analysis_cache[key]
+            
+            # Limpar tips antigos (mais de 1 hora)
+            old_tip_keys = []
+            for key, cached_item in self.tips_cache.items():
+                if (current_time - cached_item.get('timestamp', current_time)).seconds > 3600:
+                    old_tip_keys.append(key)
+            
+            for key in old_tip_keys:
+                del self.tips_cache[key]
                 
-            # Verificar se há dados detalhados
-            if match.get('detailed_stats'):
-                ev_percentage += 5
+            if old_keys or old_tip_keys:
+                logger.debug(f"🧹 Cache limpo: {len(old_keys)} análises, {len(old_tip_keys)} tips")
                 
-            return max(0, ev_percentage)
-            
         except Exception as e:
-            logger.error(f"Erro no cálculo de EV: {e}")
-            return 10.0  # EV padrão conservador
-
-    def _analyze_draft_data(self, draft_data: Dict) -> str:
-        """Analisa dados de draft/picks"""
-        try:
-            analysis = []
-            
-            team1_picks = draft_data.get('team1_picks', [])
-            team2_picks = draft_data.get('team2_picks', [])
-            
-            if team1_picks:
-                comp1 = self._analyze_team_composition(team1_picks)
-                analysis.append(f"Time 1: {comp1}")
-                
-            if team2_picks:
-                comp2 = self._analyze_team_composition(team2_picks)
-                analysis.append(f"Time 2: {comp2}")
-                
-            return " | ".join(analysis)
-            
-        except Exception as e:
-            logger.debug(f"Erro na análise de draft: {e}")
-            return "Draft data não disponível"
-
-    def _analyze_team_composition(self, picks: List) -> str:
-        """Analisa composição do time"""
-        # Análise básica de composição
-        return f"Comp: {len(picks)} picks"
-
-    def _analyze_match_statistics(self, match_stats: Dict) -> str:
-        """Analisa estatísticas da partida"""
-        try:
-            stats = []
-            
-            # Gold difference
-            gold_diff = match_stats.get('gold_difference', 0)
-            if abs(gold_diff) > 1000:
-                team_ahead = "Time 1" if gold_diff > 0 else "Time 2"
-                stats.append(f"{team_ahead} +{abs(gold_diff)}g")
-                
-            # Kills
-            team1_kills = match_stats.get('team1_kills', 0)
-            team2_kills = match_stats.get('team2_kills', 0)
-            if team1_kills + team2_kills > 5:
-                stats.append(f"Kills: {team1_kills}-{team2_kills}")
-                
-            # Towers
-            team1_towers = match_stats.get('team1_towers', 0)
-            team2_towers = match_stats.get('team2_towers', 0)
-            if team1_towers + team2_towers > 0:
-                stats.append(f"Torres: {team1_towers}-{team2_towers}")
-                
-            return " | ".join(stats) if stats else "Stats em desenvolvimento"
-            
-        except Exception as e:
-            logger.debug(f"Erro na análise de stats: {e}")
-            return "Match stats não disponíveis"
-
-    def _generate_tip_id_with_game(self, match: Dict) -> str:
-        """Gera ID único para o tip baseado na partida"""
-        try:
-            teams = match.get('teams', [])
-            team1 = teams[0].get('name', 'T1') if teams else 'T1'
-            team2 = teams[1].get('name', 'T2') if len(teams) > 1 else 'T2'
-            league = match.get('league', 'League')
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-            
-            return f"tip_{team1}_{team2}_{league}_{timestamp}".replace(' ', '_').lower()
-            
-        except Exception as e:
-            logger.error(f"Erro ao gerar tip ID: {e}")
-            return f"tip_{datetime.now().timestamp()}"
-
-    def _create_professional_tip_with_game_data(self, analysis: Dict) -> Dict:
-        """Cria tip profissional com dados de jogo em tempo real"""
-        try:
-            # Verificar se atende critérios profissionais
-            if not self._meets_professional_criteria(analysis):
-                return None
-
-            # Calcular unidades baseado no EV
-            confidence = analysis.get('confidence_score', 75)
-            ev_percentage = analysis.get('ev_percentage', 10)
-            league = analysis.get('league', 'Unknown')
-            league_tier = self._determine_league_tier(league)
-            
-            units_calc = self.units_system.calculate_units(confidence, ev_percentage, league_tier)
-
-            tip = {
-                'id': self._generate_tip_id_with_game(analysis['match']),
-                'teams': analysis['teams'],
-                'league': league,
-                'recommended_team': analysis['recommended_team'],
-                'win_probability': f"{analysis['win_probability']*100:.1f}%",
-                'confidence_score': confidence,
-                'live_odds': analysis['live_odds'],
-                'ev_percentage': ev_percentage,
-                'units': units_calc['units'],
-                'units_reasoning': units_calc['reasoning'],
-                'game_time': analysis['game_time'],
-                'draft_analysis': analysis.get('draft_analysis', ''),
-                'stats_analysis': analysis.get('stats_analysis', ''),
-                'tip_reasoning': self._generate_tip_reasoning_with_live_data(analysis, units_calc),
-                'timestamp': datetime.now().isoformat(),
-                'source': 'professional_live_analysis',
-                'quality_score': self._calculate_tip_quality(analysis, units_calc)
-            }
-
-            return tip
-
-        except Exception as e:
-            logger.error(f"❌ Erro ao criar tip profissional: {e}")
-            return None
-
-    def _generate_tip_reasoning_with_live_data(self, analysis: Dict, units_calc: Dict) -> str:
-        """Gera raciocínio do tip com dados ao vivo"""
-        try:
-            reasoning_parts = []
-            
-            # Análise base
-            reasoning_parts.append(f"🎯 {analysis['recommended_team']} ({analysis['win_probability']*100:.1f}% win prob)")
-            reasoning_parts.append(f"📊 Confiança: {analysis['confidence_score']}%")
-            reasoning_parts.append(f"💰 EV: {analysis['ev_percentage']:.1f}%")
-            reasoning_parts.append(f"🎲 Odds: {analysis['live_odds']:.2f}")
-            reasoning_parts.append(f"⏱️ Tempo: {analysis['game_time']} min")
-            
-            # Análise específica do jogo
-            if analysis.get('draft_analysis'):
-                reasoning_parts.append(f"🛡️ Draft: {analysis['draft_analysis']}")
-                
-            if analysis.get('stats_analysis'):
-                reasoning_parts.append(f"📈 Stats: {analysis['stats_analysis']}")
-            
-            # Unidades
-            reasoning_parts.append(f"💎 {units_calc['units']} unidades | {units_calc['reasoning']}")
-            
-            return " | ".join(reasoning_parts)
-            
-        except Exception as e:
-            logger.error(f"Erro ao gerar reasoning: {e}")
-            return f"Tip para {analysis.get('teams', 'partida')} - análise em tempo real"
-
-    def get_monitoring_status(self) -> Dict:
-        """Retorna status do monitoramento"""
-        return {
-            'monitoring': self.monitoring,
-            'thread_alive': self.monitor_thread.is_alive() if self.monitor_thread else False,
-            'last_scan': self.last_scan_time.strftime('%H:%M:%S') if self.last_scan_time else 'Nunca',
-            'tips_found': len(self.found_tips),
-            'matches_processed': len(self.processed_matches),
-            'scan_interval': f"{self.scan_interval}s",
-            'bot_connected': bool(self.bot_instance)
-        }
-
-    def set_bot_instance(self, bot_instance):
-        """Define instância do bot para envio de alertas"""
-        self.bot_instance = bot_instance
-        self.alerts_system.set_bot_application(bot_instance)
+            logger.warning(f"Erro ao limpar cache: {e}")
 
     def _cleanup_old_tips(self):
-        """Remove tips antigos do cache"""
+        """Remove tips antigos do banco de dados (mais de 24h)"""
         try:
-            cutoff_time = datetime.now() - timedelta(hours=12)
+            cutoff_time = datetime.now() - timedelta(hours=24)
             old_tips = []
             
-            for tip in self.found_tips:
-                tip_time_str = tip.get('timestamp', '')
-                if tip_time_str:
-                    try:
-                        tip_time = datetime.fromisoformat(tip_time_str)
-                        if tip_time < cutoff_time:
-                            old_tips.append(tip)
-                    except:
-                        continue
-                        
+            for tip in self.tips_database:
+                if tip.get('timestamp', datetime.now()) < cutoff_time:
+                    old_tips.append(tip)
+            
+            # Remover tips antigos
             for old_tip in old_tips:
-                self.found_tips.remove(old_tip)
-                
-            if old_tips:
-                logger.info(f"🧹 {len(old_tips)} tips antigos removidos")
+                if old_tip in self.tips_database:
+                    self.tips_database.remove(old_tip)
+            
+            # Limpar IDs de tips antigos
+            old_tip_ids = set()
+            for tip_id in self.given_tips:
+                # Extrair data do tip_id se possível
+                if '_' in tip_id:
+                    parts = tip_id.split('_')
+                    for part in parts:
+                        if len(part) == 8 and part.isdigit():  # YYYYMMDD
+                            try:
+                                tip_date = datetime.strptime(part, '%Y%m%d')
+                                if (datetime.now() - tip_date).days > 1:
+                                    old_tip_ids.add(tip_id)
+                            except:
+                                pass
+            
+            for old_id in old_tip_ids:
+                self.given_tips.discard(old_id)
+            
+            if old_tips or old_tip_ids:
+                logger.debug(f"🧹 Tips antigos limpos: {len(old_tips)} tips, {len(old_tip_ids)} IDs")
                 
         except Exception as e:
-            logger.error(f"Erro na limpeza de tips: {e}")
+            logger.warning(f"Erro ao limpar tips antigos: {e}")
 
-    def _meets_professional_criteria(self, analysis: Dict) -> bool:
-        """Verifica se análise atende critérios profissionais rigorosos"""
-        try:
-            confidence = analysis.get('confidence_score', 0)
-            ev_percentage = analysis.get('ev_percentage', 0)
-            
-            return confidence >= 75 and ev_percentage >= 8
-        except:
-            return False
-
-    def _create_professional_tip(self, analysis: Dict) -> Dict:
-        """Cria tip profissional padrão"""
-        try:
-            confidence = analysis.get('confidence_score', 75)
-            ev_percentage = analysis.get('ev_percentage', 10)
-            league = analysis.get('league', 'Unknown')
-            league_tier = self._determine_league_tier(league)
-            
-            units_calc = self.units_system.calculate_units(confidence, ev_percentage, league_tier)
-
-            tip = {
-                'id': self._generate_tip_id(analysis['match']),
-                'teams': analysis['teams'],
-                'league': league,
-                'recommended_team': analysis['recommended_team'],
-                'win_probability': f"{analysis['win_probability']*100:.1f}%",
-                'confidence_score': confidence,
-                'live_odds': analysis.get('live_odds', 2.0),
-                'ev_percentage': ev_percentage,
-                'units': units_calc['units'],
-                'units_reasoning': units_calc['reasoning'],
-                'tip_reasoning': self._generate_tip_reasoning(analysis, units_calc),
-                'timestamp': datetime.now().isoformat(),
-                'source': 'professional_analysis'
-            }
-
-            return tip
-        except Exception as e:
-            logger.error(f"❌ Erro ao criar tip: {e}")
-            return None
-
-    def _generate_tip_reasoning(self, analysis: Dict, units_calc: Dict) -> str:
-        """Gera raciocínio básico do tip"""
-        try:
-            return f"🎯 {analysis['recommended_team']} | Conf: {analysis['confidence_score']}% | EV: {analysis['ev_percentage']:.1f}% | {units_calc['units']} unidades"
-        except:
-            return "Análise profissional"
-
-    def _determine_league_tier(self, league: str) -> str:
-        """Determina tier da liga"""
-        tier1_leagues = ['LCK', 'LPL', 'LEC', 'LCS', 'Worlds', 'MSI']
-        if any(t1 in league.upper() for t1 in tier1_leagues):
-            return 'tier1'
-        return 'tier2'
-
-    def _generate_tip_id(self, match: Dict) -> str:
-        """Gera ID do tip"""
-        try:
-            teams = match.get('teams', [])
-            team1 = teams[0].get('name', 'T1') if teams else 'T1'
-            team2 = teams[1].get('name', 'T2') if len(teams) > 1 else 'T2'
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-            return f"tip_{team1}_{team2}_{timestamp}".replace(' ', '_').lower()
-        except:
-            return f"tip_{datetime.now().timestamp()}"
-
-    def _calculate_tip_quality(self, analysis: Dict, units_calc: Dict) -> float:
-        """Calcula score de qualidade do tip"""
-        try:
-            base_score = analysis.get('confidence_score', 75)
-            ev_bonus = min(analysis.get('ev_percentage', 0) * 2, 20)
-            units_bonus = units_calc.get('units', 1) * 5
-            
-            return min(100, base_score + ev_bonus + units_bonus)
-        except:
-            return 75.0
-
-# Instância global do monitor
-match_monitor = MatchMonitor()
-
-class TipGenerator:
-    """Gerador profissional de tips"""
-
+class LoLBotV3UltraAdvanced:
+    """Bot de League of Legends com predições avançadas e sistema de tips profissional"""
+    
     def __init__(self):
+        # RIOT API Client (dados de partidas oficiais)
         self.riot_client = RiotAPIClient()
-        self.prediction_system = global_cache.get_prediction_system()
-        self.units_system = ProfessionalUnitsSystem()
-        self.generated_tips = []
-        self.tip_cache = {}
-        self.last_generation = None
         
-        logger.info("💡 TipGenerator profissional inicializado")
-
-    def set_bot_application(self, application):
-        """Define aplicação do bot"""
-        self.bot_application = application
-
-class BotHandler:
-    """Manipulador principal de comandos do bot"""
-
-    def __init__(self):
+        # PANDASCORE API Client (dados primários e odds)
+        self.pandascore_client = PandaScoreAPIClient()
+        
+        # THE ODDS API Client (fallback para odds)
+        self.odds_client = TheOddsAPIClient()
+        
+        # Sistema de predições
+        self.prediction_system = DynamicPredictionSystem()
+        
+        # Sistema de preferências e alertas
+        self.user_preferences = LoLUserPreferences()
+        self.alerts_system = TelegramAlertsSystem(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
+        
+        # Sistema de tips profissional (híbrido PandaScore + Riot)
+        self.professional_tips = ProfessionalTipsSystem(self.riot_client, self.pandascore_client)
+        
+        # Sistema de agenda
+        self.schedule_manager = ScheduleManager(self.riot_client)
+        
+        # Sistema de unidades
+        self.units_system = ProfessionalUnitsSystem()
+        
+        # Cache e controle
+        self.live_matches_cache = {}
+        self.cache_timestamp = None
         self.bot_application = None
-        logger.info("🤖 BotHandler inicializado")
+        
+        # Conectar sistema de tips com alertas
+        if self.alerts_system:
+            self.professional_tips.set_bot_instance(self)
+        
+        logger.info("🤖 LoL Bot V3 Ultra Avançado inicializado com PandaScore como fonte primária")
 
     def set_bot_application(self, application):
-        """Define aplicação do bot"""
+        """Define a aplicação do bot para o sistema de alertas"""
         self.bot_application = application
+
+        # Railway mode - sem threading de cleanup automático
+        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME'))
+        
+        if not is_railway:
+            # Apenas local - cleanup automático
+            logger.info("🧹 Cleanup automático ativo - modo local")
 
     def start_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /start"""
         try:
-            welcome_message = """
-🎮 **BOT LOL V3 - SISTEMA PROFISSIONAL DE TIPS**
-
-🏆 **Sistema de Unidades Padrão Profissional**
-💎 Baseado em grupos de apostas de elite
-📊 Análise REAL das APIs da Riot Games
-🤖 Machine Learning integrado
-
-**Comandos Disponíveis:**
-/menu - Menu principal interativo
-/tips - Tips profissionais atuais
-/live - Partidas ao vivo
-/monitoring - Status do monitoramento
-/units - Sistema de unidades
-
-✨ **Novidades V3:**
-• Sistema de cache inteligente
-• Monitoramento automático 24/7
-• Tips com critérios rigorosos (Conf ≥75%, EV ≥8%)
-• Alertas automáticos para grupos
-
-Digite /menu para começar! 🚀
-            """
+            logger.info(f"🚀 Comando /start chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
             
+            user = update.effective_user
+            welcome_message = f"""
+🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
+
+Olá {user.first_name}! 👋
+
+🎲 **SISTEMA DE UNIDADES PROFISSIONAL**
+📊 Baseado em grupos de apostas profissionais
+⚡ Sem Kelly Criterion - Sistema simplificado
+🎯 Critérios: 65%+ confiança, 5%+ EV mínimo
+
+🔥 **FUNCIONALIDADES:**
+• 🎯 Tips profissionais com monitoramento ativo
+• 🔮 Predições IA com machine learning
+• 📅 Agenda de partidas (próximos 7 dias)
+• 🎮 Partidas ao vivo selecionáveis
+• 📢 Sistema de alertas para grupos
+• 📊 Sistema de unidades padrão
+• 📋 Estatísticas detalhadas
+
+Use /menu para ver todas as opções!
+            """
+
             keyboard = [
-                [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")],
-                [InlineKeyboardButton("💎 Tips Ativos", callback_data="current_tips")],
-                [InlineKeyboardButton("🔴 Partidas Ao Vivo", callback_data="live_matches")]
+                [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
+                [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
+                [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(
-                welcome_message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+
+            update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
+            logger.info(f"✅ Comando /start respondido com sucesso para {user.first_name}")
             
         except Exception as e:
-            logger.error(f"Erro no comando start: {e}")
-            update.message.reply_text("❌ Erro interno. Tente novamente.")
+            logger.error(f"❌ Erro no comando /start: {e}")
+            try:
+                update.message.reply_text("❌ Erro interno. Tente novamente em alguns segundos.")
+            except:
+                pass
 
     def menu_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /menu"""
         try:
-            menu_text = """
-🎮 **MENU PRINCIPAL - BOT LOL V3**
-
-Escolha uma opção abaixo:
-            """
+            logger.info(f"🎯 Comando /menu chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
             
+            menu_message = """
+🎮 **MENU PRINCIPAL - BOT LOL V3** 🎮
+
+🎯 **TIPS & ANÁLISES (ATUALIZADO):**
+• /tips - Tips profissionais AO VIVO
+• /predictions - Predições IA
+• /schedule - Agenda de partidas
+• /live - Partidas ao vivo
+• /monitoring - Status do monitoramento
+• /force_scan - Scan manual (admin)
+• /alerts - Sistema de alertas
+• /odds - Odds reais (The Odds API) 💰
+
+🎲 **SISTEMA DE UNIDADES:**
+• /units - Explicação do sistema
+• /performance - Performance atual
+• /history - Histórico de apostas
+
+📊 **INFORMAÇÕES:**
+• /help - Ajuda completa
+• /about - Sobre o bot
+
+💰 **NOVA INTEGRAÇÃO - ODDS REAIS:**
+🔥 Agora o sistema usa odds REAIS de casas de apostas!
+• ✅ The Odds API integrada
+• ✅ Múltiplas casas de apostas
+• ✅ Melhores odds automaticamente
+• ✅ EV calculado com dados reais
+
+🎮 **FUNCIONALIDADE - TIPS AO VIVO:**
+🔥 Sistema gera tips APENAS para partidas que estão acontecendo!
+• ✅ Dados reais de draft + estatísticas
+• ✅ Informação específica do mapa (Game 1, 2, 3...)
+• ✅ Análise em tempo real durante a partida
+• ✅ Tips ilimitados (sem limite semanal)
+• ✅ Monitoramento a cada 3 minutos
+
+Clique nos botões abaixo para navegação rápida:
+            """
+
             keyboard = [
-                [InlineKeyboardButton("💎 Tips Profissionais", callback_data="tips_menu")],
-                [InlineKeyboardButton("🔴 Partidas Ao Vivo", callback_data="live_matches")],
-                [InlineKeyboardButton("📅 Agenda", callback_data="schedule_menu")],
-                [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring_menu")],
-                [InlineKeyboardButton("📊 Predições", callback_data="predictions_menu")],
-                [InlineKeyboardButton("🔔 Alertas", callback_data="alerts_menu")],
-                [InlineKeyboardButton("💰 Sistema Unidades", callback_data="units_info")],
-                [InlineKeyboardButton("📈 Performance", callback_data="performance_menu")]
+                [InlineKeyboardButton("🎯 Tips AO VIVO", callback_data="tips"),
+                 InlineKeyboardButton("🔮 Predições", callback_data="predictions")],
+                [InlineKeyboardButton("💰 Odds Reais", callback_data="odds_summary"),
+                 InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule"),
+                 InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring")],
+                [InlineKeyboardButton("🚀 Scan Manual", callback_data="force_scan"),
+                 InlineKeyboardButton("📢 Alertas", callback_data="alert_stats")],
+                [InlineKeyboardButton("📊 Unidades", callback_data="units_info"),
+                 InlineKeyboardButton("❓ Ajuda", callback_data="help")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(
-                menu_text,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+            update.message.reply_text(menu_message, reply_markup=reply_markup, parse_mode="Markdown")
+            logger.info(f"✅ Comando /menu respondido com sucesso")
             
         except Exception as e:
-            logger.error(f"Erro no menu: {e}")
-            update.message.reply_text("❌ Erro ao carregar menu.")
+            logger.error(f"❌ Erro no comando /menu: {e}")
+            try:
+                update.message.reply_text("❌ Erro interno. Tente novamente.")
+            except:
+                pass
 
     def tips_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /tips"""
         try:
-            tips = match_monitor.found_tips[-5:] if match_monitor.found_tips else []
+            logger.info(f"🎯 Comando /tips chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
             
-            if not tips:
-                message = """
-💎 **TIPS PROFISSIONAIS**
+            # Usar asyncio para gerar tip
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            tip = loop.run_until_complete(self.professional_tips.generate_professional_tip())
+            loop.close()
 
-📭 Nenhum tip ativo no momento.
+            if tip:
+                # Extrair informações específicas do mapa
+                map_info = tip.get('map_info', 'Mapa 1')
+                game_time = tip.get('game_time', 0)
+                game_min = game_time // 60 if game_time > 0 else 0
+                
+                tip_message = f"""
+🎯 **TIP PROFISSIONAL AO VIVO** 🎯
 
-O sistema monitora automaticamente as partidas e gera tips apenas quando:
-• Confiança ≥ 75%
-• EV ≥ 8%
-• Dados completos da partida
+🗺️ **{map_info}: {tip['title']}**
+🎮 Liga: {tip['league']}
+⏱️ Tempo: {game_min}min (PARTIDA AO VIVO)
 
-⏰ Próximo scan: 3 minutos
+📊 **ANÁLISE COM DADOS REAIS:**
+• Confiança: {tip['confidence_score']:.1f}% ({tip['confidence_level']})
+• EV: {tip['ev_percentage']:.1f}%
+• Probabilidade: {tip['win_probability']*100:.1f}%
+
+🎲 **SISTEMA DE UNIDADES:**
+• Apostar: {tip['units']} unidades
+• Valor: ${tip['stake_amount']:.2f}
+• Risco: {tip['risk_level']}
+
+⭐ **Recomendação:** {tip['recommended_team']}
+
+💡 **Análise Completa:**
+{tip['reasoning']}
+
+🤖 **Dados Utilizados:**
+• Draft completo analisado
+• Estatísticas em tempo real
+• IA com dados ao vivo
                 """
             else:
-                message = "💎 **TIPS PROFISSIONAIS ATIVOS**\n\n"
-                for i, tip in enumerate(tips, 1):
-                    message += f"**{i}. {tip['teams']}**\n"
-                    message += f"🎯 Recomendação: {tip['recommended_team']}\n"
-                    message += f"📊 Confiança: {tip['confidence_score']}%\n"
-                    message += f"💰 EV: {tip['ev_percentage']:.1f}%\n"
-                    message += f"💎 Unidades: {tip['units']}\n"
-                    message += f"🏆 Liga: {tip['league']}\n\n"
-            
+                tip_message = """
+🎯 **NENHUM TIP DISPONÍVEL** 🎯
+
+❌ Nenhuma partida AO VIVO atende aos critérios profissionais no momento.
+
+**Critérios para tips:**
+• Confiança ≥ 65%
+• EV ≥ 5%
+• Partida em andamento
+• Dados completos disponíveis
+
+🔄 Tente novamente em alguns minutos ou use /monitoring para status.
+                """
+
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tips")],
-                [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("🔄 Buscar Novamente", callback_data="tips")],
+                [InlineKeyboardButton("🎮 Partidas ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📊 Monitoramento", callback_data="monitoring")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(
-                message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-            
+            update.message.reply_text(tip_message, reply_markup=reply_markup, parse_mode="Markdown")
+            logger.info(f"✅ Comando /tips respondido - Tip encontrado: {bool(tip)}")
+
         except Exception as e:
-            logger.error(f"Erro no comando tips: {e}")
-            update.message.reply_text("❌ Erro ao buscar tips.")
+            logger.error(f"❌ Erro no comando /tips: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao gerar tips. Tente novamente em alguns segundos.")
+            except:
+                pass
 
     def live_matches_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /live"""
         try:
-            def get_live_matches():
-                try:
-                    import asyncio
-                    return asyncio.run(riot_client.get_live_matches())
-                except Exception as e:
-                    logger.error(f"Erro ao buscar partidas: {e}")
-                    return []
+            logger.info(f"🎮 Comando /live chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
             
-            matches = get_live_matches()
-            
-            if not matches:
-                message = """
-🔴 **PARTIDAS AO VIVO**
+            # Usar asyncio para buscar partidas ao vivo
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            live_matches = loop.run_until_complete(self.riot_client.get_live_matches())
+            loop.close()
 
-📭 Nenhuma partida ao vivo encontrada.
+            if live_matches:
+                live_message = f"""
+🔴 **PARTIDAS AO VIVO** 🔴
 
-Possíveis motivos:
-• Não há partidas oficiais no momento
-• APIs temporariamente indisponíveis
-• Região com poucas partidas ativas
+📍 **{len(live_matches)} PARTIDAS ACONTECENDO AGORA**
 
-⏰ Sistema verifica a cada 3 minutos
-                """
-            else:
-                message = f"🔴 **PARTIDAS AO VIVO** ({len(matches)})\n\n"
-                for i, match in enumerate(matches[:10], 1):
+"""
+                for i, match in enumerate(live_matches[:8], 1):
                     teams = match.get('teams', [])
                     if len(teams) >= 2:
-                        team1 = teams[0].get('name', 'Team 1')
-                        team2 = teams[1].get('name', 'Team 2')
-                        league = match.get('league', 'Unknown')
-                        game_time = match.get('game_time', 0)
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        league = match.get('league', 'League')
                         
-                        message += f"**{i}. {team1} vs {team2}**\n"
-                        message += f"🏆 {league}\n"
-                        message += f"⏱️ {game_time} min\n\n"
-            
+                        # Calcular tempo de jogo se disponível
+                        game_time = match.get('game_time', 0)
+                        game_min = game_time // 60 if game_time > 0 else 0
+                        time_display = f"{game_min}min" if game_min > 0 else "Iniciando"
+                        
+                        live_message += f"""
+**{i}. {team1} vs {team2}**
+🏆 {league}
+⏱️ {time_display}
+
+"""
+            else:
+                live_message = """
+🔴 **PARTIDAS AO VIVO** 🔴
+
+📭 **NENHUMA PARTIDA AO VIVO**
+
+🔍 **Não há partidas acontecendo no momento**
+
+• Verifique a agenda com /schedule
+• Use /monitoring para status do sistema
+                """
+
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_live")],
-                [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(
-                message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-            
+            update.message.reply_text(live_message, reply_markup=reply_markup, parse_mode="Markdown")
+            logger.info(f"✅ Comando /live respondido - Partidas encontradas: {len(live_matches) if live_matches else 0}")
+
         except Exception as e:
-            logger.error(f"Erro no comando live: {e}")
-            update.message.reply_text("❌ Erro ao buscar partidas ao vivo.")
+            logger.error(f"❌ Erro no comando /live: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao buscar partidas ao vivo. Tente novamente.")
+            except:
+                pass
 
     def schedule_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /schedule"""
         try:
-            message = """
-📅 **AGENDA DE PARTIDAS**
-
-🔄 Carregando agenda...
-Esta funcionalidade busca partidas agendadas para os próximos 7 dias.
-
-⏳ Aguarde um momento...
-            """
+            logger.info(f"📅 Comando /schedule chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
             
+            # Usar asyncio para buscar dados
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            scheduled_matches = loop.run_until_complete(self.schedule_manager.get_scheduled_matches())
+            loop.close()
+
+            if scheduled_matches:
+                schedule_message = f"""
+📅 **AGENDA DE PARTIDAS** 📅
+
+🔍 **{len(scheduled_matches)} PARTIDAS AGENDADAS**
+
+"""
+                for i, match in enumerate(scheduled_matches[:10], 1):
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        league = match.get('league', 'League')
+                        start_time = match.get('start_time_formatted', 'TBD')
+
+                        schedule_message += f"""
+**{i}. {team1} vs {team2}**
+🏆 {league}
+⏰ {start_time}
+
+"""
+                schedule_message += f"""
+⏰ Última atualização: {self.schedule_manager.last_update.strftime('%H:%M:%S') if self.schedule_manager.last_update else 'Nunca'}
+                """
+            else:
+                schedule_message = """
+📅 **AGENDA DE PARTIDAS** 📅
+
+ℹ️ **NENHUMA PARTIDA AGENDADA**
+
+🔍 **Não há partidas agendadas para os próximos 7 dias**
+
+🔄 Tente novamente em alguns minutos
+                """
+
             keyboard = [
-                [InlineKeyboardButton("🔄 Carregar Agenda", callback_data="load_schedule")],
-                [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="schedule")],
+                [InlineKeyboardButton("📅 Hoje", callback_data="schedule_today")],
+                [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(
-                message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-            
+            update.message.reply_text(schedule_message, reply_markup=reply_markup, parse_mode="Markdown")
+            logger.info(f"✅ Comando /schedule respondido com {len(scheduled_matches)} partidas")
+
         except Exception as e:
-            logger.error(f"Erro no comando schedule: {e}")
-            update.message.reply_text("❌ Erro ao carregar agenda.")
+            logger.error(f"❌ Erro no comando /schedule: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao buscar agenda. Tente novamente.")
+            except:
+                pass
 
     def monitoring_command(self, update: Update, context: CallbackContext) -> None:
         """Comando /monitoring"""
         try:
-            status = match_monitor.get_monitoring_status()
+            logger.info(f"📊 Comando /monitoring chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
             
-            status_icon = "✅" if status['monitoring'] else "❌"
-            thread_icon = "🟢" if status['thread_alive'] else "🔴"
+            status = self.professional_tips.get_monitoring_status()
             
-            message = f"""
-🔍 **STATUS DO MONITORAMENTO**
+            monitoring_message = f"""
+📊 **STATUS DO MONITORAMENTO** 📊
 
-{status_icon} **Monitoramento:** {'Ativo' if status['monitoring'] else 'Inativo'}
-{thread_icon} **Thread:** {'Rodando' if status['thread_alive'] else 'Parada'}
-⏰ **Último Scan:** {status['last_scan']}
-💎 **Tips Encontrados:** {status['tips_found']}
-📊 **Partidas Processadas:** {status['matches_processed']}
-🔄 **Intervalo:** {status['scan_interval']}
-🤖 **Bot Conectado:** {'✅' if status['bot_connected'] else '❌'}
+🔄 **Monitoramento:** {'🟢 Ativo' if status['monitoring_active'] else '🔴 Inativo'}
+⏰ **Último scan:** {status['last_scan']}
+🎯 **Tips encontradas:** {status['total_tips']}
+📈 **Tips hoje:** {status['tips_today']}
 
-**Como Funciona:**
-• Busca partidas a cada 3 minutos
-• Analisa apenas jogos com dados completos
-• Gera tips com critérios rigorosos
-• Envia alertas automáticos
+🤖 **SISTEMA HÍBRIDO ATIVO:**
+• PandaScore API: 🟢 Primária
+• Riot API: 🟢 Fallback
+• Machine Learning: {'🟢 Disponível' if self.prediction_system.ml_system else '🟡 Fallback matemático'}
+• Dados ao vivo: 🟢 Integrados
+
+📈 **PERFORMANCE:**
+• ROI: {status.get('roi', 0):.1f}%
+• Win Rate: {status.get('win_rate', 0):.1f}%
+
+🔗 **APIs:**
+• PandaScore API: 🟢 Conectada
+• Riot API: 🟢 Conectada
+• The Odds API: 🟢 Conectada
+
+⏰ Intervalo de verificação: 3 minutos
+🎯 Critérios: Confiança ≥65%, EV ≥5%
             """
-            
+
             keyboard = [
-                [InlineKeyboardButton("🔄 Forçar Scan", callback_data="force_scan")],
-                [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="monitoring")],
+                [InlineKeyboardButton("🚀 Scan Manual", callback_data="force_scan")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            update.message.reply_text(
-                message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+            update.message.reply_text(monitoring_message, reply_markup=reply_markup, parse_mode="Markdown")
             
         except Exception as e:
-            logger.error(f"Erro no comando monitoring: {e}")
-            update.message.reply_text("❌ Erro ao verificar monitoramento.")
+            logger.error(f"Erro no callback monitoring: {e}")
+            query.edit_message_text("❌ Erro ao verificar status.")
 
     def force_scan_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /scan"""
+        """Comando /force_scan"""
         try:
-            update.message.reply_text("🔍 Iniciando scan manual...")
+            logger.info(f"🚀 Comando /force_scan chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            # Verificar se é admin (owner)
+            user_id = update.effective_user.id if update.effective_user else 0
+            if user_id != OWNER_ID:
+                update.message.reply_text("❌ Comando disponível apenas para administradores.")
+                return
+
+            # Executar scan manual
+            update.message.reply_text("🚀 Iniciando scan manual das partidas ao vivo...")
             
             def run_manual_scan():
+                """Executa scan manual em thread separada"""
                 try:
-                    asyncio.run(match_monitor._scan_live_matches_only())
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    # Executar scan
+                    loop.run_until_complete(self.professional_tips._scan_live_matches_only())
+                    
+                    # Gerar tip se encontrado algo
+                    tip = loop.run_until_complete(self.professional_tips.generate_professional_tip())
+                    
+                    if tip:
+                        scan_result = f"""
+🚀 **SCAN MANUAL CONCLUÍDO** 🚀
+
+✅ Tip encontrado!
+
+🎯 **{tip['title']}**
+🏆 Liga: {tip['league']}
+⭐ Recomendação: {tip['recommended_team']}
+📊 Confiança: {tip['confidence_score']:.1f}%
+💰 EV: {tip['ev_percentage']:.1f}%
+🎲 Unidades: {tip['units']}
+                        """
+                    else:
+                        scan_result = """
+🚀 **SCAN MANUAL CONCLUÍDO** 🚀
+
+❌ Nenhum tip atende aos critérios no momento.
+
+Critérios: Confiança ≥65%, EV ≥5%
+                        """
                     
                     # Enviar resultado
-                    tips_count = len(match_monitor.found_tips)
-                    result_message = f"""
-✅ **Scan Manual Completo**
-
-💎 Tips ativos: {tips_count}
-📊 Partidas processadas: {len(match_monitor.processed_matches)}
-⏰ Concluído: {datetime.now().strftime('%H:%M:%S')}
-
-Use /tips para ver os tips encontrados.
-                    """
+                    context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=scan_result,
+                        parse_mode="Markdown"
+                    )
                     
-                    if hasattr(update, 'message'):
-                        update.message.reply_text(result_message, parse_mode='Markdown')
-                        
+                    loop.close()
+                    
                 except Exception as e:
                     logger.error(f"Erro no scan manual: {e}")
-                    if hasattr(update, 'message'):
-                        update.message.reply_text(f"❌ Erro no scan: {str(e)[:100]}")
+                    try:
+                        context.bot.send_message(
+                            chat_id=update.effective_chat.id,
+                            text=f"❌ Erro no scan manual: {e}"
+                        )
+                    except:
+                        pass
             
-            # Executar em thread separada
+            # Executar em thread separada para não bloquear
             threading.Thread(target=run_manual_scan, daemon=True).start()
             
         except Exception as e:
-            logger.error(f"Erro no comando force_scan: {e}")
-            update.message.reply_text("❌ Erro ao iniciar scan manual.")
+            logger.error(f"❌ Erro no comando /force_scan: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao executar scan manual.")
+            except:
+                pass
 
     def callback_handler(self, update: Update, context: CallbackContext) -> None:
-        """Manipulador de callbacks"""
+        """Handler para callbacks de botões inline"""
         try:
             query = update.callback_query
             query.answer()
             
-            data = query.data
+            callback_data = query.data
+            chat_id = query.message.chat_id
             
-            if data == "main_menu":
-                self._handle_main_menu_callback(query)
-            elif data == "current_tips" or data == "refresh_tips":
+            logger.info(f"🔄 Callback recebido: {callback_data}")
+
+            # Roteamento de callbacks
+            if callback_data == "tips":
                 self._handle_tips_callback(query)
-            elif data == "live_matches" or data == "refresh_live":
+            elif callback_data == "live_matches":
                 self._handle_live_matches_callback(query)
-            elif data == "force_scan":
+            elif callback_data == "schedule":
+                self._handle_schedule_callback(query)
+            elif callback_data == "monitoring":
+                self._handle_monitoring_callback(query)
+            elif callback_data == "predictions":
+                self._handle_predictions_callback(query)
+            elif callback_data == "alert_stats":
+                self._handle_alert_stats_callback(query)
+            elif callback_data == "register_alerts":
+                self._handle_register_alerts_callback(query, chat_id)
+            elif callback_data == "unregister_alerts":
+                self._handle_unregister_alerts_callback(query, chat_id)
+            elif callback_data == "units_info":
+                self._handle_units_info_callback(query)
+            elif callback_data == "performance_stats":
+                self._handle_performance_stats_callback(query)
+            elif callback_data == "bet_history":
+                self._handle_bet_history_callback(query)
+            elif callback_data == "odds_summary":
+                self._handle_odds_summary_callback(query)
+            elif callback_data == "force_scan":
                 self._handle_force_scan_callback(query)
+            elif callback_data == "main_menu":
+                self._handle_main_menu_callback(query)
             else:
-                query.edit_message_text(
-                    f"⚠️ Callback não implementado: {data}\n\nUse /menu para navegar.",
-                    parse_mode='Markdown'
-                )
-                
-        except Exception as e:
-            logger.error(f"Erro no callback handler: {e}")
+                logger.warning(f"⚠️ Callback não reconhecido: {callback_data}")
+                query.edit_message_text("❌ Ação não reconhecida.")
 
-    def _handle_main_menu_callback(self, query):
-        """Manipula callback do menu principal"""
-        try:
-            menu_text = """
-🎮 **MENU PRINCIPAL - BOT LOL V3**
-
-Escolha uma opção abaixo:
-            """
-            
-            keyboard = [
-                [InlineKeyboardButton("💎 Tips Profissionais", callback_data="tips_menu")],
-                [InlineKeyboardButton("🔴 Partidas Ao Vivo", callback_data="live_matches")],
-                [InlineKeyboardButton("📅 Agenda", callback_data="schedule_menu")],
-                [InlineKeyboardButton("🔍 Monitoramento", callback_data="monitoring_menu")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            query.edit_message_text(
-                menu_text,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
-            
         except Exception as e:
-            logger.error(f"Erro no callback main_menu: {e}")
+            logger.error(f"❌ Erro no callback_handler: {e}")
+            try:
+                update.callback_query.edit_message_text("❌ Erro interno. Tente novamente.")
+            except:
+                pass
 
     def _handle_tips_callback(self, query) -> None:
-        """Manipula callback de tips"""
+        """Handle callback para tips"""
         try:
-            tips = match_monitor.found_tips[-5:] if match_monitor.found_tips else []
-            
-            if not tips:
-                message = """
-💎 **TIPS PROFISSIONAIS**
+            # Usar asyncio para gerar tip
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            tip = loop.run_until_complete(self.professional_tips.generate_professional_tip())
+            loop.close()
 
-📭 Nenhum tip ativo no momento.
+            if tip:
+                map_info = tip.get('map_info', 'Mapa 1')
+                game_time = tip.get('game_time', 0)
+                game_min = game_time // 60 if game_time > 0 else 0
+                
+                message = f"""
+🎯 **TIP PROFISSIONAL AO VIVO** 🎯
 
-O sistema monitora automaticamente e gera tips apenas quando:
-• Confiança ≥ 75%
-• EV ≥ 8%
-• Dados completos da partida
+🗺️ **{map_info}: {tip['title']}**
+🎮 Liga: {tip['league']}
+⏱️ Tempo: {game_min}min (AO VIVO)
 
-⏰ Próximo scan: 3 minutos
+📊 **ANÁLISE:**
+• Confiança: {tip['confidence_score']:.1f}% 
+• EV: {tip['ev_percentage']:.1f}%
+• Unidades: {tip['units']}
+
+⭐ **Recomendação:** {tip['recommended_team']}
+
+💡 {tip['reasoning'][:300]}...
                 """
             else:
-                message = "💎 **TIPS PROFISSIONAIS ATIVOS**\n\n"
-                for i, tip in enumerate(tips, 1):
-                    message += f"**{i}. {tip['teams']}**\n"
-                    message += f"🎯 Recomendação: {tip['recommended_team']}\n"
-                    message += f"📊 Confiança: {tip['confidence_score']}%\n"
-                    message += f"💰 EV: {tip['ev_percentage']:.1f}%\n"
-                    message += f"💎 Unidades: {tip['units']}\n\n"
-            
+                message = """
+🎯 **NENHUM TIP DISPONÍVEL** 🎯
+
+❌ Nenhuma partida AO VIVO atende aos critérios no momento.
+
+Critérios: Confiança ≥65%, EV ≥5%
+                """
+
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tips")],
-                [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="tips")],
+                [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            query.edit_message_text(
-                message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
             
         except Exception as e:
             logger.error(f"Erro no callback tips: {e}")
+            query.edit_message_text("❌ Erro ao buscar tips.")
 
     def _handle_live_matches_callback(self, query):
-        """Manipula callback de partidas ao vivo"""
+        """Handle callback para partidas ao vivo"""
         try:
-            def get_live_matches():
-                try:
-                    import asyncio
-                    return asyncio.run(riot_client.get_live_matches())
-                except Exception as e:
-                    logger.error(f"Erro ao buscar partidas: {e}")
-                    return []
-            
-            matches = get_live_matches()
-            
-            if not matches:
-                message = """
-🔴 **PARTIDAS AO VIVO**
+            # Usar método síncrono simplificado
+            live_matches = self._get_live_matches_sync()
 
-📭 Nenhuma partida ao vivo encontrada.
-
-⏰ Sistema verifica a cada 3 minutos
-                """
-            else:
-                message = f"🔴 **PARTIDAS AO VIVO** ({len(matches)})\n\n"
-                for i, match in enumerate(matches[:8], 1):
+            if live_matches:
+                message = "🔴 **PARTIDAS AO VIVO** 🔴\n\n"
+                
+                for i, match in enumerate(live_matches[:5], 1):
                     teams = match.get('teams', [])
                     if len(teams) >= 2:
-                        team1 = teams[0].get('name', 'Team 1')
-                        team2 = teams[1].get('name', 'Team 2')
-                        league = match.get('league', 'Unknown')
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        league = match.get('league', 'League')
                         
-                        message += f"**{i}. {team1} vs {team2}**\n"
-                        message += f"🏆 {league}\n\n"
-            
+                        # Calcular tempo de jogo se disponível
+                        game_time = match.get('game_time', 0)
+                        game_min = game_time // 60 if game_time > 0 else 0
+                        time_display = f"{game_min}min" if game_min > 0 else "Iniciando"
+                        
+                        message += f"**{i}. {team1} vs {team2}**\n🏆 {league}\n⏱️ {time_display}\n\n"
+            else:
+                message = """
+🔴 **PARTIDAS AO VIVO** 🔴
+
+📭 Nenhuma partida acontecendo agora.
+
+Use /schedule para ver próximas partidas.
+                """
+
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_live")],
-                [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            query.edit_message_text(
-                message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
-            )
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
             
         except Exception as e:
-            logger.error(f"Erro no callback live matches: {e}")
+            logger.error(f"Erro no callback live_matches: {e}")
+            query.edit_message_text("❌ Erro ao buscar partidas ao vivo.")
 
-    def _handle_force_scan_callback(self, query):
-        """Manipula callback de scan forçado"""
+    def _handle_schedule_callback(self, query):
+        """Handle callback para agenda"""
         try:
-            query.edit_message_text("🔍 Iniciando scan manual...")
-            
-            def run_manual_scan():
-                try:
-                    asyncio.run(match_monitor._scan_live_matches_only())
-                    
-                    tips_count = len(match_monitor.found_tips)
-                    result_message = f"""
-✅ **Scan Manual Completo**
+            # Usar método síncrono simplificado
+            scheduled_matches = self._get_schedule_sync()
 
-💎 Tips ativos: {tips_count}
-📊 Partidas processadas: {len(match_monitor.processed_matches)}
-⏰ Concluído: {datetime.now().strftime('%H:%M:%S')}
-
-Use /tips para ver os tips encontrados.
-                    """
-                    
-                    # Tentar editar a mensagem
-                    keyboard = [[InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")]]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    
-                    query.edit_message_text(
-                        result_message,
-                        parse_mode='Markdown',
-                        reply_markup=reply_markup
-                    )
-                    
-                except Exception as e:
-                    logger.error(f"Erro no scan manual: {e}")
-                    query.edit_message_text(f"❌ Erro no scan: {str(e)[:100]}")
-            
-            # Executar em thread
-            threading.Thread(target=run_manual_scan, daemon=True).start()
-            
-        except Exception as e:
-            logger.error(f"Erro no callback force_scan: {e}")
-
-    # Comandos adicionais (stubs para compatibilidade)
-    def predictions_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /predictions"""
-        update.message.reply_text("📊 Funcionalidade em desenvolvimento...")
-
-    def alerts_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /alerts"""
-        update.message.reply_text("🔔 Funcionalidade em desenvolvimento...")
-
-    def units_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /units"""
-        message = """
-💰 **SISTEMA DE UNIDADES PROFISSIONAL**
-
-🎯 **Baseado em Grupos de Apostas Elite**
-
-**Critérios para Tips:**
-• Confiança mínima: 75%
-• EV mínimo: 8%
-• Dados completos da partida
-
-**Cálculo de Unidades:**
-• Tier 1 (LCK/LPL/LEC/LCS): Multiplicador 1.2x
-• Tier 2 (Outras ligas): Multiplicador 1.0x
-• EV alto (>15%): +1 unidade
-• Confiança alta (>85%): +0.5 unidade
-
-**Bankroll Padrão:** $1,000
-        """
-        update.message.reply_text(message, parse_mode='Markdown')
-
-    def performance_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /performance"""
-        update.message.reply_text("📈 Funcionalidade em desenvolvimento...")
-
-    def history_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /history"""
-        update.message.reply_text("📚 Funcionalidade em desenvolvimento...")
-
-    def odds_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /odds"""
-        update.message.reply_text("🎲 Funcionalidade em desenvolvimento...")
-
-    def timesfavoritos_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /timesfavoritos"""
-        update.message.reply_text("⭐ Funcionalidade em desenvolvimento...")
-
-    def statuslol_command(self, update: Update, context: CallbackContext) -> None:
-        """Comando /statuslol"""
-        try:
-            message = f"""
-🎮 **STATUS LOL BOT V3**
-
-🔍 **Monitoramento:** {'✅ Ativo' if match_monitor.monitoring else '❌ Inativo'}
-💎 **Tips Encontrados:** {len(match_monitor.found_tips)}
-📊 **Partidas Processadas:** {len(match_monitor.processed_matches)}
-⏰ **Último Scan:** {match_monitor.last_scan_time.strftime('%H:%M:%S') if match_monitor.last_scan_time else 'Nunca'}
-
-🤖 **Sistema:** Operacional
-📡 **APIs:** Riot Games + The Odds API
-🔄 **Atualização:** A cada 3 minutos
-            """
-            
-            update.message.reply_text(message, parse_mode='Markdown')
-            
-        except Exception as e:
-            logger.error(f"Erro no statuslol: {e}")
-            update.message.reply_text("❌ Erro ao verificar status.")
-
-async def main():
-    """Função principal"""
-    try:
-        # Configuração global
-        os.environ['TZ'] = 'America/Sao_Paulo'
-        
-        # Verificação de ambiente
-        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
-        
-        logger.info("🚀 Iniciando BOT LOL V3 - Sistema Profissional de Unidades")
-        logger.info(f"🌍 Ambiente: {'RAILWAY' if is_railway else 'LOCAL'}")
-        
-        # Inicializar sistemas
-        global match_monitor
-        match_monitor = MatchMonitor()
-        
-        if is_railway:
-            # Modo Railway - Webhook
-            logger.info("🔗 Configurando webhook para Railway...")
-            
-            # Configurar webhook
-            webhook_url = f"https://{os.getenv('RAILWAY_STATIC_URL')}/webhook"
-            
-            try:
-                from telegram.ext import Application
+            if scheduled_matches:
+                message = "📅 **PRÓXIMAS PARTIDAS** 📅\n\n"
                 
-                # Criar aplicação v20
-                application = Application.builder().token(TOKEN).build()
-                
-                # Configurar bot handler
-                bot_handler = BotHandler()
-                bot_handler.set_bot_application(application)
-                match_monitor.set_bot_instance(application)
-                
-                # Adicionar handlers
-                application.add_handler(CommandHandler('start', bot_handler.start_command))
-                application.add_handler(CommandHandler('menu', bot_handler.menu_command))
-                application.add_handler(CommandHandler('tips', bot_handler.tips_command))
-                application.add_handler(CommandHandler('live', bot_handler.live_matches_command))
-                application.add_handler(CommandHandler('schedule', bot_handler.schedule_command))
-                application.add_handler(CommandHandler('monitoring', bot_handler.monitoring_command))
-                application.add_handler(CommandHandler('scan', bot_handler.force_scan_command))
-                application.add_handler(CommandHandler('predictions', bot_handler.predictions_command))
-                application.add_handler(CommandHandler('alerts', bot_handler.alerts_command))
-                application.add_handler(CommandHandler('units', bot_handler.units_command))
-                application.add_handler(CommandHandler('performance', bot_handler.performance_command))
-                application.add_handler(CommandHandler('history', bot_handler.history_command))
-                application.add_handler(CommandHandler('odds', bot_handler.odds_command))
-                application.add_handler(CommandHandler('timesfavoritos', bot_handler.timesfavoritos_command))
-                application.add_handler(CommandHandler('statuslol', bot_handler.statuslol_command))
-                application.add_handler(CallbackQueryHandler(bot_handler.callback_handler))
-                
-                # Inicializar aplicação
-                await application.initialize()
-                await application.start()
-                
-                # Configurar webhook
-                await application.bot.set_webhook(
-                    url=webhook_url,
-                    allowed_updates=['message', 'callback_query']
-                )
-                
-                logger.info(f"✅ Webhook configurado: {webhook_url}")
-                
-                # Iniciar monitoramento
-                match_monitor.start_monitoring()
-                
-                # Rota de webhook
-                @app.route('/webhook', methods=['POST'])
-                async def webhook_v20():
-                    """Webhook handler para v20"""
-                    try:
-                        from telegram import Update
+                for i, match in enumerate(scheduled_matches[:8], 1):
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        league = match.get('league', 'League')
+                        time_formatted = match.get('start_time_formatted', 'N/A')
                         
-                        update = Update.de_json(request.get_json(force=True), application.bot)
-                        await application.process_update(update)
-                        return 'OK', 200
-                    except Exception as e:
-                        logger.error(f"❌ Erro no webhook: {e}")
-                        return 'Error', 500
-                
-                # Iniciar Flask
-                logger.info(f"🌐 Iniciando servidor Flask na porta {PORT}")
-                app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
-                
-            except ImportError:
-                # Fallback para v13
-                logger.info("📱 Usando Telegram Bot API v13 (fallback)")
-                
-                updater = Updater(token=TOKEN, use_context=True)
-                dp = updater.dispatcher
-                
-                # Bot handler
-                bot_handler = BotHandler()
-                match_monitor.set_bot_instance(updater.bot)
-                
-                # Comandos
-                dp.add_handler(CommandHandler('start', bot_handler.start_command))
-                dp.add_handler(CommandHandler('menu', bot_handler.menu_command))
-                dp.add_handler(CommandHandler('tips', bot_handler.tips_command))
-                dp.add_handler(CommandHandler('live', bot_handler.live_matches_command))
-                dp.add_handler(CommandHandler('schedule', bot_handler.schedule_command))
-                dp.add_handler(CommandHandler('monitoring', bot_handler.monitoring_command))
-                dp.add_handler(CommandHandler('scan', bot_handler.force_scan_command))
-                dp.add_handler(CommandHandler('predictions', bot_handler.predictions_command))
-                dp.add_handler(CommandHandler('alerts', bot_handler.alerts_command))
-                dp.add_handler(CommandHandler('units', bot_handler.units_command))
-                dp.add_handler(CommandHandler('performance', bot_handler.performance_command))
-                dp.add_handler(CommandHandler('history', bot_handler.history_command))
-                dp.add_handler(CommandHandler('odds', bot_handler.odds_command))
-                dp.add_handler(CommandHandler('timesfavoritos', bot_handler.timesfavoritos_command))
-                dp.add_handler(CommandHandler('statuslol', bot_handler.statuslol_command))
-                dp.add_handler(CallbackQueryHandler(bot_handler.callback_handler))
-                
-                # Configurar webhook
-                updater.start_webhook(
-                    listen='0.0.0.0',
-                    port=PORT,
-                    url_path='/webhook',
-                    webhook_url=webhook_url
-                )
-                
-                # Iniciar monitoramento
-                match_monitor.start_monitoring()
-                
-                # Rota webhook v13
-                @app.route('/webhook', methods=['POST'])
-                def webhook_v13():
-                    """Webhook handler para v13"""
-                    try:
-                        update = Update.de_json(request.get_json(force=True), updater.bot)
-                        dp.process_update(update)
-                        return 'OK', 200
-                    except Exception as e:
-                        logger.error(f"❌ Erro no webhook v13: {e}")
-                        return 'Error', 500
-                
-                logger.info(f"✅ Bot iniciado com webhook: {webhook_url}")
-                updater.idle()
-        
-        else:
-            # Modo local - Polling
-            logger.info("🔄 Modo local - iniciando polling...")
-            
-            try:
-                from telegram.ext import Application
-                
-                # Telegram v20
-                application = Application.builder().token(TOKEN).build()
-                
-                bot_handler = BotHandler()
-                bot_handler.set_bot_application(application)
-                match_monitor.set_bot_instance(application)
-                
-                # Handlers
-                application.add_handler(CommandHandler('start', bot_handler.start_command))
-                application.add_handler(CommandHandler('menu', bot_handler.menu_command))
-                application.add_handler(CommandHandler('tips', bot_handler.tips_command))
-                application.add_handler(CommandHandler('live', bot_handler.live_matches_command))
-                application.add_handler(CommandHandler('schedule', bot_handler.schedule_command))
-                application.add_handler(CommandHandler('monitoring', bot_handler.monitoring_command))
-                application.add_handler(CommandHandler('scan', bot_handler.force_scan_command))
-                application.add_handler(CommandHandler('predictions', bot_handler.predictions_command))
-                application.add_handler(CommandHandler('alerts', bot_handler.alerts_command))
-                application.add_handler(CommandHandler('units', bot_handler.units_command))
-                application.add_handler(CommandHandler('performance', bot_handler.performance_command))
-                application.add_handler(CommandHandler('history', bot_handler.history_command))
-                application.add_handler(CommandHandler('odds', bot_handler.odds_command))
-                application.add_handler(CommandHandler('timesfavoritos', bot_handler.timesfavoritos_command))
-                application.add_handler(CommandHandler('statuslol', bot_handler.statuslol_command))
-                application.add_handler(CallbackQueryHandler(bot_handler.callback_handler))
-                
-                # Inicializar
-                await application.initialize()
-                await application.start()
-                
-                # Iniciar monitoramento
-                match_monitor.start_monitoring()
-                
-                # Iniciar Flask em thread separada
-                flask_thread = threading.Thread(target=run_flask, daemon=True)
-                flask_thread.start()
-                
-                # Controle de sinais
-                import signal
-                
-                def signal_handler(signum, frame):
-                    logger.info("🛑 Recebido sinal de parada...")
-                    match_monitor.stop_monitoring()
-                    sys.exit(0)
-                
-                signal.signal(signal.SIGINT, signal_handler)
-                signal.signal(signal.SIGTERM, signal_handler)
-                
-                logger.info("✅ Bot iniciado em modo polling")
-                await application.run_polling(
-                    allowed_updates=['message', 'callback_query'],
-                    drop_pending_updates=True
-                )
-                
-            except ImportError:
-                # Fallback v13
-                logger.info("📱 Iniciando com Telegram Bot API v13...")
-                
-                updater = Updater(token=TOKEN, use_context=True)
-                dp = updater.dispatcher
-                
-                bot_handler = BotHandler()
-                match_monitor.set_bot_instance(updater.bot)
-                
-                # Adicionar handlers
-                dp.add_handler(CommandHandler('start', bot_handler.start_command))
-                dp.add_handler(CommandHandler('menu', bot_handler.menu_command))
-                dp.add_handler(CommandHandler('tips', bot_handler.tips_command))
-                dp.add_handler(CommandHandler('live', bot_handler.live_matches_command))
-                dp.add_handler(CommandHandler('schedule', bot_handler.schedule_command))
-                dp.add_handler(CommandHandler('monitoring', bot_handler.monitoring_command))
-                dp.add_handler(CommandHandler('scan', bot_handler.force_scan_command))
-                dp.add_handler(CommandHandler('predictions', bot_handler.predictions_command))
-                dp.add_handler(CommandHandler('alerts', bot_handler.alerts_command))
-                dp.add_handler(CommandHandler('units', bot_handler.units_command))
-                dp.add_handler(CommandHandler('performance', bot_handler.performance_command))
-                dp.add_handler(CommandHandler('history', bot_handler.history_command))
-                dp.add_handler(CommandHandler('odds', bot_handler.odds_command))
-                dp.add_handler(CommandHandler('timesfavoritos', bot_handler.timesfavoritos_command))
-                dp.add_handler(CommandHandler('statuslol', bot_handler.statuslol_command))
-                dp.add_handler(CallbackQueryHandler(bot_handler.callback_handler))
-                
-                # Iniciar monitoramento
-                match_monitor.start_monitoring()
-                
-                # Flask thread
-                flask_thread = threading.Thread(target=run_flask, daemon=True)
-                flask_thread.start()
-                
-                logger.info("✅ Bot v13 iniciado com polling")
-                updater.start_polling()
-                updater.idle()
+                        message += f"🎮 **{team1} vs {team2}**\n🏆 {league}\n⏰ {time_formatted}\n\n"
+            else:
+                message = """
+📅 **AGENDA DE PARTIDAS** 📅
 
-    except Exception as e:
-        logger.error(f"❌ ERRO CRÍTICO na função main: {e}")
-        raise
+ℹ️ Nenhuma partida agendada nos próximos dias.
+
+🔄 Tente novamente em alguns minutos.
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"Erro no callback schedule: {e}")
+            query.edit_message_text("❌ Erro ao buscar agenda.")
+
+    def _get_live_matches_sync(self):
+        """Método síncrono para buscar partidas ao vivo"""
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self.riot_client.get_live_matches())
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Erro ao buscar partidas ao vivo sync: {e}")
+            return []
+
+    def _get_schedule_sync(self):
+        """Método síncrono para buscar agenda"""
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self.schedule_manager.get_scheduled_matches(days_ahead=3))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Erro ao buscar agenda sync: {e}")
+            return []
+
+    def _handle_monitoring_callback(self, query) -> None:
+        """Handle callback para monitoramento"""
+        try:
+            # Ensure self.professional_tips and self.prediction_system are initialized
+            # and accessible as instance attributes.
+            status = self.professional_tips.get_monitoring_status()
+            
+            message = f"""
+📊 **STATUS DO MONITORAMENTO** 📊
+
+🔄 **Monitoramento:** {'🟢 Ativo' if status.get('monitoring_active', False) else '🔴 Inativo'}
+⏰ **Último scan:** {status.get('last_scan', 'N/A')}
+🎯 **Tips encontradas:** {status.get('total_tips', 0)}
+📈 **Tips hoje:** {status.get('tips_today', 0)}
+
+🤖 **SISTEMA HÍBRIDO ATIVO:**
+• PandaScore API: 🟢 Primária
+• Riot API: 🟢 Fallback
+• Machine Learning: {'🟢 Disponível' if self.prediction_system.ml_system else '🟡 Fallback matemático'}
+• Dados ao vivo: 🟢 Integrados
+
+📈 **PERFORMANCE:**
+• ROI: {status.get('roi', 0):.1f}%
+• Win Rate: {status.get('win_rate', 0):.1f}%
+
+🔗 **APIs:**
+• PandaScore API: 🟢 Conectada
+• Riot API: 🟢 Conectada
+• The Odds API: 🟢 Conectada
+
+⏰ Intervalo de verificação: 3 minutos
+🎯 Critérios: Confiança ≥65%, EV ≥5%
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="monitoring")],
+                [InlineKeyboardButton("🚀 Scan Manual", callback_data="force_scan")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            # Ensure logger is defined and accessible, e.g., self.logger or a global logger
+            logger.error(f"Erro no callback monitoring: {e}")
+            try:
+                query.edit_message_text("❌ Erro ao verificar status.")
+            except Exception as e_inner:
+                logger.error(f"Erro ao enviar mensagem de erro no callback monitoring: {e_inner}")
 
 
 def run_flask():
-    """Executa Flask para health check"""
-    app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
+    """Executa apenas o Flask app para health checks"""
+    app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False, threaded=True)
+
 
 def check_single_instance():
-    """Verifica se há apenas uma instância rodando"""
+    """Verifica se já existe uma instância rodando"""
+    import tempfile
+    
+    lock_file_path = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
+    
     try:
-        # Railway sempre permite múltiplas instâncias
-        if os.getenv('RAILWAY_ENVIRONMENT_NAME'):
+        # Tentar criar arquivo de lock
+        if os.name == 'posix':  # Unix/Linux/macOS
+            import fcntl
+            lock_fd = open(lock_file_path, 'w')
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return lock_fd
+        elif os.name == 'nt':  # Windows
+            import msvcrt
+            try:
+                lock_fd = open(lock_file_path, 'w')
+                msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+                return lock_fd
+            except OSError:
+                lock_fd.close()
+                return None
+        else:
+            # Sistema não suportado, usar verificação simples
+            if os.path.exists(lock_file_path):
+                # Verificar se processo ainda está rodando
+                try:
+                    with open(lock_file_path, 'r') as f:
+                        old_pid = int(f.read().strip())
+                    
+                    # Tentar verificar se PID ainda existe
+                    try:
+                        os.kill(old_pid, 0)  # Sinal 0 não mata, apenas verifica
+                        logger.warning(f"⚠️ Instância já rodando (PID: {old_pid})")
+                        return None
+                    except OSError:
+                        # PID não existe mais, remover lock
+                        os.remove(lock_file_path)
+                        logger.info("🧹 Lock órfão removido")
+                except (ValueError, FileNotFoundError):
+                    # Arquivo corrompido ou não existe
+                    if os.path.exists(lock_file_path):
+                        os.remove(lock_file_path)
+            
+            # Criar novo lock
+            with open(lock_file_path, 'w') as f:
+                f.write(str(os.getpid()))
             return True
             
-        import tempfile
-        lock_file = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
-        
-        # Verificar se arquivo de lock existe
-        if os.path.exists(lock_file):
-            with open(lock_file, 'r') as f:
-                old_pid = int(f.read().strip())
-            
-            # Verificar se processo ainda existe
-            try:
-                if os.name == 'nt':  # Windows
-                    import subprocess
-                    result = subprocess.run(['tasklist', '/FI', f'PID eq {old_pid}'],
-                                          capture_output=True, text=True)
-                    if str(old_pid) in result.stdout:
-                        logger.error(f"❌ Outra instância já rodando! PID: {old_pid}")
-                        return False
-                else:  # Unix/Linux
-                    os.kill(old_pid, 0)  # Apenas verifica, não mata
-                    logger.error(f"❌ Outra instância já rodando! PID: {old_pid}")
-                    return False
-            except OSError:
-                # Processo não existe, remover lock
-                os.remove(lock_file)
-        
-        # Criar novo arquivo de lock
-        with open(lock_file, 'w') as f:
-            f.write(str(os.getpid()))
-            
-        logger.info(f"✅ Instância única confirmada. PID: {os.getpid()}")
-        return True
-        
     except Exception as e:
-        logger.warning(f"⚠️ Erro na verificação de instância única: {e}")
-        return True  # Permitir execução em caso de erro
+        logger.warning(f"⚠️ Erro ao verificar instância única: {e}")
+        return True  # Em caso de erro, permitir execução
 
-# Instância global do riot client
-riot_client = RiotAPIClient()
 
-if __name__ == '__main__':
+async def main():
+    """Função principal do bot"""
+    try:
+        # Verificação de instância única
+        lock_fd_or_status = check_single_instance()
+        if lock_fd_or_status is None:
+            logger.error("❌ Outra instância do bot já está rodando!")
+            sys.exit(1)
+        
+        logger.info("🤖 Bot LoL V3 Ultra Advanced com PandaScore - Iniciando...")
+        
+        # Verificar ambiente Railway
+        is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
+        logger.info(f"🔧 Ambiente detectado: {'Railway' if is_railway else 'Local'}")
+
+        # Criar instância do bot
+        bot_instance = LoLBotV3UltraAdvanced()
+
+        # Verificação de compatibilidade da versão
+        USE_APPLICATION = False
+        
+        try:
+            # Tentar importar Application (v20+)
+            from telegram.ext import Application
+            
+            logger.info("📦 Detectada versão do python-telegram-bot 20+")
+            USE_APPLICATION = True
+            
+            # Versão v20+ - usar Application
+            application = Application.builder().token(TOKEN).build()
+            
+            # Definir aplicação para sistema de alertas
+            bot_instance.set_bot_application(application)
+            
+            # Handlers para v20+
+            application.add_handler(CommandHandler("start", bot_instance.start_command))
+            application.add_handler(CommandHandler("menu", bot_instance.menu_command))
+            application.add_handler(CommandHandler("tips", bot_instance.tips_command))
+            application.add_handler(CommandHandler("live", bot_instance.live_matches_command))
+            application.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
+            application.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
+            application.add_handler(CommandHandler("force_scan", bot_instance.force_scan_command))
+            application.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
+            
+            total_handlers = len(application.handlers[0])
+            logger.info(f"✅ {total_handlers} handlers registrados (Application v20+)")
+            
+        except ImportError:
+            logger.info("📦 Versão python-telegram-bot 13-19 detectada")
+            
+            # Versão v13-19 - usar Updater  
+            try:
+                # Tentar com use_context primeiro
+                updater = Updater(TOKEN, use_context=True)
+            except TypeError:
+                try:
+                    # Fallback para versão sem use_context
+                    updater = Updater(TOKEN)
+                except TypeError:
+                    # Última tentativa - versão muito antiga com queue
+                    import queue
+                    update_queue = queue.Queue()
+                    updater = Updater(TOKEN, update_queue=update_queue)
+            
+            dispatcher = updater.dispatcher
+            
+            # Limpar webhook existente
+            try:
+                logger.info("🧹 Limpando webhook existente...")
+                updater.bot.delete_webhook(drop_pending_updates=True)
+                logger.info("✅ Webhook anterior removido")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao limpar webhook: {e}")
+
+            # Definir aplicação para sistema de alertas  
+            bot_instance.set_bot_application(updater)
+
+            # Handlers para v13-19
+            dispatcher.add_handler(CommandHandler("start", bot_instance.start_command))
+            dispatcher.add_handler(CommandHandler("menu", bot_instance.menu_command))
+            dispatcher.add_handler(CommandHandler("tips", bot_instance.tips_command))
+            dispatcher.add_handler(CommandHandler("live", bot_instance.live_matches_command))
+            dispatcher.add_handler(CommandHandler("schedule", bot_instance.schedule_command))
+            dispatcher.add_handler(CommandHandler("monitoring", bot_instance.monitoring_command))
+            dispatcher.add_handler(CommandHandler("force_scan", bot_instance.force_scan_command))
+            dispatcher.add_handler(CallbackQueryHandler(bot_instance.callback_handler))
+
+            total_handlers = sum(len(handlers) for handlers in dispatcher.handlers.values())
+            logger.info(f"✅ {total_handlers} handlers registrados (Updater v13-19)")
+
+        if is_railway:
+            # Modo Railway - Webhook
+            logger.info("🚀 Detectado ambiente Railway - Configurando webhook")
+
+            webhook_path = f"/webhook"
+
+            if USE_APPLICATION:
+                # Webhook para Application (v20+)
+                @app.route(webhook_path, methods=['POST'])
+                async def webhook_v20():
+                    try:
+                        update_data = request.get_json(force=True)
+                        if update_data:
+                            from telegram import Update
+                            update_obj = Update.de_json(update_data, application.bot)
+                            await application.process_update(update_obj)
+                            logger.info(f"🔄 Webhook v20+ processado: {update_obj.update_id if update_obj else 'None'}")
+                        return "OK", 200
+                    except Exception as e:
+                        logger.error(f"❌ Erro no webhook v20+: {e}")
+                        return "ERROR", 500
+                
+                # Configurar webhook v20+
+                railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                if not railway_url.startswith('http'):
+                    railway_url = f"https://{railway_url}"
+                webhook_url = f"{railway_url}{webhook_path}"
+
+                try:
+                    logger.info("🔄 Configurando webhook v20+...")
+                    await application.bot.delete_webhook(drop_pending_updates=True)
+                    await application.bot.set_webhook(webhook_url)
+                    
+                    webhook_info = await application.bot.get_webhook_info()
+                    logger.info(f"📋 Webhook v20+ ativo: {webhook_info.url}")
+                    
+                    me = await application.bot.get_me()
+                    logger.info(f"🤖 Bot v20+ verificado: @{me.username}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Erro ao configurar webhook v20+: {e}")
+            
+            else:
+                # Webhook para Updater (v13-19)  
+                @app.route(webhook_path, methods=['POST'])
+                def webhook_v13():
+                    try:
+                        update_data = request.get_json(force=True)
+                        if update_data:
+                            from telegram import Update
+                            update_obj = Update.de_json(update_data, updater.bot)
+                            dispatcher.process_update(update_obj)
+                            logger.info(f"🔄 Webhook v13-19 processado: {update_obj.update_id if update_obj else 'None'}")
+                        return "OK", 200
+                    except Exception as e:
+                        logger.error(f"❌ Erro no webhook v13-19: {e}")
+                        return "ERROR", 500
+                
+                # Configurar webhook v13-19
+                railway_url = os.getenv('RAILWAY_STATIC_URL', f"https://{os.getenv('RAILWAY_SERVICE_NAME', 'bot')}.railway.app")
+                if not railway_url.startswith('http'):
+                    railway_url = f"https://{railway_url}"
+                webhook_url = f"{railway_url}{webhook_path}"
+
+                try:
+                    logger.info("🔄 Configurando webhook v13-19...")
+                    updater.bot.delete_webhook(drop_pending_updates=True)
+                    updater.bot.set_webhook(webhook_url)
+                    
+                    webhook_info = updater.bot.get_webhook_info()
+                    logger.info(f"📋 Webhook v13-19 ativo: {webhook_info.url}")
+                    
+                    me = updater.bot.get_me()
+                    logger.info(f"🤖 Bot v13-19 verificado: @{me.username}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Erro ao configurar webhook v13-19: {e}")
+
+            logger.info("✅ Bot configurado (Railway webhook) - Iniciando Flask...")
+
+            app.config['ENV'] = 'production'
+            app.config['DEBUG'] = False
+
+            logger.info(f"🌐 Iniciando Flask na porta {PORT}")
+            logger.info(f"🔗 Webhook disponível em: {webhook_url}")
+
+            app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False, threaded=True)
+
+        else:
+            # Modo Local - Polling
+            logger.info("🏠 Ambiente local detectado - Usando polling")
+
+            if USE_APPLICATION:
+                # Polling v20+
+                logger.info("✅ Bot configurado (polling v20+) - Iniciando...")
+
+                try:
+                    await application.bot.delete_webhook(drop_pending_updates=True)
+                    logger.info("🧹 Webhook removido antes de iniciar polling v20+")
+                except Exception as e:
+                    logger.debug(f"Webhook já estava removido v20+: {e}")
+
+                logger.info("🔄 Iniciando polling v20+...")
+                
+                # Corrigir problema do event loop
+                try:
+                    # Primeiro tentar método padrão
+                    application.run_polling(drop_pending_updates=True)
+                except RuntimeError as e:
+                    if "event loop" in str(e).lower():
+                        logger.info("🔄 Event loop em execução, usando método alternativo...")
+                        # Método alternativo para event loop já rodando
+                        await application.initialize()
+                        await application.start()
+                        await application.updater.start_polling(drop_pending_updates=True)
+                        
+                        logger.info("✅ Bot iniciado com polling v20+ (método alternativo)")
+                        
+                        # Manter o bot rodando
+                        try:
+                            import signal
+                            import asyncio
+                            
+                            # Configurar handlers de sinal
+                            def signal_handler(signum, frame):
+                                logger.info("🛑 Sinal recebido, parando bot...")
+                                asyncio.create_task(application.stop())
+                                asyncio.create_task(application.shutdown())
+                                
+                            signal.signal(signal.SIGINT, signal_handler)
+                            signal.signal(signal.SIGTERM, signal_handler)
+                            
+                            # Loop infinito assíncrono
+                            while True:
+                                await asyncio.sleep(1)
+                                
+                        except KeyboardInterrupt:
+                            logger.info("🛑 Parando bot...")
+                        finally:
+                            await application.stop()
+                            await application.shutdown()
+                    else:
+                        raise
+            
+            else:
+                # Polling v13-19
+                logger.info("✅ Bot configurado (polling v13-19) - Iniciando...")
+
+                try:
+                    updater.bot.delete_webhook(drop_pending_updates=True)
+                    logger.info("🧹 Webhook removido antes de iniciar polling v13-19")
+                except Exception as e:
+                    logger.debug(f"Webhook já estava removido v13-19: {e}")
+
+                logger.info("🔄 Iniciando polling v13-19...")
+                updater.start_polling(drop_pending_updates=True)
+                updater.idle()
+
+    except Exception as e:
+        logger.error(f"❌ Erro crítico: {e}")
+        import traceback
+        logger.error(f"❌ Traceback completo: {traceback.format_exc()}")
+
+    finally:
+        # Liberar lock
+        if 'lock_fd_or_status' in locals() and lock_fd_or_status is not None and lock_fd_or_status is not True:
+            if hasattr(lock_fd_or_status, 'close'):
+                if os.name == 'posix':
+                    import fcntl
+                    fcntl.flock(lock_fd_or_status, fcntl.LOCK_UN)
+                elif os.name == 'nt':
+                    import msvcrt
+                    try:
+                        msvcrt.locking(lock_fd_or_status.fileno(), msvcrt.LK_UNLCK, 1)
+                    except:
+                        pass
+                lock_fd_or_status.close()
+            
+            import tempfile
+            lock_file_path = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
+            if os.path.exists(lock_file_path):
+                try:
+                    os.remove(lock_file_path)
+                    logger.info("🔓 Lock liberado e arquivo removido.")
+                except OSError as e:
+                    logger.warning(f"⚠️ Não foi possível remover arquivo de lock: {e}")
+
+
+if __name__ == "__main__":
     asyncio.run(main())

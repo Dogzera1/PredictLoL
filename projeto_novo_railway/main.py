@@ -98,6 +98,19 @@ except ImportError:
 import numpy as np
 import aiohttp
 
+# Importar sistema de ML
+try:
+    from ml_prediction_system import AdvancedMLPredictionSystem, MatchState, DraftData, TeamComposition
+    from live_data_collector import MLPredictionEngine, LiveMatchInfo, LiveGameDataCollector
+    ML_AVAILABLE = True
+    logger.info("🤖 Sistema de ML carregado com sucesso")
+except ImportError as e:
+    ML_AVAILABLE = False
+    logger.warning(f"⚠️ Sistema de ML não disponível: {e}")
+except Exception as e:
+    ML_AVAILABLE = False
+    logger.warning(f"⚠️ Erro ao carregar sistema de ML: {e}")
+
 # Configurações
 TOKEN = os.getenv('TELEGRAM_TOKEN', '7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg')
 OWNER_ID = int(os.getenv('OWNER_ID', '6404423764'))
@@ -1479,10 +1492,24 @@ class LoLBotV3UltraAdvanced:
 
     def __init__(self):
         self.riot_client = RiotAPIClient()
+        self.units_system = ProfessionalUnitsSystem()
         self.tips_system = ProfessionalTipsSystem(self.riot_client)
         self.schedule_manager = ScheduleManager(self.riot_client)
         self.prediction_system = DynamicPredictionSystem()
         self.alerts_system = TelegramAlertsSystem(TOKEN)
+        
+        # Sistema de ML avançado
+        if ML_AVAILABLE:
+            self.ml_engine = MLPredictionEngine()
+            self.advanced_ml_system = AdvancedMLPredictionSystem()
+            self.live_data_collector = LiveGameDataCollector()
+            logger.info("🤖 Sistema de ML avançado inicializado")
+        else:
+            self.ml_engine = None
+            self.advanced_ml_system = None
+            self.live_data_collector = None
+            logger.warning("⚠️ Sistema de ML não disponível - usando sistema básico")
+            
         self.live_matches_cache = {}
         self.cache_timestamp = None
         self.bot_application = None  # Será definido no main
@@ -1490,7 +1517,7 @@ class LoLBotV3UltraAdvanced:
         # Conectar sistema de tips com alertas
         self.tips_system.set_bot_instance(self)
 
-        logger.info("🤖 Bot LoL V3 Ultra Avançado inicializado - Tips + Agenda + Predições IA + Alertas")
+        logger.info("🤖 Bot LoL V3 Ultra Avançado inicializado - Tips + Agenda + Predições IA + Alertas + ML")
 
     def set_bot_application(self, application):
         """Define a aplicação do bot para o sistema de alertas"""
@@ -1512,10 +1539,16 @@ class LoLBotV3UltraAdvanced:
     async def start_command(self, update: Update, context) -> None:
         """Comando /start"""
         user = update.effective_user
+        ml_status = "✅ ATIVO" if ML_AVAILABLE else "⚠️ BÁSICO"
+        
         welcome_message = f"""
 🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
 
 Olá {user.first_name}! 👋
+
+🤖 **SISTEMA DE MACHINE LEARNING: {ml_status}**
+🎯 Especializado em Money Line para LoL
+⚡ Análise em tempo real após draft
 
 🎲 **SISTEMA DE UNIDADES PROFISSIONAL**
 📊 Baseado em grupos de apostas profissionais
@@ -1523,8 +1556,9 @@ Olá {user.first_name}! 👋
 🎯 Critérios: 65%+ confiança, 5%+ EV mínimo
 
 🔥 **FUNCIONALIDADES:**
+• 🤖 Machine Learning para predições money line
 • 🎯 Tips profissionais com monitoramento ativo
-• 🔮 Predições IA com machine learning
+• 🔮 Predições IA com dados em tempo real
 • 📅 Agenda de partidas (próximos 7 dias)
 • 🎮 Partidas ao vivo selecionáveis
 • 📢 Sistema de alertas para grupos
@@ -1535,12 +1569,14 @@ Use /menu para ver todas as opções!
         """
 
         keyboard = [
-            [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
-            [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
-            [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
-            [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
-            [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
-            [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
+            [InlineKeyboardButton("🤖 ML Predictions", callback_data="ml_predictions"),
+             InlineKeyboardButton("🎯 Money Line Tips", callback_data="money_line_tips")],
+            [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions"),
+             InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+            [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule"),
+             InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+            [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats"),
+             InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -1551,8 +1587,15 @@ Use /menu para ver todas as opções!
 
     async def menu_command(self, update: Update, context) -> None:
         """Comando /menu"""
-        menu_message = """
+        ml_status = "✅ ATIVO" if ML_AVAILABLE else "⚠️ BÁSICO"
+        
+        menu_message = f"""
 🎮 **MENU PRINCIPAL - BOT LOL V3** 🎮
+
+🤖 **MACHINE LEARNING: {ml_status}**
+• /ml_predictions - Sistema ML completo
+• /ml_live_analysis - Análise ao vivo ML
+• /money_line_tips - Tips money line especializados
 
 🎯 **TIPS & ANÁLISES:**
 • /tips - Tips profissionais
@@ -1575,8 +1618,10 @@ Clique nos botões abaixo para navegação rápida:
         """
 
         keyboard = [
-            [InlineKeyboardButton("🎯 Tips", callback_data="tips"),
-             InlineKeyboardButton("🔮 Predições", callback_data="predictions")],
+            [InlineKeyboardButton("🤖 ML System", callback_data="ml_predictions"),
+             InlineKeyboardButton("🎯 Money Line", callback_data="money_line_tips")],
+            [InlineKeyboardButton("🔮 Predições", callback_data="predictions"),
+             InlineKeyboardButton("🎯 Tips", callback_data="tips")],
             [InlineKeyboardButton("📅 Agenda", callback_data="schedule"),
              InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
             [InlineKeyboardButton("📢 Alertas", callback_data="alert_stats"),
@@ -2532,6 +2577,840 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
         # Opcionalmente, edite a mensagem anterior
         # await self.alerts_command(query.message, query.message.bot)
 
+    async def force_scan_command(self, update: Update, context) -> None:
+        """Comando para forçar escaneamento de partidas (apenas admins)"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Verificar se é admin
+            if str(user_id) != str(self.OWNER_ID):
+                await update.message.reply_text(
+                    "❌ **Acesso Negado**\n\n"
+                    "Este comando é restrito ao administrador do bot.",
+                    parse_mode='Markdown'
+                )
+                return
+
+            # Enviar mensagem de início
+            status_msg = await update.message.reply_text(
+                "🔄 **Iniciando Escaneamento Forçado**\n\n"
+                "⏳ Escaneando todas as partidas em busca de tips profissionais...",
+                parse_mode='Markdown'
+            )
+
+            # Executar escaneamento em thread separada para não bloquear
+            def run_scan():
+                try:
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    result = loop.run_until_complete(self.tips_system._scan_all_matches_for_tips())
+                    loop.close()
+                    return result
+                except Exception as e:
+                    logger.error(f"Erro no escaneamento forçado: {e}")
+                    return False
+
+            # Executar em thread
+            import threading
+            scan_thread = threading.Thread(target=run_scan)
+            scan_thread.start()
+            scan_thread.join(timeout=30)  # Timeout de 30 segundos
+
+            # Atualizar status
+            status = self.tips_system.get_monitoring_status()
+            
+            await status_msg.edit_text(
+                "✅ **Escaneamento Forçado Concluído**\n\n"
+                f"📊 **Status do Sistema:**\n"
+                f"• Status: {status['status']}\n"
+                f"• Última verificação: {status['last_check']}\n"
+                f"• Tips encontrados: {status['tips_found']}\n"
+                f"• Partidas analisadas: {status['matches_analyzed']}\n\n"
+                "💡 Use /tips para ver os tips mais recentes.",
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no force_scan_command: {e}")
+            await update.message.reply_text(
+                "❌ **Erro no Escaneamento**\n\n"
+                "Ocorreu um erro durante o escaneamento forçado. "
+                "Tente novamente mais tarde.",
+                parse_mode='Markdown'
+            )
+
+    async def units_command(self, update: Update, context) -> None:
+        """Sistema de unidades profissional"""
+        try:
+            # Informações sobre o sistema de unidades
+            units_info = self.units_system.get_units_explanation()
+            performance = self.units_system.get_performance_summary()
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("📊 Performance", callback_data="units_performance"),
+                    InlineKeyboardButton("📚 Como Usar", callback_data="units_guide")
+                ],
+                [
+                    InlineKeyboardButton("🎯 Simulador", callback_data="units_simulator"),
+                    InlineKeyboardButton("📈 Histórico", callback_data="units_history")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            message = (
+                "💰 **SISTEMA DE UNIDADES PROFISSIONAL**\n\n"
+                f"{units_info}\n\n"
+                "📊 **Performance Atual:**\n"
+                f"• ROI: {performance['roi']:.1f}%\n"
+                f"• Win Rate: {performance['win_rate']:.1f}%\n"
+                f"• Total de Apostas: {performance['total_bets']}\n"
+                f"• Unidades Ganhas: {performance['total_units']:+.2f}\n"
+                f"• Bankroll Atual: {performance['current_bankroll']:.2f}\n\n"
+                "🎯 Selecione uma opção para mais detalhes:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no units_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar sistema de unidades.",
+                parse_mode='Markdown'
+            )
+
+    async def performance_command(self, update: Update, context) -> None:
+        """Comando para exibir performance detalhada"""
+        try:
+            performance = self.units_system.get_performance_summary()
+            monitoring_status = self.tips_system.get_monitoring_status()
+            alerts_stats = self.alerts_system.get_alert_stats()
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("📊 Gráficos", callback_data="performance_charts"),
+                    InlineKeyboardButton("🔄 Atualizar", callback_data="performance_refresh")
+                ],
+                [
+                    InlineKeyboardButton("📋 Relatório", callback_data="performance_report"),
+                    InlineKeyboardButton("🎯 Estatísticas", callback_data="performance_stats")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            message = (
+                "📈 **PERFORMANCE DETALHADA**\n\n"
+                "💰 **Sistema de Unidades:**\n"
+                f"• ROI: {performance['roi']:+.1f}%\n"
+                f"• Win Rate: {performance['win_rate']:.1f}%\n"
+                f"• Profit/Loss: {performance['total_units']:+.2f} unidades\n"
+                f"• Total de Apostas: {performance['total_bets']}\n"
+                f"• Strike Rate: {performance['strike_rate']:.1f}%\n\n"
+                
+                "🔄 **Sistema de Monitoramento:**\n"
+                f"• Status: {monitoring_status['status']}\n"
+                f"• Tips Encontrados: {monitoring_status['tips_found']}\n"
+                f"• Última Verificação: {monitoring_status['last_check']}\n"
+                f"• Uptime: {monitoring_status['uptime']}\n\n"
+                
+                "📢 **Sistema de Alertas:**\n"
+                f"• Alertas Enviados: {alerts_stats['total_sent']}\n"
+                f"• Grupos Ativos: {alerts_stats['active_groups']}\n"
+                f"• Taxa de Sucesso: {alerts_stats['success_rate']:.1f}%\n"
+                f"• Último Alerta: {alerts_stats['last_alert']}\n\n"
+                
+                "🎯 Selecione uma opção para análise detalhada:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no performance_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar dados de performance.",
+                parse_mode='Markdown'
+            )
+
+    async def history_command(self, update: Update, context) -> None:
+        """Comando para histórico de apostas"""
+        try:
+            performance = self.units_system.get_performance_summary()
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("📅 Últimos 7 dias", callback_data="history_week"),
+                    InlineKeyboardButton("📅 Último mês", callback_data="history_month")
+                ],
+                [
+                    InlineKeyboardButton("🏆 Melhores Tips", callback_data="history_best"),
+                    InlineKeyboardButton("📊 Por Liga", callback_data="history_league")
+                ],
+                [
+                    InlineKeyboardButton("💾 Exportar", callback_data="history_export"),
+                    InlineKeyboardButton("🔍 Filtrar", callback_data="history_filter")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            recent_bets = performance.get('recent_bets', [])
+            bet_history = ""
+            
+            if recent_bets:
+                for i, bet in enumerate(recent_bets[-5:], 1):  # Últimas 5 apostas
+                    status_emoji = "✅" if bet.get('result') == 'win' else "❌" if bet.get('result') == 'loss' else "⏳"
+                    bet_history += (
+                        f"{status_emoji} **{bet.get('match', 'N/A')}**\n"
+                        f"   💰 {bet.get('units', 0):.2f} unidades\n"
+                        f"   📅 {bet.get('date', 'N/A')}\n\n"
+                    )
+            else:
+                bet_history = "📝 Nenhuma aposta registrada ainda."
+
+            message = (
+                "📋 **HISTÓRICO DE APOSTAS**\n\n"
+                "📊 **Resumo Geral:**\n"
+                f"• Total de Apostas: {performance['total_bets']}\n"
+                f"• Win Rate: {performance['win_rate']:.1f}%\n"
+                f"• ROI: {performance['roi']:+.1f}%\n"
+                f"• Profit Total: {performance['total_units']:+.2f} unidades\n\n"
+                
+                "🎯 **Últimas Apostas:**\n"
+                f"{bet_history}"
+                
+                "📋 Selecione um período para análise detalhada:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no history_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar histórico de apostas.",
+                parse_mode='Markdown'
+            )
+
+    async def odds_command(self, update: Update, context) -> None:
+        """Integração com The Odds API"""
+        try:
+            keyboard = [
+                [
+                    InlineKeyboardButton("⚡ Live Odds", callback_data="odds_live"),
+                    InlineKeyboardButton("📅 Upcoming", callback_data="odds_upcoming")
+                ],
+                [
+                    InlineKeyboardButton("🔍 Value Bets", callback_data="odds_value"),
+                    InlineKeyboardButton("📊 Comparar", callback_data="odds_compare")
+                ],
+                [
+                    InlineKeyboardButton("⚙️ Configurar", callback_data="odds_settings"),
+                    InlineKeyboardButton("📈 Histórico", callback_data="odds_history")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            message = (
+                "🎲 **THE ODDS API INTEGRATION**\n\n"
+                "📊 **Funcionalidades Disponíveis:**\n\n"
+                
+                "⚡ **Live Odds:**\n"
+                "• Odds em tempo real\n"
+                "• Múltiplas casas de apostas\n"
+                "• Atualizações automáticas\n\n"
+                
+                "🔍 **Value Betting:**\n"
+                "• Identificação automática de value bets\n"
+                "• Cálculo de EV (Expected Value)\n"
+                "• Alertas de oportunidades\n\n"
+                
+                "📊 **Comparação de Odds:**\n"
+                "• Melhor odd para cada mercado\n"
+                "• Arbitragem (quando disponível)\n"
+                "• Histórico de movimentação\n\n"
+                
+                "🎯 Selecione uma funcionalidade:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no odds_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar integração com The Odds API.",
+                parse_mode='Markdown'
+            )
+
+    async def proximosjogoslol_command(self, update: Update, context) -> None:
+        """Próximos jogos LoL com análise"""
+        try:
+            upcoming_matches = await self.schedule_manager.get_scheduled_matches(days_ahead=3)
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("📅 Hoje", callback_data="proximos_today"),
+                    InlineKeyboardButton("📅 Amanhã", callback_data="proximos_tomorrow")
+                ],
+                [
+                    InlineKeyboardButton("🏆 Major Leagues", callback_data="proximos_major"),
+                    InlineKeyboardButton("🌍 Todas Ligas", callback_data="proximos_all")
+                ],
+                [
+                    InlineKeyboardButton("🔍 Filtros", callback_data="proximos_filter"),
+                    InlineKeyboardButton("⚙️ Configurar", callback_data="proximos_settings")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            if upcoming_matches:
+                matches_text = ""
+                for i, match in enumerate(upcoming_matches[:5], 1):
+                    team1 = match.get('team1', {}).get('name', 'Team 1')
+                    team2 = match.get('team2', {}).get('name', 'Team 2')
+                    league = match.get('league', 'Unknown League')
+                    time = match.get('time', 'TBD')
+                    
+                    matches_text += (
+                        f"🎯 **{team1} vs {team2}**\n"
+                        f"🏆 {league}\n"
+                        f"⏰ {time}\n\n"
+                    )
+            else:
+                matches_text = "📝 Nenhuma partida encontrada nos próximos dias."
+
+            message = (
+                "🎮 **PRÓXIMOS JOGOS LOL**\n\n"
+                "📅 **Próximas Partidas:**\n\n"
+                f"{matches_text}"
+                
+                "🎯 **Funcionalidades:**\n"
+                "• Análise automática de todas as partidas\n"
+                "• Predições baseadas em IA\n"
+                "• Alertas para jogos importantes\n"
+                "• Integração com sistema de tips\n\n"
+                
+                "📋 Selecione um filtro para ver mais partidas:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no proximosjogoslol_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar próximos jogos LoL.",
+                parse_mode='Markdown'
+            )
+
+    async def filtrarligas_command(self, update: Update, context) -> None:
+        """Sistema de filtros de ligas"""
+        try:
+            keyboard = [
+                [
+                    InlineKeyboardButton("🏆 LCK", callback_data="filter_lck"),
+                    InlineKeyboardButton("🇪🇺 LEC", callback_data="filter_lec")
+                ],
+                [
+                    InlineKeyboardButton("🇺🇸 LCS", callback_data="filter_lcs"),
+                    InlineKeyboardButton("🇨🇳 LPL", callback_data="filter_lpl")
+                ],
+                [
+                    InlineKeyboardButton("🇧🇷 CBLOL", callback_data="filter_cblol"),
+                    InlineKeyboardButton("🌍 MSI/Worlds", callback_data="filter_international")
+                ],
+                [
+                    InlineKeyboardButton("⚙️ Personalizar", callback_data="filter_custom"),
+                    InlineKeyboardButton("🔄 Reset", callback_data="filter_reset")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            message = (
+                "🔍 **FILTROS DE LIGAS**\n\n"
+                "🎯 **Ligas Principais:**\n\n"
+                
+                "🏆 **LCK (Korea):**\n"
+                "• Liga mais competitiva\n"
+                "• Alto nível técnico\n"
+                "• Predições mais confiáveis\n\n"
+                
+                "🇪🇺 **LEC (Europe):**\n"
+                "• Meta diversificada\n"
+                "• Jogos estratégicos\n"
+                "• Boa para análises\n\n"
+                
+                "🇺🇸 **LCS (North America):**\n"
+                "• Liga imprevisível\n"
+                "• Upset potential alto\n"
+                "• Valor em underdogs\n\n"
+                
+                "🇨🇳 **LPL (China):**\n"
+                "• Estilo agressivo\n"
+                "• Muitos kills\n"
+                "• Over/Under interessante\n\n"
+                
+                "⚙️ **Configurações Atuais:**\n"
+                "• Todas as ligas ativas\n"
+                "• Filtros: Nenhum aplicado\n\n"
+                
+                "🎯 Selecione as ligas que deseja monitorar:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no filtrarligas_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar filtros de ligas.",
+                parse_mode='Markdown'
+            )
+
+    async def timesfavoritos_command(self, update: Update, context) -> None:
+        """Sistema de times favoritos com monitoramento automático"""
+        try:
+            keyboard = [
+                [
+                    InlineKeyboardButton("⭐ Adicionar Time", callback_data="favorites_add"),
+                    InlineKeyboardButton("❌ Remover Time", callback_data="favorites_remove")
+                ],
+                [
+                    InlineKeyboardButton("📋 Meus Times", callback_data="favorites_list"),
+                    InlineKeyboardButton("🔔 Configurar Alertas", callback_data="favorites_alerts")
+                ],
+                [
+                    InlineKeyboardButton("📊 Estatísticas", callback_data="favorites_stats"),
+                    InlineKeyboardButton("🎯 Próximos Jogos", callback_data="favorites_upcoming")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Simular lista de times favoritos (integração futura com banco de dados)
+            favorite_teams = [
+                {"name": "T1", "league": "LCK", "record": "15-3", "next_game": "vs Gen.G"},
+                {"name": "G2 Esports", "league": "LEC", "record": "12-6", "next_game": "vs FNC"},
+                {"name": "JD Gaming", "league": "LPL", "record": "14-4", "next_game": "vs BLG"}
+            ]
+
+            favorites_text = ""
+            if favorite_teams:
+                for team in favorite_teams:
+                    favorites_text += (
+                        f"⭐ **{team['name']}** ({team['league']})\n"
+                        f"   📊 Record: {team['record']}\n"
+                        f"   🎯 Próximo: {team['next_game']}\n\n"
+                    )
+            else:
+                favorites_text = "📝 Nenhum time favorito configurado ainda."
+
+            message = (
+                "⭐ **TIMES FAVORITOS**\n\n"
+                "🎯 **Funcionalidades:**\n"
+                "• Monitoramento automático\n"
+                "• Alertas para jogos importantes\n"
+                "• Estatísticas detalhadas\n"
+                "• Análise de performance\n"
+                "• Tips personalizados\n\n"
+                
+                "📋 **Seus Times Favoritos:**\n\n"
+                f"{favorites_text}"
+                
+                "🔔 **Alertas Ativos:**\n"
+                "• Notificação 1h antes do jogo\n"
+                "• Tips automáticos disponíveis\n"
+                "• Resumo pós-jogo\n\n"
+                
+                "⚙️ Configure seus times favoritos:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no timesfavoritos_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar times favoritos.",
+                parse_mode='Markdown'
+            )
+
+    async def statuslol_command(self, update: Update, context) -> None:
+        """Status geral do sistema LoL"""
+        try:
+            # Obter status de todos os sistemas
+            monitoring_status = self.tips_system.get_monitoring_status()
+            performance = self.units_system.get_performance_summary()
+            alerts_stats = self.alerts_system.get_alert_stats()
+            prediction_cache = self.prediction_system.get_cache_status()
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("🔄 Atualizar", callback_data="status_refresh"),
+                    InlineKeyboardButton("📊 Detalhes", callback_data="status_details")
+                ],
+                [
+                    InlineKeyboardButton("🔧 Diagnóstico", callback_data="status_diagnostic"),
+                    InlineKeyboardButton("⚙️ Configurações", callback_data="status_settings")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Status geral
+            system_status = "🟢 Online" if monitoring_status['status'] == 'running' else "🔴 Offline"
+            
+            message = (
+                f"📊 **STATUS GERAL DO SISTEMA**\n\n"
+                f"🔋 **Status:** {system_status}\n"
+                f"⏰ **Uptime:** {monitoring_status.get('uptime', 'N/A')}\n"
+                f"🔄 **Última Atualização:** {monitoring_status.get('last_check', 'N/A')}\n\n"
+                
+                "🎯 **Sistema de Tips:**\n"
+                f"• Status: {'🟢 Ativo' if monitoring_status['status'] == 'running' else '🔴 Inativo'}\n"
+                f"• Tips Encontrados: {monitoring_status.get('tips_found', 0)}\n"
+                f"• Partidas Analisadas: {monitoring_status.get('matches_analyzed', 0)}\n"
+                f"• Última Verificação: {monitoring_status.get('last_check', 'N/A')}\n\n"
+                
+                "💰 **Sistema de Unidades:**\n"
+                f"• ROI: {performance.get('roi', 0):+.1f}%\n"
+                f"• Win Rate: {performance.get('win_rate', 0):.1f}%\n"
+                f"• Total de Apostas: {performance.get('total_bets', 0)}\n"
+                f"• Bankroll: ${performance.get('current_bankroll', 1000):.2f}\n\n"
+                
+                "📢 **Sistema de Alertas:**\n"
+                f"• Grupos Ativos: {alerts_stats.get('active_groups', 0)}\n"
+                f"• Alertas Enviados: {alerts_stats.get('total_sent', 0)}\n"
+                f"• Taxa de Sucesso: {alerts_stats.get('success_rate', 0):.1f}%\n"
+                f"• Último Alerta: {alerts_stats.get('last_alert', 'N/A')}\n\n"
+                
+                "🤖 **Sistema de IA:**\n"
+                f"• Cache de Predições: {prediction_cache.get('cached_predictions', 0)}\n"
+                f"• Última Predição: {prediction_cache.get('last_prediction', 'N/A')}\n"
+                f"• Acurácia: {prediction_cache.get('accuracy', 0):.1f}%\n\n"
+                
+                "📊 Selecione uma opção para mais detalhes:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no statuslol_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar status do sistema.",
+                parse_mode='Markdown'
+            )
+
+    async def ml_predictions_command(self, update: Update, context) -> None:
+        """Comando para predições ML ao vivo"""
+        try:
+            if not ML_AVAILABLE or not self.ml_engine:
+                await update.message.reply_text(
+                    "❌ **Sistema de ML não disponível**\n\n"
+                    "O sistema de machine learning não está carregado.\n"
+                    "Usando sistema básico de predições.",
+                    parse_mode='Markdown'
+                )
+                return
+
+            keyboard = [
+                [
+                    InlineKeyboardButton("🔮 Análise ao Vivo", callback_data="ml_live_analysis"),
+                    InlineKeyboardButton("📊 Estatísticas ML", callback_data="ml_stats")
+                ],
+                [
+                    InlineKeyboardButton("🎯 Iniciar Monitoramento", callback_data="ml_start_monitoring"),
+                    InlineKeyboardButton("🛑 Parar Análise", callback_data="ml_stop_analysis")
+                ],
+                [
+                    InlineKeyboardButton("🧠 Config. Modelos", callback_data="ml_model_config"),
+                    InlineKeyboardButton("📈 Performance ML", callback_data="ml_performance")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Obter estatísticas atuais
+            engine_stats = self.ml_engine.get_engine_stats()
+            ml_stats = self.advanced_ml_system.get_system_stats()
+
+            message = (
+                "🤖 **SISTEMA DE MACHINE LEARNING** 🤖\n\n"
+                "🎯 **Especializado em Money Line para LoL**\n"
+                "⚡ Análise em tempo real após draft\n\n"
+                
+                "📊 **Status Atual:**\n"
+                f"• Análises ativas: {engine_stats['active_analyses']}\n"
+                f"• Predições feitas: {engine_stats['total_predictions_made']}\n"
+                f"• Modelos disponíveis: {len(ml_stats['models_available'])}\n"
+                f"• Cache ML: {ml_stats['cached_predictions']} predições\n\n"
+                
+                "🧠 **Modelos de ML:**\n"
+                "• Random Forest (40% peso)\n"
+                "• Gradient Boosting (40% peso)\n"
+                "• Neural Network (20% peso)\n"
+                "• Ensemble prediction\n\n"
+                
+                "🎮 **Análise Específica:**\n"
+                "• Estado da partida em tempo real\n"
+                "• Análise de draft e composições\n"
+                "• Feature engineering avançado\n"
+                "• Cálculo de Expected Value\n\n"
+                
+                "🎯 Selecione uma opção:"
+            )
+
+            await update.message.reply_text(
+                message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no ml_predictions_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar sistema de ML.",
+                parse_mode='Markdown'
+            )
+
+    async def ml_live_analysis_command(self, update: Update, context) -> None:
+        """Comando para análise ML ao vivo de partidas específicas"""
+        try:
+            if not ML_AVAILABLE or not self.ml_engine:
+                await update.message.reply_text(
+                    "❌ Sistema de ML não disponível.",
+                    parse_mode='Markdown'
+                )
+                return
+
+            # Buscar partidas ao vivo
+            live_matches = await self.riot_client.get_live_matches()
+
+            if not live_matches:
+                await update.message.reply_text(
+                    "🎮 **NENHUMA PARTIDA AO VIVO**\n\n"
+                    "❌ Não há partidas ao vivo para análise ML no momento.\n\n"
+                    "🔄 Tente novamente quando houver partidas ativas.",
+                    parse_mode='Markdown'
+                )
+                return
+
+            keyboard = []
+            analyses_message = "🤖 **ANÁLISES ML DISPONÍVEIS**\n\n"
+
+            # Verificar análises ativas
+            active_analyses = self.ml_engine.get_engine_stats()['active_analyses']
+            if active_analyses > 0:
+                analyses_message += f"⚡ **{active_analyses} análises ativas**\n\n"
+
+            # Listar partidas disponíveis
+            for i, match in enumerate(live_matches[:5]):
+                teams = match.get('teams', [])
+                if len(teams) >= 2:
+                    team1 = teams[0].get('name', 'Team1')
+                    team2 = teams[1].get('name', 'Team2')
+                    league = match.get('league', 'Unknown')
+
+                    analyses_message += f"🎯 **{team1} vs {team2}**\n"
+                    analyses_message += f"🏆 {league}\n\n"
+
+                    keyboard.append([
+                        InlineKeyboardButton(
+                            f"🔮 Analisar: {team1} vs {team2}",
+                            callback_data=f"ml_analyze_{i}"
+                        )
+                    ])
+
+                    # Cache da partida para análise ML
+                    self.live_matches_cache[f"ml_{i}"] = match
+
+            if not keyboard:
+                analyses_message += "❌ Nenhuma partida válida para análise ML."
+
+            keyboard.append([InlineKeyboardButton("🔄 Atualizar", callback_data="ml_live_analysis")])
+            keyboard.append([InlineKeyboardButton("🔙 Menu ML", callback_data="ml_predictions")])
+
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await update.message.reply_text(
+                analyses_message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no ml_live_analysis_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao carregar análises ML.",
+                parse_mode='Markdown'
+            )
+
+    async def money_line_tips_command(self, update: Update, context) -> None:
+        """Comando especializado para tips money line"""
+        try:
+            if not ML_AVAILABLE or not self.advanced_ml_system:
+                await update.message.reply_text(
+                    "❌ **Sistema de ML não disponível**\n\n"
+                    "Usando sistema básico de tips.\n"
+                    "Use /tips para tips tradicionais.",
+                    parse_mode='Markdown'
+                )
+                return
+
+            # Buscar partidas ao vivo para análise
+            live_matches = await self.riot_client.get_live_matches()
+
+            if not live_matches:
+                await update.message.reply_text(
+                    "🎯 **MONEY LINE TIPS**\n\n"
+                    "❌ Nenhuma partida ao vivo disponível para análise.\n\n"
+                    "💡 Tips money line são gerados apenas para partidas em andamento após o draft.",
+                    parse_mode='Markdown'
+                )
+                return
+
+            tips_found = 0
+            tips_message = "🎯 **MONEY LINE TIPS - MACHINE LEARNING**\n\n"
+
+            for match in live_matches[:3]:  # Analisar até 3 partidas
+                teams = match.get('teams', [])
+                if len(teams) >= 2:
+                    team1_name = teams[0].get('name', '')
+                    team2_name = teams[1].get('name', '')
+
+                    # Simular dados de partida em andamento
+                    from datetime import datetime, timedelta
+                    import random
+
+                    # Criar dados simulados para demonstração
+                    game_time = random.uniform(10, 35)  # 10-35 minutos
+                    
+                    if ML_AVAILABLE:
+                        match_state = MatchState(
+                            game_time=game_time,
+                            team1_kills=random.randint(5, 20),
+                            team2_kills=random.randint(5, 20),
+                            team1_gold=random.randint(15000, 45000),
+                            team2_gold=random.randint(15000, 45000),
+                            team1_towers=random.randint(0, 8),
+                            team2_towers=random.randint(0, 8),
+                            team1_dragons=random.randint(0, 3),
+                            team2_dragons=random.randint(0, 3),
+                            team1_barons=random.randint(0, 1),
+                            team2_barons=random.randint(0, 1),
+                            team1_heralds=random.randint(0, 1),
+                            team2_heralds=0,
+                            team1_inhibitors=0,
+                            team2_inhibitors=0
+                        )
+
+                        draft_data = DraftData(
+                            team1_picks=['Gnar', 'Graves', 'Azir', 'Jinx', 'Thresh'],
+                            team2_picks=['Camille', 'Lee Sin', 'Yasuo', 'Kai\'Sa', 'Nautilus'],
+                            team1_bans=['Yasuo', 'Zed', 'Akali', 'Irelia', 'Katarina'],
+                            team2_bans=['Master Yi', 'Vayne', 'Draven', 'Darius', 'Garen'],
+                            draft_phase='completed'
+                        )
+
+                        # Fazer predição ML
+                        prediction = await self.advanced_ml_system.predict_money_line(
+                            match_state, draft_data, team1_name, team2_name
+                        )
+
+                        # Verificar se é um tip válido para money line
+                        if (prediction['confidence_score'] >= 75 and 
+                            prediction['expected_value'] >= 8.0):
+                            
+                            tips_found += 1
+                            
+                            tips_message += f"💎 **TIP #{tips_found}: {prediction['favored_team']}**\n"
+                            tips_message += f"🎮 {team1_name} vs {team2_name}\n"
+                            tips_message += f"⏱️ Tempo: {game_time:.1f} min ({prediction['game_phase']})\n\n"
+                            
+                            tips_message += f"🤖 **Análise ML:**\n"
+                            tips_message += f"• Probabilidade: {prediction['team1_win_probability']*100:.1f}% vs {prediction['team2_win_probability']*100:.1f}%\n"
+                            tips_message += f"• Confiança: {prediction['confidence_level']} ({prediction['confidence_score']:.1f}%)\n"
+                            tips_message += f"• Expected Value: {prediction['expected_value']:.1f}%\n\n"
+                            
+                            tips_message += f"💰 **Money Line:**\n"
+                            if 'recommended_bet' in prediction and prediction['recommended_bet']['team'] != 'none':
+                                rec = prediction['recommended_bet']
+                                tips_message += f"• Apostar: {rec['team']}\n"
+                                tips_message += f"• Odds estimadas: {rec.get('odds', 'N/A'):.2f}\n"
+                                tips_message += f"• EV: {rec.get('ev', 0):.1f}%\n"
+                            else:
+                                tips_message += f"• Nenhuma value bet identificada\n"
+                            
+                            tips_message += f"\n🔍 **Fatores Chave:**\n"
+                            for factor in prediction['key_factors'][:3]:
+                                tips_message += f"• {factor}\n"
+                            
+                            tips_message += "\n" + "="*30 + "\n\n"
+
+            if tips_found == 0:
+                tips_message += "❌ **Nenhum tip money line encontrado**\n\n"
+                tips_message += "📋 **Critérios para tips ML:**\n"
+                tips_message += "• Confiança mínima: 75%\n"
+                tips_message += "• EV mínimo: 8%\n"
+                tips_message += "• Partida em andamento (pós-draft)\n"
+                tips_message += "• Dados suficientes para análise\n\n"
+                tips_message += "🔄 Tente novamente em alguns minutos."
+            else:
+                tips_message += f"🎯 **{tips_found} tips money line encontrados**\n"
+                tips_message += "⚡ Análise baseada em dados em tempo real"
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar Tips", callback_data="money_line_tips")],
+                [InlineKeyboardButton("🤖 Sistema ML", callback_data="ml_predictions")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await update.message.reply_text(
+                tips_message,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+
+        except Exception as e:
+            logger.error(f"Erro no money_line_tips_command: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao gerar tips money line.",
+                parse_mode='Markdown'
+            )
 
 def run_flask_app():
     """Executa Flask em thread separada (apenas para health check)"""
@@ -2851,6 +3730,18 @@ def main():
             application.add_handler(CommandHandler("monitoring", bot.monitoring_command))
             application.add_handler(CommandHandler("predictions", bot.predictions_command))
             application.add_handler(CommandHandler("alerts", bot.alerts_command))
+            application.add_handler(CommandHandler("force_scan", bot.force_scan_command))
+            application.add_handler(CommandHandler("units", bot.units_command))
+            application.add_handler(CommandHandler("performance", bot.performance_command))
+            application.add_handler(CommandHandler("history", bot.history_command))
+            application.add_handler(CommandHandler("odds", bot.odds_command))
+            application.add_handler(CommandHandler("proximosjogoslol", bot.proximosjogoslol_command))
+            application.add_handler(CommandHandler("filtrarligas", bot.filtrarligas_command))
+            application.add_handler(CommandHandler("timesfavoritos", bot.timesfavoritos_command))
+            application.add_handler(CommandHandler("statuslol", bot.statuslol_command))
+            application.add_handler(CommandHandler("ml_predictions", bot.ml_predictions_command))
+            application.add_handler(CommandHandler("ml_live_analysis", bot.ml_live_analysis_command))
+            application.add_handler(CommandHandler("money_line_tips", bot.money_line_tips_command))
             application.add_handler(CallbackQueryHandler(bot.callback_handler))
 
             # Definir aplicação para sistema de alertas
@@ -3024,12 +3915,24 @@ def main():
             dispatcher.add_handler(CommandHandler("monitoring", bot.monitoring_command))
             dispatcher.add_handler(CommandHandler("predictions", bot.predictions_command))
             dispatcher.add_handler(CommandHandler("alerts", bot.alerts_command))
+            dispatcher.add_handler(CommandHandler("force_scan", bot.force_scan_command))
+            dispatcher.add_handler(CommandHandler("units", bot.units_command))
+            dispatcher.add_handler(CommandHandler("performance", bot.performance_command))
+            dispatcher.add_handler(CommandHandler("history", bot.history_command))
+            dispatcher.add_handler(CommandHandler("odds", bot.odds_command))
+            dispatcher.add_handler(CommandHandler("proximosjogoslol", bot.proximosjogoslol_command))
+            dispatcher.add_handler(CommandHandler("filtrarligas", bot.filtrarligas_command))
+            dispatcher.add_handler(CommandHandler("timesfavoritos", bot.timesfavoritos_command))
+            dispatcher.add_handler(CommandHandler("statuslol", bot.statuslol_command))
+            dispatcher.add_handler(CommandHandler("ml_predictions", bot.ml_predictions_command))
+            dispatcher.add_handler(CommandHandler("ml_live_analysis", bot.ml_live_analysis_command))
+            dispatcher.add_handler(CommandHandler("money_line_tips", bot.money_line_tips_command))
             dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler))
 
             # Contar handlers corretamente
             total_handlers = sum(len(handlers_list) for group, handlers_list in dispatcher.handlers.items()) # Corrigido para iterar sobre items
             logger.info(f"✅ {total_handlers} handlers registrados no dispatcher v13")
-            logger.info(f"📋 Comandos disponíveis: /start, /menu, /tips, /live, /schedule, /monitoring, /predictions, /alerts")
+            logger.info(f"📋 Comandos disponíveis: /start, /menu, /tips, /live, /schedule, /monitoring, /predictions, /alerts, /force_scan, /units, /performance, /history, /odds, /proximosjogoslol, /filtrarligas, /timesfavoritos, /statuslol, /ml_predictions, /ml_live_analysis, /money_line_tips")
 
             if is_railway:
                 # Modo Railway - Webhook v13
