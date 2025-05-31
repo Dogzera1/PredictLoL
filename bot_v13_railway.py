@@ -3963,6 +3963,98 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
         """Comando /help - Alias para /comandos"""
         await self.comandos_command(update, context)
 
+    def callback_handler_sync(self, update: Update, context) -> None:
+        """Handler síncrono para callbacks dos botões - v13"""
+        import asyncio
+        try:
+            # Tentar executar a versão async
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.callback_handler(update, context))
+            loop.close()
+        except Exception as e:
+            logger.error(f"Erro no callback_handler_sync: {e}")
+            # Fallback simples
+            query = update.callback_query
+            try:
+                query.answer()
+                query.edit_message_text("⚡ Botão recebido! Use os comandos do menu.")
+            except:
+                pass
+
+    def _run_async_command_sync(self, async_method, update: Update, context) -> None:
+        """Função auxiliar para executar comandos async de forma síncrona para v13"""
+        import asyncio
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(async_method(update, context))
+            loop.close()
+        except Exception as e:
+            logger.error(f"Erro no comando async sync: {e}")
+            try:
+                update.message.reply_text(f"❌ Erro interno no comando. Detalhes: {str(e)[:100]}")
+            except:
+                pass
+
+    # Versões síncronas dos comandos async para v13
+    def menu_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.menu_command, update, context)
+    
+    def schedule_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.schedule_command, update, context)
+    
+    def monitoring_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.monitoring_command, update, context)
+    
+    def tips_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.tips_command, update, context)
+    
+    def live_matches_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.live_matches_command, update, context)
+    
+    def predictions_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.predictions_command, update, context)
+    
+    def alerts_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.alerts_command, update, context)
+    
+    def livematches_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.livematches_command, update, context)
+    
+    def proximosjogoslol_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.proximosjogoslol_command, update, context)
+    
+    def forcescan_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.forcescan_command, update, context)
+    
+    def performance_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.performance_command, update, context)
+    
+    def history_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.history_command, update, context)
+    
+    def odds_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.odds_command, update, context)
+    
+    def units_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.units_command, update, context)
+    
+    def filtrarligas_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.filtrarligas_command, update, context)
+    
+    def timesfavoritos_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.timesfavoritos_command, update, context)
+    
+    def statuslol_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.statuslol_command, update, context)
+    
+    def comandos_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.comandos_command, update, context)
+    
+    def help_command_sync(self, update: Update, context) -> None:
+        self._run_async_command_sync(self.help_command, update, context)
+
 def run_flask_app():
     """Executa Flask em thread separada (apenas para health check)"""
     # Não executar se webhook estiver ativo
@@ -4152,6 +4244,11 @@ def main():
 
         # Inicializar bot
         bot = LoLBotV3UltraAdvanced()
+
+        # INICIAR SISTEMA DE MONITORAMENTO DE TIPS
+        logger.info("🎯 Iniciando sistema de monitoramento de tips...")
+        bot.tips_system.start_monitoring()
+        logger.info("✅ Sistema de monitoramento ativo!")
 
         # Verificar modo de execução com detecção mais robusta
         is_railway = bool(os.getenv('RAILWAY_ENVIRONMENT_NAME')) or bool(os.getenv('RAILWAY_STATIC_URL'))
@@ -4467,41 +4564,40 @@ def main():
             bot.set_bot_application(updater) # Passando o updater para v13
 
             # Handlers
-            dispatcher.add_handler(CommandHandler("start", bot.start_command_sync))  # Versão síncrona para v13
-            dispatcher.add_handler(CommandHandler("menu", bot.menu_command))
-            dispatcher.add_handler(CommandHandler("tips", bot.tips_command))
-            dispatcher.add_handler(CommandHandler("live", bot.live_matches_command))
-            dispatcher.add_handler(CommandHandler("schedule", bot.schedule_command))
-            dispatcher.add_handler(CommandHandler("monitoring", bot.monitoring_command))
-            dispatcher.add_handler(CommandHandler("predictions", bot.predictions_command))
-            dispatcher.add_handler(CommandHandler("alerts", bot.alerts_command))
+            dispatcher.add_handler(CommandHandler("start", bot.start_command_sync))  # ✅ Versão síncrona
+            dispatcher.add_handler(CommandHandler("menu", bot.menu_command_sync))
+            dispatcher.add_handler(CommandHandler("tips", bot.tips_command_sync))
+            dispatcher.add_handler(CommandHandler("live", bot.live_matches_command_sync))
+            dispatcher.add_handler(CommandHandler("schedule", bot.schedule_command_sync))
+            dispatcher.add_handler(CommandHandler("monitoring", bot.monitoring_command_sync))
+            dispatcher.add_handler(CommandHandler("predictions", bot.predictions_command_sync))
+            dispatcher.add_handler(CommandHandler("alerts", bot.alerts_command_sync))
             
-            # Novos comandos personalizados
+            # Comandos personalizados - já síncronos
             dispatcher.add_handler(CommandHandler("meubankroll", bot.meubankroll_command))
             dispatcher.add_handler(CommandHandler("meuriscoperfil", bot.meuriscoperfil_command))
             dispatcher.add_handler(CommandHandler("minhasconfiguracoes", bot.minhasconfiguracoes_command))
             dispatcher.add_handler(CommandHandler("filtrosnotificacao", bot.filtrosnotificacao_command))
             
-            # COMANDOS ADICIONAIS DA DOCUMENTAÇÃO (v13) - FALTAVAM ESTES HANDLERS!
-            dispatcher.add_handler(CommandHandler("livematches", bot.livematches_command))
-            dispatcher.add_handler(CommandHandler("proximosjogoslol", bot.proximosjogoslol_command))
-            dispatcher.add_handler(CommandHandler("forcescan", bot.forcescan_command))
-            dispatcher.add_handler(CommandHandler("performance", bot.performance_command))
-            dispatcher.add_handler(CommandHandler("history", bot.history_command))
-            dispatcher.add_handler(CommandHandler("odds", bot.odds_command))
-            dispatcher.add_handler(CommandHandler("units", bot.units_command))
-            dispatcher.add_handler(CommandHandler("filtrarligas", bot.filtrarligas_command))
-            dispatcher.add_handler(CommandHandler("timesfavoritos", bot.timesfavoritos_command))
-            dispatcher.add_handler(CommandHandler("statuslol", bot.statuslol_command))
-            dispatcher.add_handler(CommandHandler("comandos", bot.comandos_command))
-            dispatcher.add_handler(CommandHandler("help", bot.help_command))
+            # Comandos adicionais - versões síncronas
+            dispatcher.add_handler(CommandHandler("livematches", bot.livematches_command_sync))
+            dispatcher.add_handler(CommandHandler("proximosjogoslol", bot.proximosjogoslol_command_sync))
+            dispatcher.add_handler(CommandHandler("forcescan", bot.forcescan_command_sync))
+            dispatcher.add_handler(CommandHandler("performance", bot.performance_command_sync))
+            dispatcher.add_handler(CommandHandler("history", bot.history_command_sync))
+            dispatcher.add_handler(CommandHandler("odds", bot.odds_command_sync))
+            dispatcher.add_handler(CommandHandler("units", bot.units_command_sync))
+            dispatcher.add_handler(CommandHandler("filtrarligas", bot.filtrarligas_command_sync))
+            dispatcher.add_handler(CommandHandler("timesfavoritos", bot.timesfavoritos_command_sync))
+            dispatcher.add_handler(CommandHandler("statuslol", bot.statuslol_command_sync))
+            dispatcher.add_handler(CommandHandler("comandos", bot.comandos_command_sync))
+            dispatcher.add_handler(CommandHandler("help", bot.help_command_sync))
             
-            dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler))
+            dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler_sync))  # Versão síncrona para v13
 
             # Contar handlers corretamente
-            total_handlers = sum(len(handlers_list) for group, handlers_list in dispatcher.handlers.items()) # Corrigido para iterar sobre items
-            logger.info(f"✅ {total_handlers} handlers registrados no dispatcher v13")
-            logger.info(f"📋 Comandos disponíveis: /start, /menu, /tips, /live, /schedule, /monitoring, /predictions, /alerts, /meubankroll, /meuriscoperfil, /minhasconfiguracoes, /filtrosnotificacao, /livematches, /proximosjogoslol, /forcescan, /performance, /history, /odds, /units, /filtrarligas, /timesfavoritos, /statuslol, /comandos, /help")
+            total_handlers = len(dispatcher.handlers[0])  # Default group
+            logger.info(f"✅ Total de handlers registrados: {total_handlers} (24 CommandHandlers + 1 CallbackQueryHandler = 25)")
 
             if is_railway:
                 # Modo Railway - Webhook v13
