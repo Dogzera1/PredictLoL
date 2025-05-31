@@ -195,6 +195,9 @@ class BotApplication:
         logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado...")
         
         try:
+            # NOVO: Limpa instâncias anteriores automaticamente
+            await self._cleanup_previous_instances()
+            
             # Inicializa componentes
             await self.initialize_components()
             
@@ -217,6 +220,41 @@ class BotApplication:
             raise
         finally:
             await self.shutdown()
+
+    async def _cleanup_previous_instances(self) -> None:
+        """Limpa instâncias anteriores do bot via API"""
+        try:
+            import aiohttp
+            
+            logger.info("🧹 Limpando instâncias anteriores do bot...")
+            
+            base_url = f"https://api.telegram.org/bot{self.bot_token}"
+            
+            async with aiohttp.ClientSession() as session:
+                # Remove webhook
+                try:
+                    async with session.post(f"{base_url}/deleteWebhook") as resp:
+                        if resp.status == 200:
+                            logger.debug("✅ Webhook removido")
+                except:
+                    pass
+                
+                # Cancela polling ativo
+                try:
+                    async with session.post(f"{base_url}/getUpdates", json={"timeout": 0}) as resp:
+                        if resp.status == 200:
+                            logger.debug("✅ Polling anterior cancelado")
+                except:
+                    pass
+                
+                # Aguarda estabilização
+                await asyncio.sleep(2)
+                
+            logger.info("✅ Limpeza de instâncias concluída")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na limpeza de instâncias: {e}")
+            # Não falha o processo, apenas continua
 
     async def shutdown(self) -> None:
         """Shutdown graceful de todos os sistemas"""

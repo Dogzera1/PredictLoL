@@ -225,27 +225,23 @@ class ProfessionalTipsSystem:
                 await asyncio.sleep(30)  # Espera 30s em caso de erro
 
     async def _get_live_matches(self) -> List[MatchData]:
-        """Busca partidas ao vivo das principais ligas"""
-        live_matches = []
+        """Obtém partidas ao vivo de ambas as APIs"""
+        all_matches = []
         
         try:
-            # Busca via PandaScore (principal fonte)
-            pandascore_matches = await self.pandascore_client.get_live_matches()
-            live_matches.extend(pandascore_matches)
+            # PandaScore - partidas com odds
+            pandascore_matches = await self.pandascore_client.get_lol_live_matches()
+            logger.debug(f"PandaScore: {len(pandascore_matches)} partidas encontradas")
             
-            # Busca via Riot API (backup)
-            try:
-                riot_matches = await self.riot_client.get_live_matches()
-                # Evita duplicatas
-                existing_ids = {match.match_id for match in live_matches}
-                for match in riot_matches:
-                    if match.match_id not in existing_ids:
-                        live_matches.append(match)
-            except Exception as e:
-                logger.warning(f"Erro ao buscar partidas da Riot API: {e}")
+            # Riot API - dados detalhados de partidas  
+            riot_matches = await self.riot_client.get_live_matches()
+            logger.debug(f"Riot API: {len(riot_matches)} partidas encontradas")
             
-            logger.info(f"Encontradas {len(live_matches)} partidas ao vivo no total")
-            return live_matches
+            all_matches.extend(pandascore_matches)
+            all_matches.extend(riot_matches)
+            
+            logger.info(f"Encontradas {len(all_matches)} partidas ao vivo no total")
+            return all_matches
             
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
