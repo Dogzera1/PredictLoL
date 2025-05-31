@@ -3,8 +3,9 @@
 """
 BOT LOL V3 ULTRA ADVANCED - VERSÃO RAILWAY
 ===========================================
-FORÇA REBUILD: 2025-05-31 17:55:00
+FORÇA REBUILD: 2025-05-31 18:16:00
 CALLBACKS IMPLEMENTADOS E FUNCIONANDO
+URGENTE: Railway deve aplicar esta versão
 ======================================
 """
 
