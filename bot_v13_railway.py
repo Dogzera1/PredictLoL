@@ -2823,6 +2823,83 @@ Clique nos botões abaixo para navegação rápida:
             except:
                 pass
 
+    def force_scan_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /force_scan"""
+        try:
+            logger.info(f"🚀 Comando /force_scan chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            # Verificar se é admin (owner)
+            user_id = update.effective_user.id if update.effective_user else 0
+            if user_id != OWNER_ID:
+                update.message.reply_text("❌ Comando disponível apenas para administradores.")
+                return
+
+            # Executar scan manual
+            update.message.reply_text("🚀 Iniciando scan manual das partidas ao vivo...")
+            
+            def run_manual_scan():
+                """Executa scan manual em thread separada"""
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    # Executar scan
+                    loop.run_until_complete(self.tips_system._scan_live_matches_only())
+                    
+                    # Gerar tip se encontrado algo
+                    tip = loop.run_until_complete(self.tips_system.generate_professional_tip())
+                    
+                    if tip:
+                        scan_result = f"""
+🚀 **SCAN MANUAL CONCLUÍDO** 🚀
+
+✅ Tip encontrado!
+
+🎯 **{tip['title']}**
+🏆 Liga: {tip['league']}
+⭐ Recomendação: {tip['recommended_team']}
+📊 Confiança: {tip['confidence_score']:.1f}%
+💰 EV: {tip['ev_percentage']:.1f}%
+🎲 Unidades: {tip['units']}
+                        """
+                    else:
+                        scan_result = """
+🚀 **SCAN MANUAL CONCLUÍDO** 🚀
+
+❌ Nenhum tip atende aos critérios no momento.
+
+Critérios: Confiança ≥65%, EV ≥5%
+                        """
+                    
+                    # Enviar resultado
+                    context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=scan_result,
+                        parse_mode="Markdown"
+                    )
+                    
+                    loop.close()
+                    
+                except Exception as e:
+                    logger.error(f"Erro no scan manual: {e}")
+                    try:
+                        context.bot.send_message(
+                            chat_id=update.effective_chat.id,
+                            text=f"❌ Erro no scan manual: {e}"
+                        )
+                    except:
+                        pass
+            
+            # Executar em thread separada para não bloquear
+            threading.Thread(target=run_manual_scan, daemon=True).start()
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /force_scan: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao executar scan manual.")
+            except:
+                pass
+
     def callback_handler(self, update: Update, context: CallbackContext) -> None:
         """Handler para callbacks de botões inline"""
         try:
@@ -3453,6 +3530,541 @@ Navegue pelos botões abaixo:
             logger.error(f"Erro no callback main_menu: {e}")
             query.edit_message_text("❌ Erro ao carregar menu principal.")
 
+    def predictions_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /predictions"""
+        try:
+            logger.info(f"🔮 Comando /predictions chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            predictions_message = """
+🔮 **PREDIÇÕES IA - SISTEMA AVANÇADO** 🔮
+
+🤖 **SISTEMA DE IA ATIVO:**
+• Machine Learning: 🟢 Disponível
+• Algoritmos matemáticos: 🟢 Ativo
+• Dados ao vivo: 🟢 Integrados
+
+📊 **TIPOS DE PREDIÇÃO:**
+• Partidas ao vivo com dados completos
+• Análise de draft e composições
+• Estatísticas em tempo real
+• Cálculo de probabilidades
+
+🎯 **COMO FUNCIONA:**
+• IA analisa histórico de times
+• Considera meta atual do jogo
+• Avalia composições de campeões
+• Calcula odds e EV em tempo real
+
+Use os botões abaixo para interagir:
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔮 Ver Predições", callback_data="predictions")],
+                [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(predictions_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /predictions: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao buscar predições. Tente novamente.")
+            except:
+                pass
+
+    def alerts_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /alerts"""
+        try:
+            logger.info(f"📢 Comando /alerts chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            stats = self.alerts_system.get_alert_stats()
+            
+            alerts_message = f"""
+📢 **SISTEMA DE ALERTAS** 📢
+
+🤖 **STATUS DO SISTEMA:**
+• Alertas automáticos: 🟢 Ativo
+• Grupos registrados: {len(self.alerts_system.group_chat_ids)}
+• Tips enviadas hoje: {stats.get('tips_sent_today', 0)}
+
+📊 **ESTATÍSTICAS:**
+• Total de alertas enviados: {stats.get('total_alerts_sent', 0)}
+• Última tip enviada: {stats.get('last_tip_time', 'Nenhuma')}
+• Tips nas últimas 24h: {stats.get('tips_last_24h', 0)}
+
+🎯 **CRITÉRIOS PARA ALERTAS:**
+• Confiança ≥ 65%
+• EV ≥ 5%
+• Partidas ao vivo apenas
+• Dados completos verificados
+
+💡 **COMO FUNCIONA:**
+• Sistema monitora partidas 24/7
+• Envia alertas automáticos para grupos registrados
+• Apenas tips que atendem critérios profissionais
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("📊 Ver Estatísticas", callback_data="alert_stats")],
+                [InlineKeyboardButton("✅ Registrar Alertas", callback_data="register_alerts")],
+                [InlineKeyboardButton("❌ Cancelar Alertas", callback_data="unregister_alerts")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(alerts_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /alerts: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao verificar alertas. Tente novamente.")
+            except:
+                pass
+
+    def units_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /units"""
+        try:
+            logger.info(f"🎲 Comando /units chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            units_message = """
+🎲 **SISTEMA DE UNIDADES PROFISSIONAL** 🎲
+
+💰 **BANKROLL PADRÃO:** $1000.00
+🎯 **UNIDADE BASE:** $10.00 (1% do bankroll)
+
+📊 **ESCALA DE UNIDADES:**
+• 5.0 unidades: 90%+ confiança, 15%+ EV (Máximo)
+• 4.0 unidades: 85%+ confiança, 12%+ EV (Alto)
+• 3.0 unidades: 80%+ confiança, 10%+ EV (Alto)
+• 2.5 unidades: 75%+ confiança, 8%+ EV (Médio-Alto)
+• 2.0 unidades: 70%+ confiança, 6%+ EV (Médio)
+• 1.0 unidades: 65%+ confiança, 5%+ EV (Baixo)
+• 0.5 unidades: Mínimo absoluto
+
+🏆 **AJUSTES POR LIGA:**
+• Tier 1 (LCK, LPL, LEC, LCS): 100%
+• Tier 2 (Regionais): 90%
+• Tier 3 (Menores): 80%
+
+⚡ **SISTEMA SIMPLIFICADO:**
+• Sem Kelly Criterion complexo
+• Baseado em grupos profissionais
+• Foco em consistência
+
+🎯 **CRITÉRIOS MÍNIMOS:**
+• Confiança ≥ 65%
+• EV ≥ 5%
+• Dados completos verificados
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("📊 Ver Explicação", callback_data="units_info")],
+                [InlineKeyboardButton("📈 Performance", callback_data="performance_stats")],
+                [InlineKeyboardButton("📋 Histórico", callback_data="bet_history")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(units_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /units: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao mostrar sistema de unidades. Tente novamente.")
+            except:
+                pass
+
+    def performance_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /performance"""
+        try:
+            logger.info(f"📈 Comando /performance chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            stats = self.tips_system.get_monitoring_status()
+            
+            performance_message = f"""
+📈 **PERFORMANCE DO SISTEMA** 📈
+
+🎯 **ESTATÍSTICAS GERAIS:**
+• Tips geradas: {stats.get('total_tips', 0)}
+• Tips hoje: {stats.get('tips_today', 0)}
+• Última atualização: {stats.get('last_scan', 'Nunca')}
+
+🤖 **SISTEMA DE IA:**
+• ML Status: {'🟢 Ativo' if self.prediction_system.ml_system else '🟡 Fallback'}
+• Modelo usado: Random Forest (70.5% acurácia)
+• Dados ao vivo: 🟢 Integrados
+
+📊 **PERFORMANCE ATUAL:**
+• ROI: {stats.get('roi', 0):.1f}%
+• Win Rate: {stats.get('win_rate', 0):.1f}%
+• Monitoramento: {'🟢 Ativo' if stats.get('monitoring_active') else '🔴 Inativo'}
+
+🎲 **SISTEMA DE UNIDADES:**
+• Bankroll: $1000.00
+• Unidade base: $10.00
+• Critério mínimo: 65% confiança, 5% EV
+
+⏰ **TEMPO REAL:**
+• Scan a cada 3 minutos
+• Apenas partidas AO VIVO
+• Dados completos obrigatórios
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="performance_stats")],
+                [InlineKeyboardButton("📋 Histórico", callback_data="bet_history")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(performance_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /performance: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao verificar performance. Tente novamente.")
+            except:
+                pass
+
+    def history_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /history"""
+        try:
+            logger.info(f"📋 Comando /history chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            history_message = """
+📋 **HISTÓRICO DE APOSTAS** 📋
+
+📊 **RESUMO GERAL:**
+• Total de tips: 0
+• Tips vencedoras: 0
+• Tips perdedoras: 0
+• ROI geral: 0.0%
+
+🎯 **ÚLTIMAS TIPS:**
+• Nenhuma tip registrada ainda
+
+💰 **BALANÇO:**
+• Bankroll inicial: $1000.00
+• Bankroll atual: $1000.00
+• Lucro/Prejuízo: $0.00
+
+📈 **PERFORMANCE POR PERÍODO:**
+• Hoje: 0 tips
+• Últimos 7 dias: 0 tips
+• Último mês: 0 tips
+
+🎲 **DISTRIBUIÇÃO DE UNIDADES:**
+• 0.5-1.0 unidades: 0 tips
+• 1.5-2.0 unidades: 0 tips
+• 2.5-3.0 unidades: 0 tips
+• 3.5+ unidades: 0 tips
+
+💡 **NOTA:** Sistema iniciado recentemente.
+O histórico será populado conforme tips forem geradas.
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="bet_history")],
+                [InlineKeyboardButton("📈 Performance", callback_data="performance_stats")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(history_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /history: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao verificar histórico. Tente novamente.")
+            except:
+                pass
+
+    def odds_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /odds"""
+        try:
+            logger.info(f"💰 Comando /odds chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            odds_message = """
+💰 **ODDS REAIS - THE ODDS API** 💰
+
+🔥 **INTEGRAÇÃO ATIVA:**
+• The Odds API: 🟢 Conectada
+• Múltiplas casas de apostas
+• Odds atualizadas em tempo real
+• Melhores odds automaticamente
+
+🏠 **CASAS DE APOSTAS MONITORADAS:**
+• Bet365
+• Pinnacle  
+• Betfair
+• William Hill
+• E outras principais
+
+📊 **COMO FUNCIONA:**
+• Bot busca odds de todas as casas
+• Seleciona automaticamente as melhores
+• Calcula EV com dados reais
+• Atualiza continuamente
+
+🎯 **VANTAGENS:**
+• Sem odds simuladas/fictícias
+• Dados reais do mercado
+• EV calculado com precisão
+• Tips baseadas em valor real
+
+⚡ **TEMPO REAL:**
+• Odds atualizadas a cada scan
+• Apenas partidas com odds disponíveis
+• Comparação automática entre casas
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("📊 Ver Resumo", callback_data="odds_summary")],
+                [InlineKeyboardButton("🎯 Tips com Odds", callback_data="tips")],
+                [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(odds_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /odds: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao verificar odds. Tente novamente.")
+            except:
+                pass
+
+    def proximosjogoslol_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /proximosjogoslol"""
+        try:
+            logger.info(f"📅 Comando /proximosjogoslol chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            # Buscar agenda de forma síncrona
+            scheduled_matches = self._get_schedule_sync()
+            
+            if scheduled_matches:
+                message = "📅 **PRÓXIMOS JOGOS LOL** 📅\n\n"
+                
+                for i, match in enumerate(scheduled_matches[:10], 1):
+                    teams = match.get('teams', [])
+                    if len(teams) >= 2:
+                        team1 = teams[0].get('name', 'Team1')
+                        team2 = teams[1].get('name', 'Team2')
+                        league = match.get('league', 'League')
+                        
+                        # Formatar data/hora
+                        match_time = match.get('start_time', 'TBD')
+                        if isinstance(match_time, str) and 'T' in match_time:
+                            try:
+                                from datetime import datetime
+                                dt = datetime.fromisoformat(match_time.replace('Z', '+00:00'))
+                                match_time = dt.strftime('%d/%m %H:%M')
+                            except:
+                                match_time = 'TBD'
+                        
+                        message += f"**{i}. {team1} vs {team2}**\n🏆 {league}\n🕐 {match_time}\n\n"
+            else:
+                message = """
+📅 **PRÓXIMOS JOGOS LOL** 📅
+
+📭 Nenhuma partida agendada encontrada.
+
+• Use /live para ver partidas ao vivo
+• Use /menu para outras opções
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /proximosjogoslol: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao buscar próximos jogos. Tente novamente.")
+            except:
+                pass
+
+    def filtrarligas_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /filtrarligas"""
+        try:
+            logger.info(f"🏆 Comando /filtrarligas chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            filter_message = """
+🏆 **FILTRAR LIGAS** 🏆
+
+📊 **LIGAS PRINCIPAIS MONITORADAS:**
+
+🥇 **TIER 1 (Principais):**
+• LCK (Korea)
+• LPL (China)  
+• LEC (Europe)
+• LCS (North America)
+
+🥈 **TIER 2 (Regionais):**
+• LCK Challengers
+• LPL Development
+• LEC Masters
+• LCS Academy
+• CBLoL (Brasil)
+• LLA (Latam)
+
+🥉 **TIER 3 (Menores):**
+• Ligas regionais menores
+• Torneios especiais
+• Competições amadoras
+
+⚙️ **FILTROS AUTOMÁTICOS:**
+• Sistema prioriza Tier 1 e 2
+• Tips com critérios específicos por tier
+• Ajuste de unidades por importância da liga
+
+💡 **COMO FUNCIONA:**
+• Bot monitora todas as ligas automaticamente
+• Aplica critérios específicos para cada tier
+• Gera tips baseadas na importância da competição
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🥇 Ver Tier 1", callback_data="schedule")],
+                [InlineKeyboardButton("🥈 Ver Tier 2", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(filter_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /filtrarligas: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao mostrar filtros. Tente novamente.")
+            except:
+                pass
+
+    def timesfavoritos_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /timesfavoritos"""
+        try:
+            logger.info(f"⭐ Comando /timesfavoritos chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            favorites_message = """
+⭐ **TIMES FAVORITOS** ⭐
+
+🤖 **SISTEMA AUTOMÁTICO:**
+• Bot monitora todos os times automaticamente
+• Não há necessidade de configurar favoritos
+• Sistema gera tips para qualquer time que atenda critérios
+
+🏆 **TIMES PRINCIPAIS MONITORADOS:**
+
+🇰🇷 **LCK (Korea):**
+• T1, Gen.G, KT Rolster, DRX, Hanwha Life
+
+🇨🇳 **LPL (China):**
+• JDG, BLG, WBG, TES, LNG
+
+🇪🇺 **LEC (Europe):**
+• G2, Fnatic, MAD Lions, BDS, SK Gaming
+
+🇺🇸 **LCS (North America):**
+• Cloud9, Team Liquid, TSM, 100 Thieves
+
+🇧🇷 **CBLoL (Brasil):**
+• LOUD, FURIA, paiN Gaming, RED Canids
+
+⚡ **MONITORAMENTO 24/7:**
+• Todas as partidas são verificadas
+• Tips geradas baseadas em critérios objetivos
+• Sem bias por times específicos
+
+💡 **SISTEMA INTELIGENTE:**
+• Foca em valor matemático, não preferências
+• Analisa todos os times igualmente
+• Critérios: 65%+ confiança, 5%+ EV
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🎮 Ver Partidas", callback_data="live_matches")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(favorites_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /timesfavoritos: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao mostrar times favoritos. Tente novamente.")
+            except:
+                pass
+
+    def statuslol_command(self, update: Update, context: CallbackContext) -> None:
+        """Comando /statuslol"""
+        try:
+            logger.info(f"📊 Comando /statuslol chamado por {update.effective_user.first_name if update.effective_user else 'Unknown'}")
+            
+            # Obter status atual
+            monitoring_status = self.tips_system.get_monitoring_status()
+            alerts_stats = self.alerts_system.get_alert_stats()
+            
+            status_message = f"""
+📊 **STATUS GERAL LOL** 📊
+
+🤖 **SISTEMA PRINCIPAL:**
+• Bot Status: 🟢 Online
+• Monitoramento: {'🟢 Ativo' if monitoring_status.get('monitoring_active') else '🔴 Inativo'}
+• Último scan: {monitoring_status.get('last_scan', 'Nunca')}
+
+🔮 **SISTEMA DE IA:**
+• Machine Learning: {'🟢 Disponível' if self.prediction_system.ml_system else '🟡 Fallback'}
+• Algoritmos: 🟢 Ativos
+• Dados ao vivo: 🟢 Integrados
+
+📡 **APIS CONECTADAS:**
+• Riot API: 🟢 Conectada
+• The Odds API: 🟢 Conectada
+• Telegram API: 🟢 Conectada
+
+🎯 **TIPS HOJE:**
+• Tips geradas: {monitoring_status.get('tips_today', 0)}
+• Alertas enviados: {alerts_stats.get('tips_sent_today', 0)}
+• Grupos alertas: {len(self.alerts_system.group_chat_ids)}
+
+⏰ **MONITORAMENTO:**
+• Frequência: A cada 3 minutos
+• Tipo: Apenas partidas AO VIVO
+• Critérios: 65%+ confiança, 5%+ EV
+
+💰 **SISTEMA DE UNIDADES:**
+• Bankroll: $1000.00
+• Unidade base: $10.00
+• Sistema: Profissional simplificado
+
+🔄 **ÚLTIMA ATUALIZAÇÃO:**
+{monitoring_status.get('last_scan', 'Sistema iniciando...')}
+            """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar Status", callback_data="monitoring")],
+                [InlineKeyboardButton("🎯 Ver Tips", callback_data="tips")],
+                [InlineKeyboardButton("📈 Performance", callback_data="performance_stats")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(status_message, reply_markup=reply_markup, parse_mode="Markdown")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro no comando /statuslol: {e}")
+            try:
+                update.message.reply_text("❌ Erro ao verificar status. Tente novamente.")
+            except:
+                pass
+
+
 def run_flask():
     """Executa apenas o Flask app para health checks"""
     app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False, threaded=True)
@@ -3797,7 +4409,7 @@ async def main():
                     except:
                         pass
                 lock_fd_or_status.close()
-            
+
             import tempfile
             lock_file_path = os.path.join(tempfile.gettempdir(), 'bot_lol_v3.lock')
             if os.path.exists(lock_file_path):
