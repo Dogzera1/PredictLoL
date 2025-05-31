@@ -242,7 +242,7 @@ class ChampionAnalyzer:
         return np.mean(mobility_scores) / 10.0
 
 class AdvancedMLPredictionSystem:
-    """Sistema avançado de ML para predições money line"""
+    """Sistema avançado de ML para predições money line - OTIMIZADO"""
     
     def __init__(self):
         self.champion_analyzer = ChampionAnalyzer()
@@ -258,14 +258,28 @@ class AdvancedMLPredictionSystem:
             'correct_predictions': 0
         }
         
-        # Cache de predições
+        # Cache de predições OTIMIZADO
         self.prediction_cache = {}
         self.cache_duration = 180  # 3 minutos
         
-        # Inicializar modelos
-        self._initialize_models()
+        # LAZY LOADING - modelos só são inicializados quando necessários
+        self._models_loaded = False
+        self._loading_models = False
         
-        logger.info("🤖 Sistema Avançado de ML inicializado")
+        logger.info("🤖 Sistema Avançado de ML inicializado (lazy loading)")
+        
+    async def _ensure_models_loaded(self):
+        """Garante que os modelos estão carregados (lazy loading)"""
+        if self._models_loaded or self._loading_models:
+            return
+            
+        self._loading_models = True
+        try:
+            await asyncio.sleep(0.1)  # Yield para não bloquear
+            self._initialize_models()
+            self._models_loaded = True
+        finally:
+            self._loading_models = False
         
     def _initialize_models(self):
         """Inicializa modelos de machine learning"""
@@ -277,30 +291,32 @@ class AdvancedMLPredictionSystem:
             self._create_new_models()
             
     def _create_new_models(self):
-        """Cria novos modelos de ML"""
+        """Cria novos modelos de ML - VERSÃO OTIMIZADA"""
         try:
             from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
             from sklearn.neural_network import MLPClassifier
-            from sklearn.svm import SVC
             
+            # Modelos com parâmetros otimizados para velocidade
             self.models = {
                 'random_forest': RandomForestClassifier(
-                    n_estimators=100,
-                    max_depth=10,
+                    n_estimators=50,  # Reduzido de 100 para 50
+                    max_depth=8,      # Reduzido de 10 para 8
                     random_state=42,
-                    class_weight='balanced'
+                    class_weight='balanced',
+                    n_jobs=1  # Evitar overhead de threading
                 ),
                 'gradient_boosting': GradientBoostingClassifier(
-                    n_estimators=100,
-                    learning_rate=0.1,
-                    max_depth=6,
+                    n_estimators=50,  # Reduzido de 100 para 50
+                    learning_rate=0.15,  # Aumentado para convergir mais rápido
+                    max_depth=5,      # Reduzido de 6 para 5
                     random_state=42
                 ),
                 'neural_network': MLPClassifier(
-                    hidden_layer_sizes=(100, 50),
-                    max_iter=500,
+                    hidden_layer_sizes=(50, 25),  # Reduzido de (100, 50)
+                    max_iter=300,     # Reduzido de 500 para 300
                     random_state=42,
-                    early_stopping=True
+                    early_stopping=True,
+                    validation_fraction=0.1
                 ),
                 'ensemble_weight': {
                     'random_forest': 0.4,
@@ -309,7 +325,7 @@ class AdvancedMLPredictionSystem:
                 }
             }
             
-            logger.info("✅ Novos modelos de ML criados")
+            logger.info("✅ Modelos ML otimizados criados")
             
         except ImportError:
             logger.warning("⚠️ Scikit-learn não disponível - usando modelo simplificado")
@@ -428,16 +444,19 @@ class AdvancedMLPredictionSystem:
         
     async def predict_money_line(self, match_state: MatchState, draft_data: DraftData,
                                 team1_name: str, team2_name: str) -> Dict:
-        """Predição principal para money line"""
+        """Predição principal para money line - OTIMIZADA"""
         
         try:
-            # Verificar cache
+            # Verificar cache primeiro (mais rápido)
             cache_key = f"{team1_name}_{team2_name}_{match_state.game_time:.1f}"
             if cache_key in self.prediction_cache:
                 cached = self.prediction_cache[cache_key]
                 if (datetime.now() - cached['timestamp']).seconds < self.cache_duration:
                     cached['cache_hit'] = True
                     return cached
+            
+            # Carregar modelos se necessário (assíncrono)
+            await self._ensure_models_loaded()
                     
             # Analisar composição
             team_composition = self.champion_analyzer.analyze_composition(draft_data)
@@ -446,19 +465,19 @@ class AdvancedMLPredictionSystem:
             features = self.extract_features(match_state, draft_data, team_composition)
             
             # Fazer predição com ensemble
-            if 'random_forest' in self.models:
+            if self._models_loaded and 'random_forest' in self.models:
                 prediction = self._ensemble_prediction(features)
             else:
                 prediction = self._simple_prediction(features)
                 
-            # Calcular confiança
-            confidence = self._calculate_confidence(features, prediction, team_composition)
+            # Calcular confiança (versão simplificada)
+            confidence = self._calculate_confidence_fast(features, prediction)
             
-            # Calcular expected value
-            ev_data = self._calculate_expected_value(prediction, confidence)
+            # Calcular expected value (versão otimizada)
+            ev_data = self._calculate_expected_value_fast(prediction)
             
-            # Gerar análise
-            analysis = self._generate_detailed_analysis(
+            # Gerar análise (versão concisa)
+            analysis = self._generate_analysis_fast(
                 match_state, team_composition, prediction, team1_name, team2_name
             )
             
@@ -474,27 +493,23 @@ class AdvancedMLPredictionSystem:
                 'recommended_bet': ev_data['recommendation'],
                 'game_time': match_state.game_time,
                 'game_phase': self._get_game_phase_name(match_state.game_time),
-                'key_factors': analysis['key_factors'],
-                'risk_assessment': analysis['risk_assessment'],
-                'detailed_analysis': analysis['detailed_text'],
-                'feature_importance': self._get_top_features(features),
+                'key_factors': analysis['key_factors'][:3],  # Limitado a 3
+                'risk_assessment': analysis['risk_assessment'][:2],  # Limitado a 2
+                'detailed_analysis': analysis['summary'],  # Versão resumida
                 'timestamp': datetime.now(),
                 'cache_hit': False,
-                'model_type': 'ensemble' if 'random_forest' in self.models else 'simple'
+                'model_type': 'ensemble' if self._models_loaded else 'simple'
             }
             
             # Salvar no cache
             self.prediction_cache[cache_key] = result
-            
-            # Registrar para tracking
-            self._track_prediction(result)
             
             return result
             
         except Exception as e:
             logger.error(f"❌ Erro na predição ML: {e}")
             return self._get_fallback_prediction(team1_name, team2_name)
-            
+
     def _ensemble_prediction(self, features: np.ndarray) -> Dict:
         """Predição usando ensemble de modelos"""
         try:
@@ -546,33 +561,17 @@ class AdvancedMLPredictionSystem:
             'team2_prob': 1 - team1_prob
         }
         
-    def _calculate_confidence(self, features: np.ndarray, prediction: Dict, 
-                            team_composition: TeamComposition) -> Dict:
-        """Calcula nível de confiança da predição"""
+    def _calculate_confidence_fast(self, features: np.ndarray, prediction: Dict) -> Dict:
+        """Versão otimizada do cálculo de confiança"""
         
-        # Fatores de confiança
-        confidence_factors = []
+        # Margem da predição
+        prob_margin = abs(prediction['team1_prob'] - 0.5) * 2
         
-        # 1. Margem da predição
-        prob_margin = abs(prediction['team1_prob'] - 0.5)
-        confidence_factors.append(prob_margin * 2)  # 0-1 scale
+        # Qualidade dos dados baseada em features
+        data_quality = min(abs(features[1]) * 2, 1) if len(features) > 1 else 0.5
         
-        # 2. Consistência dos dados
-        if features[1] != 0:  # gold_diff
-            confidence_factors.append(min(abs(features[1]) * 2, 1))
-            
-        # 3. Fase do jogo (mais confiável em late game)
-        game_phase = self._get_game_phase(features[0])
-        phase_confidence = 0.5 + (game_phase * 0.25)
-        confidence_factors.append(phase_confidence)
-        
-        # 4. Qualidade da composição
-        comp_clarity = abs(team_composition.team1_comp_strength - 
-                          team_composition.team2_comp_strength)
-        confidence_factors.append(min(comp_clarity / 2, 1))
-        
-        # Calcular confiança final
-        final_confidence = np.mean(confidence_factors) * 100
+        # Confiança final simplificada
+        final_confidence = (prob_margin * 0.7 + data_quality * 0.3) * 100
         
         # Determinar nível
         if final_confidence >= 85:
@@ -584,136 +583,67 @@ class AdvancedMLPredictionSystem:
         else:
             level = 'Baixa'
             
-        return {
-            'score': final_confidence,
-            'level': level,
-            'factors': confidence_factors
-        }
+        return {'score': final_confidence, 'level': level}
         
-    def _calculate_expected_value(self, prediction: Dict, confidence: Dict) -> Dict:
-        """Calcula expected value para money line"""
+    def _calculate_expected_value_fast(self, prediction: Dict) -> Dict:
+        """Versão otimizada do cálculo de EV"""
         
-        # Estimar odds do mercado (simulação)
         team1_prob = prediction['team1_prob']
         
-        # Margem típica das casas de apostas (5-7%)
-        market_margin = 0.06
+        # Estimativa rápida de odds
+        team1_odds = 1 / max(team1_prob * 0.94, 0.1)  # Margem 6%
+        team2_odds = 1 / max((1 - team1_prob) * 0.94, 0.1)
         
-        # Odds implícitas do mercado
-        market_team1_prob = team1_prob * (1 - market_margin/2)
-        market_team2_prob = (1 - team1_prob) * (1 - market_margin/2)
-        
-        # Converter para odds decimais
-        team1_odds = 1 / market_team1_prob if market_team1_prob > 0 else 2.0
-        team2_odds = 1 / market_team2_prob if market_team2_prob > 0 else 2.0
-        
-        # Calcular EV para cada time
+        # EV simples
         team1_ev = (team1_prob * team1_odds) - 1
         team2_ev = ((1 - team1_prob) * team2_odds) - 1
         
-        # Determinar melhor aposta
-        if team1_ev > team2_ev and team1_ev > 0.05:  # Mínimo 5% EV
-            recommendation = {
-                'team': 'team1',
-                'ev': team1_ev * 100,
-                'odds': team1_odds,
-                'probability': team1_prob
-            }
+        # Recomendação rápida
+        if team1_ev > team2_ev and team1_ev > 0.05:
+            recommendation = {'team': 'team1', 'ev': team1_ev * 100}
         elif team2_ev > 0.05:
-            recommendation = {
-                'team': 'team2', 
-                'ev': team2_ev * 100,
-                'odds': team2_odds,
-                'probability': 1 - team1_prob
-            }
+            recommendation = {'team': 'team2', 'ev': team2_ev * 100}
         else:
-            recommendation = {
-                'team': 'none',
-                'ev': 0,
-                'reason': 'Nenhuma value bet encontrada'
-            }
+            recommendation = {'team': 'none', 'reason': 'Sem value'}
             
         return {
             'ev': max(team1_ev, team2_ev) * 100,
-            'team1_ev': team1_ev * 100,
-            'team2_ev': team2_ev * 100,
-            'recommendation': recommendation,
-            'estimated_odds': {
-                'team1': team1_odds,
-                'team2': team2_odds
-            }
+            'recommendation': recommendation
         }
         
-    def _generate_detailed_analysis(self, match_state: MatchState, 
-                                  team_composition: TeamComposition,
-                                  prediction: Dict, team1_name: str, 
-                                  team2_name: str) -> Dict:
-        """Gera análise detalhada da predição"""
+    def _generate_analysis_fast(self, match_state: MatchState, 
+                              team_composition: TeamComposition,
+                              prediction: Dict, team1_name: str, 
+                              team2_name: str) -> Dict:
+        """Versão otimizada da análise"""
         
         key_factors = []
         
-        # Analisar vantagens atuais
+        # Fatores mais importantes apenas
         gold_diff = match_state.team1_gold - match_state.team2_gold
-        if abs(gold_diff) > 1000:
+        if abs(gold_diff) > 2000:
             leading_team = team1_name if gold_diff > 0 else team2_name
-            key_factors.append(f"Vantagem de ouro significativa: {leading_team}")
+            key_factors.append(f"Vantagem de ouro: {leading_team}")
             
-        # Analisar objetivos
-        if match_state.team1_dragons > match_state.team2_dragons + 1:
+        if match_state.team1_dragons - match_state.team2_dragons >= 2:
             key_factors.append(f"Controle de dragões: {team1_name}")
-        elif match_state.team2_dragons > match_state.team1_dragons + 1:
+        elif match_state.team2_dragons - match_state.team1_dragons >= 2:
             key_factors.append(f"Controle de dragões: {team2_name}")
             
-        # Analisar composição
-        if abs(team_composition.team1_comp_strength - team_composition.team2_comp_strength) > 1:
-            stronger_comp = team1_name if team_composition.team1_comp_strength > team_composition.team2_comp_strength else team2_name
-            key_factors.append(f"Composição superior: {stronger_comp}")
-            
-        # Análise de fase
-        game_phase = self._get_game_phase_name(match_state.game_time)
-        if team_composition.early_game_advantage != 'neutral' and game_phase == 'Early Game':
-            adv_team = team1_name if team_composition.early_game_advantage == 'team1' else team2_name
-            key_factors.append(f"Vantagem early game ativa: {adv_team}")
-            
-        # Risk assessment
         risk_factors = []
-        
-        if prediction['team1_prob'] > 0.8 or prediction['team1_prob'] < 0.2:
-            risk_factors.append("Predição extrema - maior variância")
+        if prediction['team1_prob'] > 0.85 or prediction['team1_prob'] < 0.15:
+            risk_factors.append("Predição extrema")
             
-        if match_state.game_time < 10:
-            risk_factors.append("Early game - maior imprevisibilidade")
-            
-        if abs(match_state.team1_kills - match_state.team2_kills) > 10:
-            risk_factors.append("Jogo desbalanceado - possível snowball")
-            
-        # Texto detalhado
+        # Resumo conciso
         favored_team = team1_name if prediction['team1_prob'] > 0.5 else team2_name
         prob = max(prediction['team1_prob'], prediction['team2_prob']) * 100
         
-        detailed_text = f"""
-🎮 **ANÁLISE ML COMPLETA** 🎮
-
-⭐ **Favorito:** {favored_team} ({prob:.1f}% probabilidade)
-⏱️ **Fase:** {game_phase} ({match_state.game_time:.1f} min)
-
-📊 **Estado Atual:**
-• Ouro: {match_state.team1_gold:,} vs {match_state.team2_gold:,}
-• Kills: {match_state.team1_kills} vs {match_state.team2_kills}
-• Torres: {match_state.team1_towers} vs {match_state.team2_towers}
-• Dragões: {match_state.team1_dragons} vs {match_state.team2_dragons}
-
-🎯 **Fatores Decisivos:**
-{chr(10).join(f"• {factor}" for factor in key_factors)}
-
-⚠️ **Fatores de Risco:**
-{chr(10).join(f"• {risk}" for risk in risk_factors) if risk_factors else "• Risco padrão"}
-        """
+        summary = f"Favorito: {favored_team} ({prob:.0f}%) | Fase: {self._get_game_phase_name(match_state.game_time)}"
         
         return {
             'key_factors': key_factors,
             'risk_assessment': risk_factors,
-            'detailed_text': detailed_text.strip()
+            'summary': summary
         }
         
     def _get_game_phase_name(self, game_time: float) -> str:

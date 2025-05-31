@@ -19,7 +19,7 @@ THE_ODDS_API_KEY=8cff2fb4dafc21c0ac5c04862903990d
 # PandaScore - Especializado em Esports (Pago)
 # Cadastro: https://pandascore.co/
 # Documentação: https://developers.pandascore.co/
-PANDASCORE_API_KEY=YOUR_PANDASCORE_API_KEY_HERE
+PANDASCORE_API_KEY=90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ
 
 # OddsMatrix - Teste grátis de 1 mês
 # Cadastro: https://oddsmatrix.com/
