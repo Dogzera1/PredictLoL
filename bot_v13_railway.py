@@ -1,8 +1,8 @@
 ﻿# -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
 """
-BOT LOL V3 ULTRA AVAN??ADO - Sistema de Tips Profissional
-Sistema de unidades padr??o de grupos de apostas profissionais
+BOT LOL V3 ULTRA AVANÇADO - Sistema de Tips Profissional
+Sistema de unidades padrão de grupos de apostas profissionais
 APENAS DADOS REAIS DA API DA RIOT GAMES
 """
 
@@ -20,7 +20,7 @@ import pytz
 import random
 import concurrent.futures
 
-# ===== SISTEMA DE OTIMIZA????O E CACHE GLOBAL =====
+# ===== SISTEMA DE OTIMIZAÇÃO E CACHE GLOBAL =====
 class GlobalCacheManager:
     """Sistema de cache global para otimizar performance"""
     
@@ -132,6 +132,9 @@ from telegram.error import TelegramError
 
 import numpy as np
 import aiohttp
+
+# Import do BotHandler
+from bot_handler import BotHandler
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
