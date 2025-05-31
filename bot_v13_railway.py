@@ -2162,41 +2162,57 @@ Use /menu para ver todas as opções!
 
     def start_command_sync(self, update: Update, context) -> None:
         """Comando /start - versão síncrona para v13"""
-        import asyncio
         try:
-            # Tentar executar a versão async
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.start_command(update, context))
-            loop.close()
-        except Exception as e:
-            logger.error(f"Erro no start_command_sync: {e}")
-            # Fallback simples
+            logger.info("🎮 start_command_sync: Comando /start chamado")
+            
+            # VERSÃO TOTALMENTE SÍNCRONA - SEM ASYNC
             user = update.effective_user
-            welcome_message = f"""
-🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
+            user_name = user.first_name if user and user.first_name else "Usuário"
+            
+            welcome_message = f"""🎮 BOT LOL V3 ULTRA AVANÇADO 🎮
 
-Olá {user.first_name}! 👋
+Olá {user_name}! 👋
 
-🔥 **FUNCIONALIDADES:**
+🎲 SISTEMA DE UNIDADES PROFISSIONAL
+📊 Baseado em grupos de apostas profissionais
+⚡ Sem Kelly Criterion - Sistema simplificado
+🎯 Critérios: 65%+ confiança, 5%+ EV mínimo
+
+🔥 FUNCIONALIDADES:
 • 🎯 Tips profissionais com monitoramento ativo
 • 🔮 Predições IA com machine learning
 • 📅 Agenda de partidas (próximos 7 dias)
 • 🎮 Partidas ao vivo selecionáveis
+• 📢 Sistema de alertas para grupos
+• 📊 Sistema de unidades padrão
+• 📋 Estatísticas detalhadas
 
-Use /menu para ver todas as opções!
-            """
+Use /menu para ver todas as opções!"""
             
+            # Criar botões inline
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             keyboard = [
                 [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
                 [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
                 [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
                 [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📢 Sistema de Alertas", callback_data="alert_stats")],
                 [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+            # Enviar mensagem sem formatação primeiro para garantir que funciona
+            update.message.reply_text(welcome_message, reply_markup=reply_markup)
+            logger.info("✅ start_command_sync: Mensagem enviada com sucesso!")
+                
+        except Exception as e:
+            logger.error(f"❌ start_command_sync: Erro: {e}")
+            # Fallback ultra simples
+            try:
+                update.message.reply_text("🎮 Bot LoL V3 iniciado! Use /menu para ver as opções.")
+                logger.info("✅ start_command_sync: Fallback simples enviado")
+            except Exception as final_error:
+                logger.error(f"❌ start_command_sync: Fallback falhou: {final_error}")
 
     async def menu_command(self, update: Update, context) -> None:
         """Comando /menu"""
@@ -4055,6 +4071,26 @@ O sistema monitora continuamente todas as partidas e envia alertas automáticos 
     def help_command_sync(self, update: Update, context) -> None:
         self._run_async_command_sync(self.help_command, update, context)
 
+    # Comando de teste para diagnóstico
+    def test_command_sync(self, update: Update, context) -> None:
+        """Comando de teste para diagnóstico"""
+        try:
+            logger.info("🧪 test_command_sync: Comando chamado")
+            user = update.effective_user
+            user_name = user.first_name if user and user.first_name else "Usuário"
+            
+            test_message = f"🧪 TESTE FUNCIONANDO!\n\nOlá {user_name}!\n\nSe você vê esta mensagem, o bot está funcionando."
+            
+            update.message.reply_text(test_message)
+            logger.info("✅ test_command_sync: Mensagem enviada com sucesso")
+            
+        except Exception as e:
+            logger.error(f"❌ test_command_sync: Erro: {e}")
+            try:
+                update.message.reply_text("❌ Erro no comando de teste")
+            except:
+                pass
+
 def run_flask_app():
     """Executa Flask em thread separada (apenas para health check)"""
     # Não executar se webhook estiver ativo
@@ -4592,12 +4628,13 @@ def main():
             dispatcher.add_handler(CommandHandler("statuslol", bot.statuslol_command_sync))
             dispatcher.add_handler(CommandHandler("comandos", bot.comandos_command_sync))
             dispatcher.add_handler(CommandHandler("help", bot.help_command_sync))
+            dispatcher.add_handler(CommandHandler("test", bot.test_command_sync))  # Comando de teste
             
             dispatcher.add_handler(CallbackQueryHandler(bot.callback_handler_sync))  # Versão síncrona para v13
 
             # Contar handlers corretamente
             total_handlers = len(dispatcher.handlers[0])  # Default group
-            logger.info(f"✅ Total de handlers registrados: {total_handlers} (24 CommandHandlers + 1 CallbackQueryHandler = 25)")
+            logger.info(f"✅ Total de handlers registrados: {total_handlers} (25 CommandHandlers + 1 CallbackQueryHandler = 26)")
 
             if is_railway:
                 # Modo Railway - Webhook v13
