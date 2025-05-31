@@ -1721,6 +1721,11 @@ class TelegramAlertsSystem:
 
         logger.info("???? Sistema de Alertas para Tips inicializado")
 
+    def set_bot_application(self, application):
+        """Define aplicação do bot para envio de alertas"""
+        self.bot_application = application
+        logger.info("🤖 Bot application definida para alertas")
+
     def add_group(self, chat_id: int):
         """Adiciona grupo para receber alertas"""
         self.group_chat_ids.add(chat_id)
