@@ -4275,12 +4275,12 @@ def main():
         
         logger.info("🎲 Sistema de Unidades: PADRÃO DE GRUPOS PROFISSIONAIS")
 
-        # LIMPEZA FORÇADA PARA ELIMINAR CONFLITOS
-        logger.info("🧹 INICIANDO LIMPEZA FORÇADA DA SESSÃO DO TELEGRAM...")
-        if force_clean_telegram_session():
-            logger.info("✅ Limpeza forçada concluída com sucesso")
-        else:
-            logger.warning("⚠️ Limpeza forçada falhou - continuando mesmo assim")
+        # LIMPEZA FORÇADA TEMPORARIAMENTE DESABILITADA PARA RAILWAY
+        # logger.info("🧹 INICIANDO LIMPEZA FORÇADA DA SESSÃO DO TELEGRAM...")
+        # if force_clean_telegram_session():
+        #     logger.info("✅ Limpeza forçada concluída com sucesso")
+        # else:
+        #     logger.warning("⚠️ Limpeza forçada falhou - continuando mesmo assim")
         
         logger.info("🎲 Sistema de Unidades: PADRÃO DE GRUPOS PROFISSIONAIS")
         logger.info("📊 Baseado em: Confiança + EV + Tier da Liga")
@@ -4812,10 +4812,12 @@ def main():
                             def run_async_handler():
                                 try:
                                     logger.info("🔄 Iniciando processamento do update...")
-                                    # Verificar se já existe um loop
-                                    loop = asyncio.get_event_loop()
-                                    if loop.is_running():
-                                        # Se o loop já está rodando, criar tarefa
+                                    # CORREÇÃO: Sempre criar novo loop para thread do webhook
+                                    try:
+                                        # Verificar se já existe loop na thread atual
+                                        current_loop = asyncio.get_running_loop()
+                                        # Se chegou aqui, há loop rodando - usar thread separada
+                                        logger.info("🧵 Loop detectado - criando thread separada...")
                                         import threading
                                         def async_task():
                                             logger.info("🧵 Criando thread separada para processar update...")
@@ -4836,11 +4838,19 @@ def main():
                                         thread.start()
                                         thread.join(timeout=30)  # Timeout de 30s
                                         logger.info("✅ Thread finalizada")
-                                    else:
-                                        # Se não há loop, usar run
-                                        logger.info("⚙️ Executando dispatcher.process_update diretamente...")
-                                        dispatcher.process_update(update)
-                                        logger.info("✅ Update processado diretamente!")
+                                        
+                                    except RuntimeError:
+                                        # Não há loop na thread atual - criar novo
+                                        logger.info("⚙️ Nenhum loop detectado - criando novo loop...")
+                                        new_loop = asyncio.new_event_loop()
+                                        asyncio.set_event_loop(new_loop)
+                                        try:
+                                            logger.info("⚙️ Executando dispatcher.process_update...")
+                                            dispatcher.process_update(update)
+                                            logger.info("✅ Update processado com sucesso!")
+                                        finally:
+                                            new_loop.close()
+                                            
                                 except Exception as handler_error:
                                     logger.error(f"❌ Erro no run_async_handler: {handler_error}")
                                     import traceback
