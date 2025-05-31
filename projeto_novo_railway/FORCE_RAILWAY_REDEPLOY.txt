@@ -1,0 +1,15 @@
+FORÇA REDEPLOY RAILWAY - URGENTE
+=================================
+
+PROBLEMA: Railway não aplicou as correções dos callbacks
+STATUS: Comando /start funciona, mas callbacks ainda com erro
+
+CALLBACKS FALTANDO NO RAILWAY:
+❌ _handle_predictions_callback
+❌ _handle_main_menu_callback  
+❌ _handle_alert_stats_callback
+
+AÇÃO: Este arquivo força novo deploy
+TIMESTAMP: 2025-05-31 17:55:00
+
+RAILWAY DEVE APLICAR VERSÃO CORRETA AGORA! 

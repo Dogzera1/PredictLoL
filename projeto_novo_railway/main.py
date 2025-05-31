@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-BOT LOL V3 ULTRA AVANÇADO - Sistema de Tips Profissional
-Sistema de unidades padrão de grupos de apostas profissionais
-APENAS DADOS REAIS DA API DA RIOT GAMES
+BOT LOL V3 ULTRA ADVANCED - VERSÃO RAILWAY
+===========================================
+FORÇA REBUILD: 2025-05-31 17:55:00
+CALLBACKS IMPLEMENTADOS E FUNCIONANDO
+======================================
 """
 
 import os
@@ -1558,7 +1560,7 @@ class ProfessionalTipsSystem:
 
 class LoLBotV3UltraAdvanced:
     """Bot LoL V3 Ultra Avançado - Tips + Agenda + Predições IA + ML Otimizado"""
-    
+
     def __init__(self):
         # Clients básicos (inicialização rápida)
         self.riot_client = RiotAPIClient()
@@ -1568,11 +1570,11 @@ class LoLBotV3UltraAdvanced:
         self.schedule_manager = ScheduleManager(riot_client=self.riot_client)
         self.prediction_system = DynamicPredictionSystem()
         self.alerts_system = TelegramAlertsSystem(bot_token=TOKEN)
-        
+
         # Sistemas avançados
         self.tips_system = ProfessionalTipsSystem(riot_client=self.riot_client)
         self.tips_system.set_bot_instance(self)
-        
+
         # Sistema de Odds Reais
         self.odds_system = odds_system if ODDS_SYSTEM_AVAILABLE else None
         
@@ -1967,12 +1969,12 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
 🔄 Tente novamente em alguns minutos
                 """
 
-            keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
                 [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
                 [InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
-                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
-            ]
+                    [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+                ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if TELEGRAM_VERSION == "v20+":
@@ -2057,7 +2059,7 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
                     "❌ Comando não reconhecido. Use /start para voltar ao menu principal.",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]])
                 )
-            
+
         except Exception as e:
             logger.error(f"❌ Erro no callback_handler: {e}")
             await query.edit_message_text(
@@ -2824,15 +2826,18 @@ Use o botão "Cadastrar Grupo" abaixo
             )
 
     async def _handle_prediction_cache_callback(self, query):
+        """Callback para mostrar status do cache de predições"""
         cache_status = self.prediction_system.get_cache_status()
+        
         cache_message = f"""
-🔍 **STATUS DO CACHE DE PREDIÇÕES** 🔍
+🧠 **CACHE DE PREDIÇÕES** 🧠
 
-🎯 **PREDIÇÕES:**
-• Total: {cache_status['cached_predictions']}
-• Duração: {cache_status['cache_duration_minutes']} minutos
+📊 **Status Atual:**
+• Total em cache: {cache_status['total_cached']}
+• Cache válido: {'✅ Sim' if cache_status['cache_valid'] else '❌ Não'}
+• Tempo até expirar: {cache_status['time_until_expire']}
 • Última predição: {cache_status['last_prediction'].strftime('%d/%m %H:%M') if cache_status['last_prediction'] else 'Nunca'}
-        """
+"""
         # Usar edit_message_text para callbacks
         await query.edit_message_text(cache_message, parse_mode=ParseMode.MARKDOWN,
                                       reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Voltar", callback_data="predictions")]]))
@@ -2861,7 +2866,7 @@ Use o botão "Cadastrar Grupo" abaixo
 
 🤖 **PROCESSO AUTOMÁTICO:**
 O sistema monitora continuamente e envia alertas automáticos quando encontra tips de alta qualidade.
-            """
+"""
 
             keyboard = [
                 [InlineKeyboardButton("🔄 Atualizar", callback_data="alert_stats")],
