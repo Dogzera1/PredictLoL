@@ -2160,6 +2160,44 @@ Use /menu para ver todas as opções!
         else:
             await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
+    def start_command_sync(self, update: Update, context) -> None:
+        """Comando /start - versão síncrona para v13"""
+        import asyncio
+        try:
+            # Tentar executar a versão async
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.start_command(update, context))
+            loop.close()
+        except Exception as e:
+            logger.error(f"Erro no start_command_sync: {e}")
+            # Fallback simples
+            user = update.effective_user
+            welcome_message = f"""
+🎮 **BOT LOL V3 ULTRA AVANÇADO** 🎮
+
+Olá {user.first_name}! 👋
+
+🔥 **FUNCIONALIDADES:**
+• 🎯 Tips profissionais com monitoramento ativo
+• 🔮 Predições IA com machine learning
+• 📅 Agenda de partidas (próximos 7 dias)
+• 🎮 Partidas ao vivo selecionáveis
+
+Use /menu para ver todas as opções!
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("🎯 Tips Profissionais", callback_data="tips")],
+                [InlineKeyboardButton("🔮 Predições IA", callback_data="predictions")],
+                [InlineKeyboardButton("📅 Agenda de Partidas", callback_data="schedule")],
+                [InlineKeyboardButton("🎮 Partidas Ao Vivo", callback_data="live_matches")],
+                [InlineKeyboardButton("📋 Menu Completo", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+
     async def menu_command(self, update: Update, context) -> None:
         """Comando /menu"""
         menu_message = """
@@ -4429,7 +4467,7 @@ def main():
             bot.set_bot_application(updater) # Passando o updater para v13
 
             # Handlers
-            dispatcher.add_handler(CommandHandler("start", bot.start_command))
+            dispatcher.add_handler(CommandHandler("start", bot.start_command_sync))  # Versão síncrona para v13
             dispatcher.add_handler(CommandHandler("menu", bot.menu_command))
             dispatcher.add_handler(CommandHandler("tips", bot.tips_command))
             dispatcher.add_handler(CommandHandler("live", bot.live_matches_command))
@@ -4498,14 +4536,42 @@ def main():
                         
                         logger.info(f"📨 Dados recebidos: {json.dumps(data, indent=2)}")
                         
-                        # Processar update do Telegram usando o dispatcher v13
+                        # Processar update do Telegram usando o dispatcher v13 COM SUPORTE ASYNC
                         from telegram import Update
+                        import asyncio
+                        
                         update = Update.de_json(data, updater.bot)
                         
                         if update:
                             logger.info(f"✅ Update processado: tipo={type(update).__name__}")
-                            # Processar update no dispatcher
-                            dispatcher.process_update(update)
+                            
+                            # CORREÇÃO: Executar em loop async para v13
+                            def run_async_handler():
+                                try:
+                                    # Verificar se já existe um loop
+                                    loop = asyncio.get_event_loop()
+                                    if loop.is_running():
+                                        # Se o loop já está rodando, criar tarefa
+                                        import threading
+                                        def async_task():
+                                            new_loop = asyncio.new_event_loop()
+                                            asyncio.set_event_loop(new_loop)
+                                            try:
+                                                dispatcher.process_update(update)
+                                            finally:
+                                                new_loop.close()
+                                        
+                                        thread = threading.Thread(target=async_task)
+                                        thread.start()
+                                        thread.join(timeout=30)  # Timeout de 30s
+                                    else:
+                                        # Se não há loop, usar run
+                                        dispatcher.process_update(update)
+                                except:
+                                    # Fallback: processar de forma síncrona
+                                    dispatcher.process_update(update)
+                            
+                            run_async_handler()
                         else:
                             logger.warning("⚠️ Update não pôde ser processado")
                         
