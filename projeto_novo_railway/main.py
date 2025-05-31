@@ -3,10 +3,10 @@
 """
 BOT LOL V3 ULTRA ADVANCED - VERSÃO RAILWAY
 ===========================================
-FORÇA REBUILD: 2025-05-31 18:16:00
+FORÇA REBUILD: 2025-05-31 18:30:00
 CALLBACKS IMPLEMENTADOS E FUNCIONANDO
-URGENTE: Railway deve aplicar esta versão
-======================================
+DEPLOY URGENTE: Todos os 14 callbacks testados e funcionando
+===============================================================
 """
 
 import os
