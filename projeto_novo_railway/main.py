@@ -451,16 +451,36 @@ class ProfessionalUnitsSystem:
 
     def get_performance_summary(self) -> Dict:
         """Retorna resumo de performance"""
+        # Garantir que todas as estatísticas existam
+        stats = self.performance_stats.copy()
+        
+        # Calcular valores derivados com segurança
+        total_bets = stats.get('total_bets', 0)
+        wins = stats.get('wins', 0)
+        losses = stats.get('losses', 0)
+        total_units_staked = stats.get('total_units_staked', 0)
+        total_units_profit = stats.get('total_units_profit', 0)
+        
+        # Calcular win_rate e roi
+        win_rate = (wins / total_bets * 100) if total_bets > 0 else 0
+        roi = (total_units_profit / total_units_staked * 100) if total_units_staked > 0 else 0
+        
         return {
-            'total_bets': self.performance_stats['total_bets'],
-            'wins': self.performance_stats['wins'],
-            'losses': self.performance_stats['losses'],
-            'strike_rate': self.performance_stats['strike_rate'],
-            'roi_percentage': self.performance_stats['roi_percentage'],
-            'total_units_staked': self.performance_stats['total_units_staked'],
-            'total_units_profit': self.performance_stats['total_units_profit'],
-            'current_bankroll': self.bankroll + (self.performance_stats['total_units_profit'] * self.base_unit),
-            'unit_value': self.base_unit
+            'total_bets': total_bets,
+            'wins': wins,
+            'losses': losses,
+            'win_rate': win_rate,
+            'roi': roi,
+            'roi_percentage': stats.get('roi_percentage', roi),
+            'strike_rate': stats.get('strike_rate', win_rate),
+            'total_units_staked': total_units_staked,
+            'total_units_profit': total_units_profit,
+            'current_bankroll': self.bankroll + (total_units_profit * self.base_unit),
+            'unit_value': self.base_unit,
+            'profit_loss': total_units_profit * self.base_unit,
+            'avg_odds': stats.get('avg_odds', 2.0),
+            'best_streak': stats.get('best_streak', 0),
+            'current_streak': stats.get('current_streak', 0)
         }
 
     def get_units_explanation(self) -> str:
@@ -1895,64 +1915,83 @@ O sistema escaneia continuamente todas as partidas disponíveis na API da Riot G
                 await update.message.reply_text(error_message)
 
     async def live_matches_command(self, update: Update, context) -> None:
-        """Comando /live"""
+        """Comando /live_matches"""
         try:
-            matches = await self.riot_client.get_live_matches()
+            # Inicializar cache se não existir
+            if not hasattr(self, 'live_matches_cache'):
+                self.live_matches_cache = {'matches': [], 'timestamp': 0}
+            
+            # Verificar cache (5 minutos)
+            if time.time() - self.live_matches_cache.get('timestamp', 0) > 300:
+                logger.info("🔍 Buscando partidas ao vivo...")
+                live_matches = await self.riot_client.get_live_matches()
+                self.live_matches_cache = {
+                    'matches': live_matches,
+                    'timestamp': time.time()
+                }
+            else:
+                live_matches = self.live_matches_cache['matches']
 
-            if matches:
-                message = "🎮 **PARTIDAS AO VIVO** 🎮\n\nSelecione uma partida para análise detalhada:\n\n"
+            if live_matches:
+                live_message = f"""
+🎮 **PARTIDAS AO VIVO** 🎮
 
-                keyboard = []
-                for i, match in enumerate(matches[:8]):  # Máximo 8 partidas
+🔴 **{len(live_matches)} PARTIDAS ATIVAS**
+
+"""
+                for i, match in enumerate(live_matches[:10], 1):
                     teams = match.get('teams', [])
                     if len(teams) >= 2:
                         team1 = teams[0].get('name', 'Team1')
                         team2 = teams[1].get('name', 'Team2')
                         league = match.get('league', 'League')
-                        start_time = match.get('start_time_formatted', 'TBD')
+                        
+                        live_message += f"""
+**{i}. {team1} vs {team2}**
+🏆 {league}
+🔴 AO VIVO
 
-                        button_text = f"{team1} vs {team2}"
-                        if len(button_text) > 30:
-                            button_text = button_text[:27] + "..."
+"""
 
-                        keyboard.append([InlineKeyboardButton(
-                            button_text,
-                            callback_data=f"match_{i}"
-                        )])
-
-                        # Cache da partida
-                        self.live_matches_cache[i] = match
-
-                keyboard.append([InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")])
-                keyboard.append([InlineKeyboardButton("🏠 Menu", callback_data="main_menu")])
-
-            else:
-                message = """
-🎮 **NENHUMA PARTIDA AO VIVO** 🎮
-
-❌ Não há partidas ao vivo no momento.
-
-🔄 Tente novamente em alguns minutos.
+                live_message += f"""
+⏰ Atualizado: {datetime.fromtimestamp(self.live_matches_cache['timestamp']).strftime('%H:%M:%S')}
                 """
-                keyboard = [
-                    [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
-                    [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
-                ]
+            else:
+                live_message = """
+🎮 **PARTIDAS AO VIVO** 🎮
 
+ℹ️ **NENHUMA PARTIDA AO VIVO**
+
+🔍 **Não há partidas ativas no momento**
+
+🔄 Tente novamente em alguns minutos
+                """
+
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="live_matches")],
+                [InlineKeyboardButton("🎯 Tips", callback_data="tips")],
+                [InlineKeyboardButton("📅 Agenda", callback_data="schedule")],
+                [InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             if TELEGRAM_VERSION == "v20+":
-                await update.message.reply_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text(live_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
             else:
-                await update.message.reply_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
+                await update.message.reply_text(live_message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN)
 
         except Exception as e:
             logger.error(f"Erro no comando live: {e}")
-            error_message = "❌ Erro ao buscar partidas. Tente novamente."
+            error_message = "❌ Erro ao buscar partidas ao vivo. Tente novamente."
             if TELEGRAM_VERSION == "v20+":
                 await update.message.reply_text(error_message)
             else:
                 await update.message.reply_text(error_message)
+
+    # Alias para compatibilidade
+    async def live_command(self, update: Update, context) -> None:
+        """Alias para live_matches_command"""
+        await self.live_matches_command(update, context)
 
     async def callback_handler(self, update: Update, context) -> None:
         """Handler principal para callbacks"""
