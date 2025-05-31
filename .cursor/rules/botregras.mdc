@@ -3,4 +3,4 @@ description:
 globs: 
 alwaysApply: true
 ---
-Nao remova funcionalidades existentes, na hora de corrigir um arquivo principal tome cuidado para nao remover funcionalidades. Sempre que fizer uma alteração verifique o healtcheck para deploy no railway. Nao simplifique nem remova funcionalidades existentes. nao use dados simulados/ficticios no bot, use apenas para pequenos testes, e em seguida exclua os arquivos de teste.
+Nao remova funcionalidades existentes, na hora de corrigir um arquivo principal tome cuidado para nao remover funcionalidades. Sempre que fizer uma alteração verifique o healtcheck para deploy no railway. Nao simplifique nem remova funcionalidades existentes. nao use dados simulados/ficticios no bot, use apenas para pequenos testes, e em seguida exclua os arquivos de teste. Nao remova partes importantes do arquivo principal que vao excluir/reduzir funcionalidades.
