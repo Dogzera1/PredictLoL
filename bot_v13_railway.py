@@ -4874,10 +4874,32 @@ def main():
                     import time
                     time.sleep(2)
 
-                    # Configurar novo webhook
+                    # Configurar novo webhook COM TRATAMENTO DE FLOOD CONTROL
                     logger.info(f"🔗 Configurando webhook v13: {webhook_url}")
-                    result = updater.bot.set_webhook(webhook_url)
-                    logger.info(f"✅ Webhook v13 configurado: {webhook_url} (resultado: {result})")
+                    
+                    # Retry com backoff exponencial para flood control
+                    max_retries = 5
+                    retry_delay = 1
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            result = updater.bot.set_webhook(webhook_url)
+                            logger.info(f"✅ Webhook v13 configurado: {webhook_url} (resultado: {result})")
+                            break  # Sucesso, sair do loop
+                            
+                        except Exception as webhook_error:
+                            if "Flood control exceeded" in str(webhook_error) or "RetryAfter" in str(webhook_error):
+                                if attempt < max_retries - 1:
+                                    wait_time = retry_delay * (2 ** attempt)  # Backoff exponencial
+                                    logger.warning(f"⏳ Flood control detectado (tentativa {attempt + 1}/{max_retries}). Aguardando {wait_time}s...")
+                                    time.sleep(wait_time)
+                                    continue
+                                else:
+                                    logger.error(f"❌ Falha após {max_retries} tentativas de configurar webhook")
+                                    raise webhook_error
+                            else:
+                                # Erro diferente de flood control, repropagate imediatamente
+                                raise webhook_error
 
                     # Verificar se foi configurado corretamente
                     webhook_info = updater.bot.get_webhook_info()
@@ -4893,6 +4915,27 @@ def main():
                     logger.error(f"❌ Erro ao configurar webhook v13: {e}")
                     import traceback
                     logger.error(f"❌ Traceback webhook v13: {traceback.format_exc()}")
+                    
+                    # FALLBACK: Tentar sem webhook (modo polling de emergência no Railway)
+                    logger.warning("🆘 FALLBACK: Configurando modo polling de emergência no Railway...")
+                    try:
+                        # Garantir que webhook está removido
+                        updater.bot.delete_webhook(drop_pending_updates=True)
+                        logger.info("🧹 Webhook removido para fallback")
+                        
+                        # Configurar polling em background thread
+                        import threading
+                        def polling_fallback():
+                            logger.info("🔄 Iniciando polling de emergência...")
+                            updater.start_polling(drop_pending_updates=True)
+                            updater.idle()
+                        
+                        polling_thread = threading.Thread(target=polling_fallback, daemon=True)
+                        polling_thread.start()
+                        logger.info("✅ Polling de emergência iniciado em background")
+                        
+                    except Exception as fallback_error:
+                        logger.error(f"❌ Fallback polling também falhou: {fallback_error}")
 
                 logger.info("✅ Bot configurado (Railway webhook v13) - Iniciando Flask...")
 
