@@ -235,7 +235,7 @@ Olá, {user.first_name}\\!
 • `/stats` \\- Suas estatísticas
 • `/mystats` \\- Estatísticas detalhadas
 
-{f"**👑 Comandos Admin:**\\n• `/admin` \\- Painel administrativo\\n• `/system` \\- Status completo\\n• `/force` \\- Forçar scan" if is_admin else ""}
+""" + (f"**👑 Comandos Admin:**\n• `/admin` - Painel administrativo\n• `/system` - Status completo\n• `/force` - Forçar scan" if is_admin else "") + """
 
 ⚡ **Powered by Machine Learning \\+ Algoritmos Heurísticos**
 🔥 **Deploy: Railway \\| Status: ONLINE**"""
@@ -482,7 +482,7 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
         
         for task_id, task_info in system_status['tasks']['task_details'].items():
             status_icon = "🏃" if task_info['status'] == 'running' else "⏸️" if task_info['status'] == 'scheduled' else "✅"
-            admin_message += f"\n• {task_id}: {status_icon} {task_info['run_count']} exec\\., {task_info['error_count']} erros"
+            admin_message += f"\n• {task_id}: {status_icon} {task_info['run_count']} exec., {task_info['error_count']} erros"
         
         admin_message += f"""
 
@@ -567,7 +567,7 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                 
                 # Obtém resultado
                 stats = self.schedule_manager.stats
-                message = f"✅ **Scan forçado concluído\\!**\n\n• Tips geradas: {stats['tips_generated']}\n• Status: Operacional"
+                message = f"✅ **Scan forçado concluído!**\n\n• Tips geradas: {stats['tips_generated']}\n• Status: Operacional"
             else:
                 message = "❌ **Falha ao forçar scan\\.**\n\nTarefa pode já estar executando\\."
             
@@ -730,7 +730,7 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                     )
                 
                 await query.edit_message_text(
-                    f"✅ **Subscrição configurada\\!**\n\nTipo: {subscription_type.value}\n\nVocê receberá tips conforme sua subscrição\\.",
+                    f"✅ **Subscrição configurada!**\n\nTipo: {subscription_type.value}\n\nVocê receberá tips conforme sua subscrição.",
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
             

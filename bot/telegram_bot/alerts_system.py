@@ -672,7 +672,7 @@ Sistema profissional de tips para League of Legends que combina Machine Learning
             )
         
         await query.edit_message_text(
-            f"✅ **Subscrição configurada\\!**\n\nTipo: {subscription_type.value}\n\nVocê receberá notificações conforme sua subscrição\\.",
+            f"✅ **Subscrição configurada!**\n\nTipo: {subscription_type.value}\n\nVocê receberá notificações conforme sua subscrição.",
             parse_mode=ParseMode.MARKDOWN_V2
         )
 
