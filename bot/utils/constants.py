@@ -183,21 +183,102 @@ TELEGRAM_CONFIG = {
     "admin_user_ids": ["8012415611"]  # ID do admin como padrão
 }
 
-# Template para tips do Telegram
+# Template melhorado para tips do Telegram - EXPERIÊNCIA PREMIUM
 TIP_TEMPLATE = {
     "header": "🚀 **TIP PROFISSIONAL LoL** 🚀",
-    "match_format": "🎮 **{team_a} vs {team_b}**",
-    "league_format": "🏆 **Liga:** {league}",
-    "tip_format": "⚡ **Tip:** {tip_on_team}",
-    "odds_format": "💰 **Odds:** {odds}",
-    "units_format": "{risk_emoji} **Unidades:** {units} ({risk_level})",
-    "time_format": "⏰ **Tempo:** {game_time}",
-    "analysis_header": "📊 **Análise:**",
-    "ev_format": "{ev_icon} **EV:** +{ev_percentage:.1f}%",
-    "confidence_format": "🎯 **Confiança:** {confidence_percentage:.0f}%",
-    "source_format": "🤖 **Fonte:** {prediction_source}",
-    "quality_format": "⭐ **Qualidade:** {data_quality_score:.0%}",
-    "footer": "🔥 **Bot LoL V3 Ultra Avançado**"
+    "match_info": "🎮 **{team_a}** vs **{team_b}**\n🏆 **Liga:** {league} | 🗺️ **Mapa:** {map_number}\n⏰ **Tempo:** {game_time} | 🔴 **Status:** {match_status}",
+    
+    # Seção da tip principal
+    "tip_main": "⚡ **APOSTAR EM:** {tip_on_team}\n💰 **Odds Atual:** {odds} | 📊 **Odds Mínima:** {min_odds}",
+    
+    # Explicação didática da tip
+    "tip_explanation": "📝 **Por que apostar?**\n{explanation_text}",
+    
+    # Informações de gestão de risco
+    "risk_management": "🎯 **Gestão de Risco:**\n{risk_emoji} **{units} unidades** ({risk_level})\n💡 **Valor da unidade:** R$ {unit_value}\n💸 **Apostar:** R$ {bet_amount}",
+    
+    # Análise técnica
+    "technical_analysis": "📊 **Análise Técnica:**\n🎯 **Confiança:** {confidence_percentage}%\n📈 **Expected Value:** +{ev_percentage}%\n⭐ **Qualidade dos Dados:** {data_quality_score}%",
+    
+    # Situação atual da partida
+    "game_situation": "🔥 **Situação Atual:**\n{game_situation_text}",
+    
+    # Próximos objetivos importantes
+    "next_objectives": "⏳ **Próximos Objetivos:**\n{objectives_text}",
+    
+    # Timing da aposta
+    "bet_timing": "⚠️ **Timing:**\n{timing_advice}",
+    
+    # Histórico dos times (se disponível)
+    "teams_history": "📈 **Histórico Recente:**\n{history_text}",
+    
+    # Alertas importantes
+    "alerts": "🚨 **Alertas:**\n{alerts_text}",
+    
+    # Rodapé
+    "footer": "🤖 **Fonte:** {prediction_source} | ⏱️ **Gerado:** {generated_time}\n🔥 **Bot LoL V3 Ultra Avançado** | 📊 **Tip #{tip_id}**"
+}
+
+# Explicações didáticas para diferentes cenários
+TIP_EXPLANATIONS = {
+    "early_advantage": "O time {team} está com uma vantagem sólida no início da partida, controlando recursos importantes e demonstrando superioridade estratégica.",
+    "momentum_shift": "Detectamos uma mudança de momentum favorável ao {team}, com conquistas recentes de objetivos cruciais que indicam domínio crescente.",
+    "late_game_superior": "Em partidas longas, {team} tem composição e macro-jogo superiores, tornando-se favorito conforme o tempo passa.",
+    "objective_control": "{team} está dominando objetivos estratégicos (Dragões, Baron), o que historicamente resulta em maior taxa de vitória.",
+    "gold_lead_significant": "Vantagem de ouro de {gold_diff} está em nível crítico, onde estatisticamente {team} tem {win_rate}% de chance de vitória.",
+    "team_comp_advantage": "A composição de {team} é superior na fase atual do jogo, com vantagem em teamfights e controle de mapa.",
+    "default": "Baseado em análise de múltiplos fatores, {team} apresenta maior probabilidade de vitória neste momento da partida."
+}
+
+# Conselhos de timing para apostas
+TIMING_ADVICE = {
+    "immediate": "⚡ **Entre AGORA** - Situação ideal identificada",
+    "wait_for_better_odds": "⏳ **Aguarde** - Odds podem melhorar nos próximos minutos",
+    "last_chance": "🚨 **ÚLTIMA CHANCE** - Partida decidindo-se rapidamente",
+    "stable_situation": "✅ **Situação estável** - Pode entrar com segurança",
+    "risky_timing": "⚠️ **Timing arriscado** - Situação volátil, considere apostar menos"
+}
+
+# Alertas importantes para usuários
+ALERT_MESSAGES = {
+    "high_volatility": "🌪️ Partida muito volátil - Resultado pode mudar rapidamente",
+    "comeback_possible": "🔄 Time perdedor ainda pode virar - Cuidado com reversões",
+    "dominant_position": "👑 Posição dominante - Chance baixa de virada",
+    "early_game": "🌅 Início de partida - Situação pode mudar drasticamente",
+    "late_game_decide": "🌙 Partida decidindo - Próximo teamfight pode ser crucial",
+    "baron_available": "🐲 Baron disponível - Próximos 5min são críticos",
+    "elder_dragon_up": "🔥 Elder Dragon disponível - Pode decidir a partida",
+    "inhibitor_down": "🏠 Inibidor destruído - Pressão significativa",
+    "no_major_alerts": "✅ Situação controlada - Sem alertas especiais"
+}
+
+# Emojis para mapas
+MAP_EMOJIS = {
+    1: "🗺️ Mapa 1",
+    2: "🗺️ Mapa 2", 
+    3: "🗺️ Mapa 3",
+    4: "🗺️ Mapa 4",
+    5: "🗺️ Mapa 5",
+    "unknown": "🗺️ Mapa ?"
+}
+
+# Status da partida em português
+MATCH_STATUS_PT = {
+    "live": "🔴 AO VIVO",
+    "inprogress": "🔴 EM ANDAMENTO",
+    "ongoing": "🔴 ACONTECENDO",
+    "in_progress": "🔴 EM PROGRESSO",
+    "started": "🔴 INICIADA",
+    "draft": "📋 DRAFT",
+    "lobby": "🏠 LOBBY",
+    "unknown": "❓ DESCONHECIDO"
+}
+
+# Objetivos próximos baseados no tempo de jogo
+NEXT_OBJECTIVES_BY_TIME = {
+    "early": ["🐉 Primeiro Dragão (6min)", "🏰 Primeira Torre", "🦀 Caranguejo"],
+    "mid": ["🐉 Alma do Dragão", "🐲 Baron Nashor (20min)", "🏰 Torres Externas"],
+    "late": ["🔥 Elder Dragon", "🐲 Baron Buff", "🏠 Inibidores", "👑 Nexus"]
 }
 
 # Emojis para níveis de risco

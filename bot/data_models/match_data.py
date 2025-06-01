@@ -7,6 +7,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional, Union
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -367,23 +370,144 @@ class MatchData:
         
         Args:
             api_data: Dados brutos da API
-            api_source: Fonte da API ("riot", "other")
+            api_source: Fonte da API ("riot", "pandascore", "other")
             
         Returns:
             Instância de MatchData
         """
-        # Implementação básica - seria expandida conforme formato da API
-        match_data = cls(
-            match_id=api_data.get("id", ""),
-            league=api_data.get("league", ""),
-            team1_name=api_data.get("team1", {}).get("name", ""),
-            team2_name=api_data.get("team2", {}).get("name", ""),
-            status=api_data.get("status", ""),
-            raw_data=api_data
+        try:
+            if api_source == "riot":
+                return cls._from_riot_api_data(api_data)
+            elif api_source == "pandascore":
+                return cls._from_pandascore_data(api_data)
+            else:
+                # Implementação genérica
+                return cls._from_generic_data(api_data)
+        except Exception as e:
+            logger.warning(f"Erro ao processar dados da API {api_source}: {e}")
+            # Retorna dados básicos com fallbacks
+            return cls._create_fallback_match(api_data, api_source)
+    
+    @classmethod
+    def _from_riot_api_data(cls, data: Dict) -> MatchData:
+        """Processa dados específicos da Riot API"""
+        # Extrai match_id
+        match_id = str(data.get("id", data.get("eventId", "unknown")))
+        
+        # Extrai informações da liga
+        league_data = data.get("league", {})
+        league_name = "LEC"  # Default para eventos da Riot
+        if isinstance(league_data, dict):
+            league_name = league_data.get("name", league_data.get("slug", "Liga Desconhecida"))
+        elif isinstance(league_data, str):
+            league_name = league_data
+        
+        # Extrai times das matches dentro do evento
+        team1_name = "Team A"
+        team2_name = "Team B"
+        
+        # Tenta extrair times de diferentes estruturas possíveis
+        if "match" in data:
+            match_data = data["match"]
+            teams = match_data.get("teams", [])
+            if len(teams) >= 2:
+                team1_name = teams[0].get("name", teams[0].get("code", "Team A"))
+                team2_name = teams[1].get("name", teams[1].get("code", "Team B"))
+        
+        elif "teams" in data:
+            teams = data["teams"]
+            if len(teams) >= 2:
+                team1_name = teams[0].get("name", teams[0].get("code", "Team A"))
+                team2_name = teams[1].get("name", teams[1].get("code", "Team B"))
+        
+        # Se ainda não encontrou, tenta outras estruturas
+        if team1_name == "Team A":
+            # Busca em games se disponível
+            if "games" in data and data["games"]:
+                game = data["games"][0]
+                teams = game.get("teams", [])
+                if len(teams) >= 2:
+                    team1_name = teams[0].get("name", teams[0].get("code", "Team A"))
+                    team2_name = teams[1].get("name", teams[1].get("code", "Team B"))
+        
+        # Status da partida
+        status = data.get("state", data.get("status", "live"))
+        if status in ["inProgress", "unstarted", "unneeded"]:
+            status = "live"
+        
+        # Tempo de jogo (se disponível)
+        game_time = 0
+        if "games" in data and data["games"]:
+            game = data["games"][0]
+            game_time = game.get("gameTime", 0)
+        
+        return cls(
+            match_id=match_id,
+            team1_name=team1_name,
+            team2_name=team2_name,
+            league=league_name,
+            status=status,
+            tournament=league_name,
+            game_time_seconds=game_time,
+            raw_data=data
         )
+    
+    @classmethod
+    def _from_pandascore_data(cls, data: Dict) -> MatchData:
+        """Processa dados específicos do PandaScore"""
+        # Extrai informações básicas
+        match_id = str(data.get("id", "unknown"))
         
-        # Extrai mais dados conforme disponível
-        if "gameTime" in api_data:
-            match_data.game_time_seconds = api_data["gameTime"]
+        # Times
+        opponents = data.get("opponents", [])
+        team1_name = "Team A"
+        team2_name = "Team B"
         
-        return match_data 
+        if len(opponents) >= 2:
+            team1_name = opponents[0].get("opponent", {}).get("name", "Team A")
+            team2_name = opponents[1].get("opponent", {}).get("name", "Team B")
+        
+        # Liga
+        league_data = data.get("league", {})
+        league_name = league_data.get("name", "Liga Desconhecida")
+        
+        # Tournament
+        tournament_data = data.get("tournament", {})
+        tournament_name = tournament_data.get("name", league_name)
+        
+        # Status
+        status = data.get("status", "live")
+        
+        return cls(
+            match_id=match_id,
+            team1_name=team1_name,
+            team2_name=team2_name,
+            league=league_name,
+            status=status,
+            tournament=tournament_name,
+            raw_data=data
+        )
+    
+    @classmethod
+    def _from_generic_data(cls, data: Dict) -> MatchData:
+        """Processa dados de formato genérico"""
+        return cls(
+            match_id=str(data.get("id", data.get("match_id", "unknown"))),
+            team1_name=data.get("team1", {}).get("name", data.get("team1_name", "Team A")),
+            team2_name=data.get("team2", {}).get("name", data.get("team2_name", "Team B")),
+            league=data.get("league", "Liga Desconhecida"),
+            status=data.get("status", "live"),
+            raw_data=data
+        )
+    
+    @classmethod
+    def _create_fallback_match(cls, data: Dict, api_source: str) -> MatchData:
+        """Cria match com dados mínimos quando há erro no processamento"""
+        return cls(
+            match_id=str(data.get("id", f"fallback_{hash(str(data))}")),
+            team1_name="Team A (Dados Incompletos)",
+            team2_name="Team B (Dados Incompletos)",
+            league=f"Liga Desconhecida ({api_source})",
+            status="live",
+            raw_data=data
+        ) 

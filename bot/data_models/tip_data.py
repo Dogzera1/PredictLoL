@@ -13,48 +13,88 @@ from ..utils.helpers import format_odds, calculate_percentage, get_current_times
 
 @dataclass
 class ProfessionalTip:
-    """Tip profissional de League of Legends"""
+    """
+    Tip profissional melhorada com experiência premium para usuários
     
-    # Identificação da partida (OBRIGATÓRIOS)
+    Inclui informações detalhadas, explicações didáticas e alertas importantes
+    para proporcionar a melhor experiência possível ao apostador.
+    """
+    # Dados básicos da partida (OBRIGATÓRIOS)
     match_id: str
     team_a: str
     team_b: str
     league: str
-    tip_on_team: str  # Nome do time apostado (ex: "Team A ML")
+    tournament: str
+    
+    # Dados da tip principal (OBRIGATÓRIOS)
+    tip_on_team: str
     odds: float
     units: float
-    risk_level: str  # "Risco Baixo", "Risco Médio", etc.
-    confidence_percentage: float  # 0-100
-    ev_percentage: float  # Expected Value em %
-    analysis_reasoning: str
-    game_time_at_tip: str  # ex: "25min"
+    risk_level: str
     
-    # Campos opcionais com valores padrão
-    tournament: str = ""
+    # Análise e métricas (OBRIGATÓRIAS)
+    confidence_percentage: float
+    ev_percentage: float
+    analysis_reasoning: str
+    
+    # Informações de contexto de jogo (OBRIGATÓRIAS)
+    game_time_at_tip: str
+    game_time_seconds: int
+    
+    # Metadados técnicos (OBRIGATÓRIOS)
+    prediction_source: str
+    data_quality_score: float
+    
+    # Campos com valores padrão
+    min_odds: float = 0.0  # Odds mínima recomendada
+    map_number: int = 1  # Número do mapa
+    match_status: str = "live"  # Status da partida
+    
+    # Experiência melhorada para usuário
+    explanation_text: str = ""  # Explicação didática da tip
+    game_situation_text: str = ""  # Situação atual do jogo
+    objectives_text: str = ""  # Próximos objetivos importantes
+    timing_advice: str = ""  # Conselho de timing
+    alerts_text: str = ""  # Alertas importantes
+    history_text: str = ""  # Histórico dos times
+    
+    # Gestão de risco melhorada
+    unit_value: float = 10.0  # Valor de uma unidade em R$
+    bet_amount: float = 0.0  # Valor recomendado da aposta
+    
+    # Metadados adicionais
+    tip_id: str = ""  # ID único da tip
+    generated_time: str = ""  # Hora de geração
+    
+    # Campos legados mantidos para compatibilidade
     tip_type: str = "ML"  # Moneyline (ML), outros tipos no futuro
-    game_time_seconds: int = 0
     timestamp: int = field(default_factory=get_current_timestamp)
     created_at: datetime = field(default_factory=datetime.now)
     
-    # Metadados da análise
-    prediction_source: str = "ML"  # "ML", "Algorithm", "Hybrid"
-    data_quality_score: float = 0.0  # 0-1
-    
-    # Dados brutos para referência
-    match_data_snapshot: Dict = field(default_factory=dict)
-    analysis_data: Dict = field(default_factory=dict)
-    
     # Status da tip
-    status: str = "active"  # "active", "won", "lost", "void"
-    result: Optional[str] = None  # "win", "loss", "void"
+    status: str = "active"  # active, settled, cancelled
+    result: Optional[str] = None  # win, loss, push
     settled_at: Optional[datetime] = None
-    
-    # Performance tracking
-    profit_loss: float = 0.0  # Em unidades
-    actual_odds: Optional[float] = None  # Odds reais quando apostado
+    profit_loss: float = 0.0
+    actual_odds: Optional[float] = None
     
     def __post_init__(self):
         """Inicialização pós-criação"""
+        if self.bet_amount == 0.0:
+            self.bet_amount = self.units * self.unit_value
+        
+        if not self.tip_id:
+            import time
+            self.tip_id = f"TIP{int(time.time())}"
+        
+        if not self.generated_time:
+            from datetime import datetime
+            self.generated_time = datetime.now().strftime("%H:%M")
+        
+        # Calcula odds mínima se não fornecida (5% abaixo da atual)
+        if self.min_odds == 0.0:
+            self.min_odds = round(self.odds * 0.95, 2)
+        
         # Garante que tip_on_team tem formato correto
         if not self.tip_on_team.endswith(" ML"):
             self.tip_on_team = f"{self.tip_on_team} ML"
@@ -191,7 +231,18 @@ class ProfessionalTip:
             "result": self.result,
             "settled_at": self.settled_at.isoformat() if self.settled_at else None,
             "profit_loss": self.profit_loss,
-            "actual_odds": self.actual_odds
+            "actual_odds": self.actual_odds,
+            "min_odds": self.min_odds,
+            "explanation_text": self.explanation_text,
+            "game_situation_text": self.game_situation_text,
+            "objectives_text": self.objectives_text,
+            "timing_advice": self.timing_advice,
+            "alerts_text": self.alerts_text,
+            "history_text": self.history_text,
+            "unit_value": self.unit_value,
+            "bet_amount": self.bet_amount,
+            "tip_id": self.tip_id,
+            "generated_time": self.generated_time
         }
     
     @classmethod
@@ -214,18 +265,29 @@ class ProfessionalTip:
             ev_percentage=data["ev_percentage"],
             analysis_reasoning=data["analysis_reasoning"],
             game_time_at_tip=data["game_time_at_tip"],
-            tournament=data.get("tournament", ""),
+            tournament=data["tournament"],
             tip_type=data.get("tip_type", "ML"),
-            game_time_seconds=data.get("game_time_seconds", 0),
+            game_time_seconds=data["game_time_seconds"],
             timestamp=data.get("timestamp", get_current_timestamp()),
             created_at=created_at,
-            prediction_source=data.get("prediction_source", "ML"),
-            data_quality_score=data.get("data_quality_score", 0.0),
-            status=data.get("status", "active"),
-            result=data.get("result"),
+            prediction_source=data["prediction_source"],
+            data_quality_score=data["data_quality_score"],
+            status=data["status"],
+            result=data["result"],
             settled_at=settled_at,
-            profit_loss=data.get("profit_loss", 0.0),
-            actual_odds=data.get("actual_odds")
+            profit_loss=data["profit_loss"],
+            actual_odds=data["actual_odds"],
+            min_odds=data.get("min_odds", 0.0),
+            explanation_text=data.get("explanation_text", ""),
+            game_situation_text=data.get("game_situation_text", ""),
+            objectives_text=data.get("objectives_text", ""),
+            timing_advice=data.get("timing_advice", ""),
+            alerts_text=data.get("alerts_text", ""),
+            history_text=data.get("history_text", ""),
+            unit_value=data.get("unit_value", 10.0),
+            bet_amount=data.get("bet_amount", 0.0),
+            tip_id=data.get("tip_id", ""),
+            generated_time=data.get("generated_time", "")
         )
         
         return tip

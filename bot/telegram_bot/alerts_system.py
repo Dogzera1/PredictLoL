@@ -26,7 +26,7 @@ except ImportError:
 
 from ..data_models.tip_data import ProfessionalTip
 from ..core_logic.game_analyzer import GameAnalysis
-from ..utils.constants import TELEGRAM_CONFIG, TIP_TEMPLATE
+from ..utils.constants import TELEGRAM_CONFIG, TIP_TEMPLATE, RISK_EMOJIS, MAP_EMOJIS
 from ..utils.helpers import get_current_timestamp
 from ..utils.logger_config import get_logger
 
@@ -234,61 +234,155 @@ class TelegramAlertsSystem:
 
     async def send_professional_tip(self, tip: ProfessionalTip) -> bool:
         """
-        Envia tip profissional para todos os usuários e grupos subscritos
+        Envia tip profissional melhorada com experiência premium
         
         Args:
-            tip: Tip profissional a enviar
+            tip: Tip profissional com informações aprimoradas
             
         Returns:
-            True se enviada com sucesso para pelo menos um destinatário
+            True se enviado com sucesso
         """
-        if not self.bot:
-            logger.error("Bot não inicializado para envio de tip")
-            return False
-        
-        # Verifica cache para evitar spam
-        tip_id = f"{tip.match_id}_{tip.team_name}_{tip.prediction_type}"
-        if tip_id in self.recent_tips_cache:
-            logger.debug(f"Tip {tip_id} já enviada recentemente (cache)")
-            return False
-        
-        # Adiciona ao cache
-        self.recent_tips_cache[tip_id] = time.time()
-        
-        # Formata mensagem
-        message = self._format_tip_message(tip)
-        
-        # Envia para usuários individuais
-        eligible_users = self._get_eligible_users_for_tip(tip)
-        user_success_count = 0
-        
-        for user_id in eligible_users:
-            if await self._send_message_to_user(user_id, message, NotificationType.TIP_ALERT):
-                user_success_count += 1
-                if user_id in self.users:
-                    self.users[user_id].tips_received += 1
-        
-        # Envia para grupos
-        eligible_groups = self._get_eligible_groups_for_tip(tip)
-        group_success_count = 0
-        
-        for group_id in eligible_groups:
-            if await self._send_message_to_group(group_id, message, NotificationType.TIP_ALERT):
-                group_success_count += 1
-                if group_id in self.groups:
-                    self.groups[group_id].tips_received += 1
-        
-        total_success = user_success_count + group_success_count
-        
-        if total_success > 0:
-            self.stats.tips_sent += 1
-            self.stats.total_alerts_sent += total_success
-            self.stats.last_alert_time = time.time()
+        try:
+            # Determina emoji de risco
+            risk_emoji = RISK_EMOJIS.get(tip.risk_level, "📊")
             
-            logger.info(f"Tip enviada para {user_success_count} usuários e {group_success_count} grupos")
-            return True
-        else:
-            logger.warning("Tip não foi enviada para nenhum destinatário")
+            # Constrói mensagem com novo formato premium
+            message_parts = []
+            
+            # 1. Header
+            message_parts.append(TIP_TEMPLATE["header"])
+            message_parts.append("")
+            
+            # 2. Informações da partida
+            match_info = TIP_TEMPLATE["match_info"].format(
+                team_a=self._escape_markdown_v2(tip.team_a),
+                team_b=self._escape_markdown_v2(tip.team_b),
+                league=self._escape_markdown_v2(tip.league),
+                map_number=f"Mapa {tip.map_number}",
+                game_time=self._escape_markdown_v2(tip.game_time_at_tip),
+                match_status=tip.match_status
+            )
+            message_parts.append(match_info)
+            message_parts.append("")
+            
+            # 3. Tip principal
+            tip_main = TIP_TEMPLATE["tip_main"].format(
+                tip_on_team=self._escape_markdown_v2(tip.tip_on_team),
+                odds=tip.odds,
+                min_odds=tip.min_odds
+            )
+            message_parts.append(tip_main)
+            message_parts.append("")
+            
+            # 4. Explicação didática
+            if tip.explanation_text:
+                explanation = TIP_TEMPLATE["tip_explanation"].format(
+                    explanation_text=self._escape_markdown_v2(tip.explanation_text)
+                )
+                message_parts.append(explanation)
+                message_parts.append("")
+            
+            # 5. Gestão de risco
+            risk_management = TIP_TEMPLATE["risk_management"].format(
+                risk_emoji=risk_emoji,
+                units=tip.units,
+                risk_level=self._escape_markdown_v2(tip.risk_level),
+                unit_value=f"{tip.unit_value:.0f}",
+                bet_amount=f"{tip.bet_amount:.0f}"
+            )
+            message_parts.append(risk_management)
+            message_parts.append("")
+            
+            # 6. Análise técnica
+            technical_analysis = TIP_TEMPLATE["technical_analysis"].format(
+                confidence_percentage=f"{tip.confidence_percentage:.0f}",
+                ev_percentage=f"{tip.ev_percentage:.1f}",
+                data_quality_score=f"{tip.data_quality_score*100:.0f}"
+            )
+            message_parts.append(technical_analysis)
+            message_parts.append("")
+            
+            # 7. Situação atual do jogo
+            if tip.game_situation_text:
+                game_situation = TIP_TEMPLATE["game_situation"].format(
+                    game_situation_text=self._escape_markdown_v2(tip.game_situation_text)
+                )
+                message_parts.append(game_situation)
+                message_parts.append("")
+            
+            # 8. Próximos objetivos
+            if tip.objectives_text:
+                next_objectives = TIP_TEMPLATE["next_objectives"].format(
+                    objectives_text=self._escape_markdown_v2(tip.objectives_text)
+                )
+                message_parts.append(next_objectives)
+                message_parts.append("")
+            
+            # 9. Timing da aposta
+            if tip.timing_advice:
+                bet_timing = TIP_TEMPLATE["bet_timing"].format(
+                    timing_advice=self._escape_markdown_v2(tip.timing_advice)
+                )
+                message_parts.append(bet_timing)
+                message_parts.append("")
+            
+            # 10. Histórico dos times
+            if tip.history_text:
+                teams_history = TIP_TEMPLATE["teams_history"].format(
+                    history_text=self._escape_markdown_v2(tip.history_text)
+                )
+                message_parts.append(teams_history)
+                message_parts.append("")
+            
+            # 11. Alertas importantes
+            if tip.alerts_text:
+                alerts = TIP_TEMPLATE["alerts"].format(
+                    alerts_text=self._escape_markdown_v2(tip.alerts_text)
+                )
+                message_parts.append(alerts)
+                message_parts.append("")
+            
+            # 12. Rodapé
+            footer = TIP_TEMPLATE["footer"].format(
+                prediction_source=self._escape_markdown_v2(tip.prediction_source),
+                generated_time=tip.generated_time,
+                tip_id=tip.tip_id
+            )
+            message_parts.append(footer)
+            
+            # Junta todas as partes
+            full_message = "\n".join(message_parts)
+            
+            logger.info(f"Enviando tip premium para {len(self.active_users)} usuários")
+            
+            # Envia para todos os usuários ativos
+            success_count = 0
+            for user_id in self.active_users:
+                try:
+                    await self.application.bot.send_message(
+                        chat_id=user_id,
+                        text=full_message,
+                        parse_mode="MarkdownV2",
+                        disable_web_page_preview=True
+                    )
+                    success_count += 1
+                    
+                    # Rate limiting
+                    await asyncio.sleep(0.1)
+                    
+                except Exception as e:
+                    logger.error(f"Erro ao enviar tip para usuário {user_id}: {e}")
+                    continue
+            
+            logger.info(f"Tip premium enviada com sucesso para {success_count}/{len(self.active_users)} usuários")
+            
+            # Salva tip no histórico
+            self._save_tip_to_history(tip)
+            
+            return success_count > 0
+            
+        except Exception as e:
+            logger.error(f"Erro ao enviar tip profissional: {e}")
             return False
 
     async def send_match_update(self, analysis: GameAnalysis, match_id: str) -> None:

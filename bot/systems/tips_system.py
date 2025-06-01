@@ -244,7 +244,7 @@ class ProfessionalTipsSystem:
             for raw_match in pandascore_raw:
                 try:
                     if isinstance(raw_match, dict):
-                        match_obj = MatchData.from_api_data(raw_match)
+                        match_obj = MatchData.from_api_data(raw_match, api_source="pandascore")
                         all_matches.append(match_obj)
                     elif isinstance(raw_match, MatchData):
                         # Já é um objeto MatchData
@@ -259,11 +259,11 @@ class ProfessionalTipsSystem:
             for raw_match in riot_raw:
                 try:
                     if isinstance(raw_match, dict):
-                        match_obj = MatchData.from_api_data(raw_match)
+                        match_obj = MatchData.from_api_data(raw_match, api_source="riot")
                         all_matches.append(match_obj)
                     elif isinstance(raw_match, MatchData):
                         # Já é um objeto MatchData
-                        all_matches.append(match_obj)
+                        all_matches.append(raw_match)
                     else:
                         logger.warning(f"Tipo inesperado do Riot API: {type(raw_match)}")
                 except Exception as e:
