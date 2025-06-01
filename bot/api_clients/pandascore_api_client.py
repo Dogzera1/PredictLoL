@@ -204,7 +204,7 @@ class PandaScoreAPIClient:
             if isinstance(matches, list):
                 logger.info(f"PandaScore: {len(matches)} partidas LoL futuras encontradas")
                 return matches
-            
+                
             return []
             
         except Exception as e:
@@ -455,4 +455,326 @@ class PandaScoreAPIClient:
                 "available_leagues": [],
                 "timestamp": time.time(),
                 "error": str(e)
-            } 
+            }
+
+    async def get_match_composition_data(self, match_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Busca dados de composição (picks & bans) de uma partida específica
+        
+        Args:
+            match_id: ID da partida
+            
+        Returns:
+            Dados de composição ou None se não encontrado
+        """
+        try:
+            endpoint = f"/lol/matches/{match_id}"
+            match_data = await self._make_request(endpoint)
+            
+            if not match_data:
+                logger.warning(f"Match {match_id} não encontrado")
+                return None
+            
+            # Extrai dados de composição
+            composition_data = await self._extract_composition_data(match_data)
+            
+            if composition_data:
+                logger.info(f"✅ Dados de composição obtidos para match {match_id}")
+                return composition_data
+            else:
+                logger.warning(f"Dados de composição não disponíveis para match {match_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Erro ao buscar composição da partida {match_id}: {e}")
+            return None
+
+    async def get_live_match_compositions(self) -> List[Dict[str, Any]]:
+        """
+        Busca composições de todas as partidas ao vivo
+        
+        Returns:
+            Lista de composições das partidas ao vivo
+        """
+        compositions = []
+        
+        try:
+            live_matches = await self.get_lol_live_matches()
+            
+            for match in live_matches:
+                match_id = match.get("id")
+                if match_id:
+                    composition = await self.get_match_composition_data(match_id)
+                    if composition:
+                        compositions.append(composition)
+                        
+            logger.info(f"📊 {len(compositions)} composições de partidas ao vivo coletadas")
+            return compositions
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar composições de partidas ao vivo: {e}")
+            return []
+
+    async def get_match_games_data(self, match_id: int) -> List[Dict[str, Any]]:
+        """
+        Busca dados detalhados dos games de uma partida
+        
+        Args:
+            match_id: ID da partida
+            
+        Returns:
+            Lista de dados dos games
+        """
+        try:
+            endpoint = f"/lol/matches/{match_id}/games"
+            games_data = await self._make_request(endpoint)
+            
+            if isinstance(games_data, list):
+                logger.info(f"🎮 {len(games_data)} games encontrados para match {match_id}")
+                
+                # Processa dados de cada game
+                processed_games = []
+                for game in games_data:
+                    processed_game = await self._process_game_data(game)
+                    if processed_game:
+                        processed_games.append(processed_game)
+                
+                return processed_games
+            
+            return []
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar games da partida {match_id}: {e}")
+            return []
+
+    async def _extract_composition_data(self, match_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Extrai dados de composição de uma partida
+        
+        Args:
+            match_data: Dados brutos da partida
+            
+        Returns:
+            Dados de composição estruturados
+        """
+        try:
+            teams = match_data.get("opponents", [])
+            if len(teams) != 2:
+                logger.warning("Partida não possui exatamente 2 times")
+                return None
+            
+            # Busca dados dos games para obter picks & bans
+            match_id = match_data.get("id")
+            if not match_id:
+                return None
+                
+            games_data = await self.get_match_games_data(match_id)
+            if not games_data:
+                logger.warning(f"Dados de games não disponíveis para match {match_id}")
+                return None
+            
+            # Pega o game mais recente (último)
+            latest_game = games_data[-1] if games_data else None
+            if not latest_game:
+                return None
+            
+            composition_data = {
+                "match_id": str(match_id),
+                "teams": {
+                    "team_a": {
+                        "name": teams[0].get("opponent", {}).get("name", "Team A"),
+                        "id": teams[0].get("opponent", {}).get("id"),
+                        "picks": latest_game.get("team_a_picks", []),
+                        "bans": latest_game.get("team_a_bans", [])
+                    },
+                    "team_b": {
+                        "name": teams[1].get("opponent", {}).get("name", "Team B"),
+                        "id": teams[1].get("opponent", {}).get("id"),
+                        "picks": latest_game.get("team_b_picks", []),
+                        "bans": latest_game.get("team_b_bans", [])
+                    }
+                },
+                "patch": latest_game.get("patch", "unknown"),
+                "side": {
+                    "blue": latest_game.get("blue_side", teams[0].get("opponent", {}).get("name", "Team A")),
+                    "red": latest_game.get("red_side", teams[1].get("opponent", {}).get("name", "Team B"))
+                },
+                "league": match_data.get("league", {}).get("name", "Unknown League"),
+                "status": match_data.get("status", "unknown"),
+                "timestamp": match_data.get("scheduled_at")
+            }
+            
+            logger.debug(f"✅ Composição extraída para match {match_id}")
+            return composition_data
+            
+        except Exception as e:
+            logger.error(f"Erro ao extrair dados de composição: {e}")
+            return None
+
+    async def _process_game_data(self, game_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Processa dados de um game individual
+        
+        Args:
+            game_data: Dados brutos do game
+            
+        Returns:
+            Dados do game processados
+        """
+        try:
+            # Extrai picks e bans dos times
+            teams = game_data.get("teams", [])
+            if len(teams) != 2:
+                return None
+            
+            team_a = teams[0]
+            team_b = teams[1]
+            
+            processed_data = {
+                "game_id": game_data.get("id"),
+                "patch": game_data.get("version", {}).get("name", "unknown"),
+                "duration": game_data.get("length"),
+                "finished": game_data.get("finished", False),
+                "winner": game_data.get("winner", {}).get("name") if game_data.get("winner") else None,
+                
+                # Picks time A
+                "team_a_picks": self._extract_picks_from_team(team_a),
+                "team_a_bans": self._extract_bans_from_team(team_a),
+                
+                # Picks time B  
+                "team_b_picks": self._extract_picks_from_team(team_b),
+                "team_b_bans": self._extract_bans_from_team(team_b),
+                
+                # Informações de side
+                "blue_side": team_a.get("name") if team_a.get("side") == "blue" else team_b.get("name"),
+                "red_side": team_b.get("name") if team_b.get("side") == "red" else team_a.get("name")
+            }
+            
+            return processed_data
+            
+        except Exception as e:
+            logger.error(f"Erro ao processar dados do game: {e}")
+            return None
+
+    def _extract_picks_from_team(self, team_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extrai picks de um time
+        
+        Args:
+            team_data: Dados do time
+            
+        Returns:
+            Lista de picks estruturados
+        """
+        picks = []
+        
+        try:
+            players = team_data.get("players", [])
+            
+            for i, player in enumerate(players):
+                champion_data = player.get("champion")
+                if champion_data:
+                    pick = {
+                        "champion": champion_data.get("name", "Unknown"),
+                        "champion_id": champion_data.get("id"),
+                        "position": self._determine_position_by_order(i),
+                        "pick_order": i + 1,
+                        "player": player.get("name", "Unknown Player")
+                    }
+                    picks.append(pick)
+            
+            return picks
+            
+        except Exception as e:
+            logger.error(f"Erro ao extrair picks: {e}")
+            return []
+
+    def _extract_bans_from_team(self, team_data: Dict[str, Any]) -> List[str]:
+        """
+        Extrai bans de um time
+        
+        Args:
+            team_data: Dados do time
+            
+        Returns:
+            Lista de campeões banidos
+        """
+        bans = []
+        
+        try:
+            bans_data = team_data.get("bans", [])
+            
+            for ban in bans_data:
+                if isinstance(ban, dict) and ban.get("champion"):
+                    bans.append(ban["champion"].get("name", "Unknown"))
+                elif isinstance(ban, str):
+                    bans.append(ban)
+            
+            return bans
+            
+        except Exception as e:
+            logger.error(f"Erro ao extrair bans: {e}")
+            return []
+
+    def _determine_position_by_order(self, order_index: int) -> str:
+        """
+        Determina posição baseada na ordem padrão do LoL
+        
+        Args:
+            order_index: Índice da ordem (0-4)
+            
+        Returns:
+            Posição do jogador
+        """
+        position_map = {
+            0: "top",
+            1: "jungle", 
+            2: "mid",
+            3: "adc",
+            4: "support"
+        }
+        
+        return position_map.get(order_index, "unknown")
+
+    async def search_matches_by_teams(self, team1: str, team2: str) -> List[Dict[str, Any]]:
+        """
+        Busca partidas entre dois times específicos
+        
+        Args:
+            team1: Nome do primeiro time
+            team2: Nome do segundo time
+            
+        Returns:
+            Lista de partidas encontradas
+        """
+        try:
+            # Busca partidas recentes
+            endpoint = "/lol/matches"
+            params = {
+                "per_page": 50,
+                "sort": "-scheduled_at"  # Mais recentes primeiro
+            }
+            
+            matches = await self._make_request(endpoint, params)
+            
+            if not isinstance(matches, list):
+                return []
+            
+            # Filtra partidas entre os times específicos
+            matching_matches = []
+            
+            for match in matches:
+                opponents = match.get("opponents", [])
+                if len(opponents) == 2:
+                    match_team1 = opponents[0].get("opponent", {}).get("name", "")
+                    match_team2 = opponents[1].get("opponent", {}).get("name", "")
+                    
+                    if self._teams_match(team1, team2, match_team1, match_team2):
+                        matching_matches.append(match)
+            
+            logger.info(f"🔍 {len(matching_matches)} partidas encontradas entre {team1} e {team2}")
+            return matching_matches
+            
+        except Exception as e:
+            logger.error(f"Erro ao buscar partidas entre {team1} e {team2}: {e}")
+            return [] 

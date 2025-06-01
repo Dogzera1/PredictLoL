@@ -1,0 +1,34 @@
+{
+  "azir": {
+    "base_strength": 7.8,
+    "type": "mage",
+    "positions": {
+      "mid": 1.0,
+      "adc": 0.6
+    },
+    "early_game": 4.0,
+    "mid_game": 7.0,
+    "late_game": 9.0
+  },
+  "graves": {
+    "base_strength": 8.2,
+    "type": "marksman",
+    "positions": {
+      "jungle": 1.0,
+      "adc": 0.7
+    },
+    "early_game": 8.0,
+    "mid_game": 8.5,
+    "late_game": 7.0
+  },
+  "thresh": {
+    "base_strength": 8.0,
+    "type": "support",
+    "positions": {
+      "support": 1.0
+    },
+    "early_game": 7.0,
+    "mid_game": 8.0,
+    "late_game": 7.5
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "azir_vs_leblanc": {
+    "advantage": -0.3,
+    "reason": "LeBlanc pode burst Azir facilmente",
+    "confidence": 0.8
+  },
+  "graves_vs_kindred": {
+    "advantage": 0.4,
+    "reason": "Graves domina early jungle vs Kindred",
+    "confidence": 0.85
+  }
+}
