@@ -7,6 +7,9 @@ from typing import Dict, List, Optional, Set, Any, Union
 from dataclasses import dataclass
 from enum import Enum
 import re
+import logging
+import json
+from datetime import datetime, timedelta
 
 try:
     from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -159,6 +162,17 @@ class TelegramAlertsSystem:
         # Cache de mensagens para evitar spam
         self.recent_tips_cache: Dict[str, float] = {}  # tip_id -> timestamp
         self.cache_duration = 300  # 5 minutos
+        
+        # Estatísticas expandidas
+        self.tips_sent_count = 0
+        self.users_notified_count = 0
+        self.groups_notified_count = 0
+        
+        # Cache para otimização
+        self._subscription_cache = {}
+        self._last_cache_update = 0
+        
+        self.logger = logging.getLogger(__name__)
         
         logger.info("TelegramAlertsSystem inicializado")
 
@@ -549,23 +563,23 @@ class TelegramAlertsSystem:
         """Handler do comando /start"""
         user = update.effective_user
         
-        welcome_message = f"""🚀 **Bem\\-vindo ao Bot LoL V3 Ultra Avançado\\!**
+        welcome_message = f"""🚀 **Bem-vindo ao Bot LoL V3 Ultra Avançado!**
 
-Olá, {user.first_name}\\! 
+Olá, {user.first_name}! 
 
 Este bot envia **tips profissionais** para apostas em League of Legends baseadas em:
-• 🧠 Machine Learning \\+ Algoritmos Heurísticos
+• 🧠 Machine Learning + Algoritmos Heurísticos
 • 📊 Análise em tempo real de partidas
 • 💰 Expected Value calculado
 • 🎯 Gestão profissional de risco
 
 **Comandos disponíveis:**
-/subscribe \\\\ Configurar notificações
-/status \\\\ Ver status do sistema
-/mystats \\\\ Suas estatísticas
-/help \\\\ Ajuda completa
+/subscribe - Configurar notificações
+/status - Ver status do sistema
+/mystats - Suas estatísticas
+/help - Ajuda completa
 
-🔥 **Subscreva\\-se para receber tips profissionais\\!**"""
+🔥 **Subscreva-se para receber tips profissionais!**"""
         
         # Registra usuário se novo
         if user.id not in self.users:
@@ -578,7 +592,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             logger.info(f"Novo usuário registrado: {user.first_name} ({user.id})")
         
         await update.message.reply_text(
-            welcome_message,
+            self._escape_markdown_v2(welcome_message),
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=self._get_subscription_keyboard()
         )
@@ -586,7 +600,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
     async def _handle_subscribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /subscribe"""
         await update.message.reply_text(
-            "📋 **Escolha seu tipo de subscrição:**",
+            self._escape_markdown_v2("📋 **Escolha seu tipo de subscrição:**"),
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=self._get_subscription_keyboard()
         )
@@ -597,11 +611,14 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         
         if user_id in self.users:
             self.users[user_id].is_active = False
-            message = "❌ **Subscrição cancelada**\n\nVocê não receberá mais notificações\\.\nUse /subscribe para reativar\\."
+            message = "❌ **Subscrição cancelada**\n\nVocê não receberá mais notificações.\nUse /subscribe para reativar."
         else:
-            message = "ℹ️ Você não está subscrito\\."
+            message = "ℹ️ Você não está subscrito."
         
-        await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(
+            self._escape_markdown_v2(message), 
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /status"""
@@ -615,16 +632,22 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 
 ⏰ **Última tip:** {self._format_time_ago(self.stats.last_alert_time)}
 
-🔥 **Sistema operacional\\!**"""
+🔥 **Sistema operacional!**"""
         
-        await update.message.reply_text(status_message, parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(
+            self._escape_markdown_v2(status_message), 
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_my_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /mystats"""
         user_id = update.effective_user.id
         
         if user_id not in self.users:
-            await update.message.reply_text("ℹ️ Você não está registrado\\. Use /start primeiro\\.", parse_mode=ParseMode.MARKDOWN_V2)
+            await update.message.reply_text(
+                self._escape_markdown_v2("ℹ️ Você não está registrado. Use /start primeiro."), 
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
         
         user = self.users[user_id]
@@ -639,7 +662,10 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 
 ⏰ **Última atividade:** {self._format_time_ago(user.last_active)}"""
         
-        await update.message.reply_text(stats_message, parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(
+            self._escape_markdown_v2(stats_message), 
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /help"""
@@ -667,7 +693,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 ⚡ Sistema profissional de tips eSports"""
         
         await update.message.reply_text(
-            help_text,
+            self._escape_markdown_v2(help_text),
             parse_mode=ParseMode.MARKDOWN_V2
         )
 
@@ -682,63 +708,62 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         try:
             subscription_type = SubscriptionType(query.data)
         except ValueError:
-            await query.edit_message_text("❌ **Tipo de subscrição inválido\\.**", parse_mode=ParseMode.MARKDOWN_V2)
+            await query.edit_message_text(
+                self._escape_markdown_v2("❌ **Tipo de subscrição inválido.**"), 
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
-        
-        # Verifica se é um grupo ou usuário individual
+
+        # Determina se é grupo ou usuário individual
         if chat.type in ['group', 'supergroup']:
-            # Lógica para grupos
             await self._handle_group_subscription(query, chat, user, subscription_type)
         else:
-            # Lógica para usuários individuais
             await self._handle_user_subscription(query, user, subscription_type)
 
     async def _handle_group_subscription(self, query, chat, user, subscription_type: SubscriptionType) -> None:
-        """Lida com subscrição de grupos"""
+        """Manipula subscrição em grupos"""
+        # Verifica se usuário é admin do grupo
         try:
-            # Verifica se o usuário é admin
-            member = await self.bot.get_chat_member(chat.id, user.id)
-            if member.status not in ['administrator', 'creator']:
-                await query.edit_message_text(
-                    "❌ **Apenas administradores podem configurar alertas\\!**",
-                    parse_mode=ParseMode.MARKDOWN_V2
-                )
-                return
-        except Exception as e:
-            logger.error(f"Erro ao verificar admin no callback: {e}")
+            chat_member = await self.bot.get_chat_member(chat.id, user.id)
+            is_admin = chat_member.status in ['administrator', 'creator']
+        except Exception:
+            is_admin = False
+        
+        if not is_admin:
+            await query.edit_message_text(
+                self._escape_markdown_v2("❌ **Apenas administradores podem configurar alertas do grupo.**"),
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
         
-        # Registra ou atualiza o grupo
-        if chat.id in self.groups:
-            self.groups[chat.id].subscription_type = subscription_type
-            self.groups[chat.id].is_active = True
-        else:
-            self.groups[chat.id] = TelegramGroup(
-                group_id=chat.id,
-                title=chat.title,
-                subscription_type=subscription_type,
-                activated_by=user.id
-            )
-        
-        await query.edit_message_text(
-            f"✅ **Alertas ativados no grupo\\!**\n\n"
-            f"📋 **Grupo:** {chat.title}\n"
-            f"📊 **Tipo:** {subscription_type.value}\n"
-            f"👤 **Configurado por:** {user.first_name}\n\n"
-            f"O grupo receberá tips automáticas conforme o tipo selecionado\\.\n"
-            f"Use `/group_status` para ver detalhes\\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+        # Registra ou atualiza grupo
+        self.groups[chat.id] = TelegramGroup(
+            group_id=chat.id,
+            title=chat.title or "Grupo",
+            subscription_type=subscription_type,
+            activated_by=user.id,
+            admin_ids=[user.id]
         )
         
-        logger.info(f"Grupo {chat.title} ({chat.id}) ativado por {user.first_name} ({user.id})")
+        confirmation_message = f"""✅ **Alertas de grupo configurados!**
+
+📋 **Grupo:** {chat.title}
+🔔 **Tipo:** {subscription_type.value}
+👤 **Configurado por:** {user.first_name}
+
+🎯 O grupo receberá tips conforme a subscrição selecionada."""
+        
+        await query.edit_message_text(
+            self._escape_markdown_v2(confirmation_message),
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_user_subscription(self, query, user, subscription_type: SubscriptionType) -> None:
-        """Lida com subscrição de usuários individuais"""
+        """Manipula subscrição individual"""
         # Registra ou atualiza usuário
         if user.id in self.users:
             self.users[user.id].subscription_type = subscription_type
             self.users[user.id].is_active = True
-            self.users[user.id].last_active = time.time()
         else:
             self.users[user.id] = TelegramUser(
                 user_id=user.id,
@@ -747,10 +772,15 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
                 subscription_type=subscription_type
             )
         
+        confirmation_message = f"""✅ **Subscrição configurada!**
+
+🔔 **Tipo:** {subscription_type.value}
+👤 **Usuário:** {user.first_name}
+
+🎯 Você receberá tips conforme sua subscrição."""
+        
         await query.edit_message_text(
-            f"✅ **Subscrição configurada\\!**\n\n"
-            f"📊 **Tipo:** {subscription_type.value}\n"
-            f"Você receberá tips conforme sua subscrição\\.",
+            self._escape_markdown_v2(confirmation_message),
             parse_mode=ParseMode.MARKDOWN_V2
         )
 
@@ -856,8 +886,8 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         # Verifica se é um grupo
         if chat.type not in ['group', 'supergroup']:
             await update.message.reply_text(
-                "❌ **Este comando só funciona em grupos\\!**\n\n"
-                "Use `/subscribe` para alertas pessoais\\.",
+                "❌ **Este comando só funciona em grupos!**\n\n"
+                "Use `/subscribe` para alertas pessoais.",
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -867,14 +897,14 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             member = await self.bot.get_chat_member(chat.id, user.id)
             if member.status not in ['administrator', 'creator']:
                 await update.message.reply_text(
-                    "❌ **Apenas administradores podem ativar alertas no grupo\\!**",
+                    "❌ **Apenas administradores podem ativar alertas no grupo!**",
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
                 return
         except Exception as e:
             logger.error(f"Erro ao verificar admin: {e}")
             await update.message.reply_text(
-                "❌ **Erro ao verificar permissões\\.**",
+                "❌ **Erro ao verificar permissões.**",
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -883,11 +913,11 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         if chat.id in self.groups and self.groups[chat.id].is_active:
             group = self.groups[chat.id]
             await update.message.reply_text(
-                f"✅ **Grupo já está ativo\\!**\n\n"
+                f"✅ **Grupo já está ativo!**\n\n"
                 f"📊 **Tipo:** {group.subscription_type.value}\n"
                 f"🎯 **Tips recebidas:** {group.tips_received}\n"
                 f"👤 **Ativado por:** {group.activated_by}\n\n"
-                f"Use `/group_status` para mais detalhes\\.",
+                f"Use `/group_status` para mais detalhes.",
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -911,7 +941,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         # Verifica se é um grupo
         if chat.type not in ['group', 'supergroup']:
             await update.message.reply_text(
-                "❌ **Este comando só funciona em grupos\\!**",
+                "❌ **Este comando só funciona em grupos!**",
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -919,8 +949,8 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         # Verifica se o grupo está registrado
         if chat.id not in self.groups:
             await update.message.reply_text(
-                "ℹ️ **Grupo não está registrado\\.**\n\n"
-                "Use `/activate_group` para ativar alertas\\.",
+                "ℹ️ **Grupo não está registrado.**\n\n"
+                "Use `/activate_group` para ativar alertas.",
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -947,8 +977,8 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 • Data: {time.strftime('%d/%m/%Y %H:%M', time.localtime(group.activated_at))}
 
 ⚙️ **Comandos:**
-• `/activate_group` \\- Reconfigurar alertas
-• `/deactivate_group` \\- Desativar alertas"""
+• `/activate_group` - Reconfigurar alertas
+• `/deactivate_group` - Desativar alertas"""
         
         await update.message.reply_text(
             status_text,
@@ -963,7 +993,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         # Verifica se é um grupo
         if chat.type not in ['group', 'supergroup']:
             await update.message.reply_text(
-                "❌ **Este comando só funciona em grupos\\!**",
+                "❌ **Este comando só funciona em grupos!**",
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -973,7 +1003,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             member = await self.bot.get_chat_member(chat.id, user.id)
             if member.status not in ['administrator', 'creator']:
                 await update.message.reply_text(
-                    "❌ **Apenas administradores podem desativar alertas\\!**",
+                    "❌ **Apenas administradores podem desativar alertas!**",
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
                 return
@@ -984,7 +1014,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         # Verifica se o grupo está ativo
         if chat.id not in self.groups or not self.groups[chat.id].is_active:
             await update.message.reply_text(
-                "ℹ️ **Alertas já estão desativados neste grupo\\.**",
+                "ℹ️ **Alertas já estão desativados neste grupo.**",
                 parse_mode=ParseMode.MARKDOWN_V2
             )
             return
@@ -993,9 +1023,9 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         self.groups[chat.id].is_active = False
         
         await update.message.reply_text(
-            f"❌ **Alertas desativados\\!**\n\n"
-            f"O grupo não receberá mais tips automáticas\\.\n"
-            f"Use `/activate_group` para reativar\\.",
+            f"❌ **Alertas desativados!**\n\n"
+            f"O grupo não receberá mais tips automáticas.\n"
+            f"Use `/activate_group` para reativar.",
             parse_mode=ParseMode.MARKDOWN_V2
         )
 
@@ -1060,4 +1090,18 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         except Exception as e:
             logger.error(f"Erro ao enviar mensagem para grupo {group_id}: {e}")
             self.stats.failed_deliveries += 1
-            return False 
+            return False
+
+    def _escape_markdown_v2(self, text: str) -> str:
+        """
+        Escapa caracteres especiais para MarkdownV2 do Telegram
+        
+        Caracteres que precisam ser escapados:
+        _ * [ ] ( ) ~ ` > # + - = | { } . !
+        """
+        escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        
+        for char in escape_chars:
+            text = text.replace(char, f'\\{char}')
+        
+        return text 

@@ -8,6 +8,9 @@ from dataclasses import dataclass
 import signal
 import sys
 import tempfile
+import logging
+from datetime import datetime, timedelta
+import traceback
 
 # Import condicional para fcntl (não disponível no Windows)
 try:
@@ -268,6 +271,20 @@ class LoLBotV3UltraAdvanced:
         self.stats = BotStats(start_time=time.time())
         
         logger.info("LoLBotV3UltraAdvanced inicializado com sucesso")
+
+    def _escape_markdown_v2(self, text: str) -> str:
+        """
+        Escapa caracteres especiais para MarkdownV2 do Telegram
+        
+        Caracteres que precisam ser escapados:
+        _ * [ ] ( ) ~ ` > # + - = | { } . !
+        """
+        escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        
+        for char in escape_chars:
+            text = text.replace(char, f'\\{char}')
+        
+        return text
 
     async def start_bot(self) -> None:
         """Inicia o bot completo com ScheduleManager"""
@@ -1168,129 +1185,49 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
     # ===== CALLBACK HANDLERS =====
 
     async def _handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler para callbacks de botões inline"""
+        """Handler principal para callbacks de botões"""
         query = update.callback_query
         await query.answer()
         
         data = query.data
-        user_id = query.from_user.id
+        logger.info(f"Callback recebido: {data}")
         
         try:
-            if data.startswith("sub_"):
-                # Subscrição
-                subscription_type = SubscriptionType(data[4:])
-                
-                # Registra ou atualiza usuário
-                from ..telegram_bot.alerts_system import TelegramUser
-                
-                if user_id in self.telegram_alerts.users:
-                    self.telegram_alerts.users[user_id].subscription_type = subscription_type
-                    self.telegram_alerts.users[user_id].is_active = True
-                else:
-                    self.telegram_alerts.users[user_id] = TelegramUser(
-                        user_id=user_id,
-                        username=query.from_user.username or "",
-                        first_name=query.from_user.first_name,
-                        subscription_type=subscription_type
-                    )
-                
+            # Menu principal
+            if data == "main_menu":
                 await query.edit_message_text(
-                    f"✅ **Subscrição configurada!**\n\nTipo: {subscription_type.value}\n\nVocê receberá tips conforme sua subscrição.",
-                    parse_mode=ParseMode.MARKDOWN_V2
-                )
-            
-            elif data.startswith("admin_"):
-                # Comandos admin via callback
-                if not self._is_admin(user_id):
-                    await query.edit_message_text("❌ Acesso negado\\.", parse_mode=ParseMode.MARKDOWN_V2)
-                    return
-                
-                if data == "admin_force_scan":
-                    await self._handle_force_scan_callback(query)
-                elif data == "admin_health_check":
-                    await self._handle_health_callback(query)
-                elif data == "admin_system_status":
-                    await self._handle_system_callback(query)
-            
-            elif data == "restart_confirm":
-                # Confirma reinício
-                if self._is_admin(user_id):
-                    await query.edit_message_text(
-                        "🔄 **Reiniciando sistema\\.\\.\\.**\n\nAguarde\\.\\.\\.",
-                        parse_mode=ParseMode.MARKDOWN_V2
-                    )
-                    # Em implementação real: reinicia componentes
-                    await asyncio.sleep(2)
-                    await query.edit_message_text(
-                        "✅ **Sistema reiniciado\\!**\n\nTodos os componentes operacionais\\.",
-                        parse_mode=ParseMode.MARKDOWN_V2
-                    )
-            
-            elif data == "restart_cancel":
-                await query.edit_message_text(
-                    "❌ **Reinício cancelado\\.**",
-                    parse_mode=ParseMode.MARKDOWN_V2
-                )
-            
-            elif data == "ping_test":
-                await query.edit_message_text(
-                    "🏓 **Pong\\!** \\- Resposta em `0\\.15s`\n\n"
-                    "✅ Latência baixa\n"
-                    "🚀 Conexão estável\n" 
-                    "💚 Sistema responsivo",
+                    self._escape_markdown_v2("🎮 **LoL Prediction Bot V3**\n\n"
+                    "🚀 Sistema profissional de tips de apostas\n"
+                    "📊 IA avançada + análise em tempo real\n"
+                    "🎯 Tips de alta qualidade garantidas\n\n"
+                    "Escolha uma opção abaixo:"),
                     parse_mode=ParseMode.MARKDOWN_V2,
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                    reply_markup=self._get_main_keyboard(self._is_admin(query.from_user.id))
                 )
             
-            elif data == "main_menu":
-                # Retorna ao menu principal
-                is_admin = self._is_admin(user_id)
-                await query.edit_message_text(
-                    f"🏠 **Menu Principal**\n\n"
-                    f"Bem\\-vindo de volta\\! Escolha uma opção:",
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                    reply_markup=self._get_main_keyboard(is_admin)
-                )
+            # Handlers de subscrição
+            elif data in ["subscribe_all", "subscribe_high_value", "subscribe_high_confidence", "subscribe_premium"]:
+                await self._handle_subscription_callback(query, data)
             
-            elif data == "user_settings":
-                await query.edit_message_text(
-                    "⚙️ **Configurações do Usuário**\n\n"
-                    "Personalize sua experiência com o bot:",
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                    reply_markup=self._get_settings_keyboard()
-                )
-            
-            elif data == "show_global_stats":
-                # Mostra estatísticas globais via callback
+            # Outros handlers específicos
+            elif data == "stats":
                 await self._handle_stats_callback(query)
-            
-            elif data == "refresh_main":
-                # Atualiza o menu principal
-                is_admin = self._is_admin(user_id)
-                await query.edit_message_text(
-                    f"🔄 **Menu Atualizado**\n\n"
-                    f"Sistema: ✅ Online\n"
-                    f"Hora: {time.strftime('%H:%M:%S')}\n\n"
-                    f"Escolha uma opção:",
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                    reply_markup=self._get_main_keyboard(is_admin)
-                )
-            
+            elif data == "system_status":
+                await self._handle_system_callback(query)
+            elif data == "force_scan":
+                await self._handle_force_scan_callback(query)
+            elif data == "health_check":
+                await self._handle_health_callback(query)
             elif data.startswith("help_"):
                 await self._handle_help_sections(query, data)
-            
             elif data.startswith("settings_"):
                 await self._handle_settings_sections(query, data)
-            
-            elif data == "unsubscribe_all":
-                # Cancela todas as subscrições
-                if user_id in self.telegram_alerts.users:
-                    self.telegram_alerts.users[user_id].is_active = False
-                
+            elif data == "unsubscribe_confirm":
+                # Confirma cancelamento
                 await query.edit_message_text(
-                    "❌ **Todos os alertas cancelados\\!**\n\n"
-                    "Você não receberá mais notificações\\.\n"
-                    "Use `/subscribe` para reativar\\.",
+                    self._escape_markdown_v2("❌ **Todos os alertas cancelados!**\n\n"
+                    "Você não receberá mais notificações.\n"
+                    "Use `/subscribe` para reativar."),
                     parse_mode=ParseMode.MARKDOWN_V2,
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
                 )
@@ -1298,7 +1235,7 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
         except Exception as e:
             logger.error(f"Erro no callback {data}: {e}")
             await query.edit_message_text(
-                f"❌ **Erro:** {str(e)[:100]}",
+                self._escape_markdown_v2(f"❌ **Erro:** {str(e)[:100]}"),
                 parse_mode=ParseMode.MARKDOWN_V2
             )
 
@@ -1308,17 +1245,17 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
             success = await self.schedule_manager.force_task_execution("monitor_live_matches")
             if success:
                 await query.edit_message_text(
-                    "✅ **Scan forçado iniciado\\!**\n\nVerifique `/system` para resultados\\.",
+                    self._escape_markdown_v2("✅ **Scan forçado iniciado!**\n\nVerifique `/system` para resultados."),
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
             else:
                 await query.edit_message_text(
-                    "❌ **Falha ao forçar scan\\.**",
+                    self._escape_markdown_v2("❌ **Falha ao forçar scan.**"),
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
         except Exception as e:
             await query.edit_message_text(
-                f"❌ **Erro:** `{str(e)[:50]}`",
+                self._escape_markdown_v2(f"❌ **Erro:** `{str(e)[:50]}`"),
                 parse_mode=ParseMode.MARKDOWN_V2
             )
 
@@ -1331,12 +1268,12 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
             status_text = "✅ Saudável" if health.is_healthy else "❌ Problemas"
             
             await query.edit_message_text(
-                f"💓 **Health Check:**\n\n{status_text}\nMemória: {health.memory_usage_mb:.1f}MB",
+                self._escape_markdown_v2(f"💓 **Health Check:**\n\n{status_text}\nMemória: {health.memory_usage_mb:.1f}MB"),
                 parse_mode=ParseMode.MARKDOWN_V2
             )
         except Exception as e:
             await query.edit_message_text(
-                f"❌ **Erro no health check:** `{str(e)[:50]}`",
+                self._escape_markdown_v2(f"❌ **Erro no health check:** `{str(e)[:50]}`"),
                 parse_mode=ParseMode.MARKDOWN_V2
             )
 
@@ -1352,51 +1289,54 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
 🎯 Tips: {status['statistics']['tips_generated']}
 ⏰ Uptime: {status['system']['uptime_hours']:.1f}h"""
         
-        await query.edit_message_text(quick_status, parse_mode=ParseMode.MARKDOWN_V2)
+        await query.edit_message_text(
+            self._escape_markdown_v2(quick_status), 
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_help_sections(self, query, data: str) -> None:
         """Handler para seções de ajuda"""
         help_sections = {
             "help_basic": """📋 **COMANDOS BÁSICOS**
 
-• `/start` \\- Menu principal e boas\\-vindas
-• `/help` \\- Esta ajuda completa
-• `/status` \\- Status do sistema em tempo real
-• `/stats` \\- Estatísticas globais
-• `/subscribe` \\- Configurar alertas
-• `/ping` \\- Testar conectividade
+• `/start` - Menu principal e boas-vindas
+• `/help` - Esta ajuda completa
+• `/status` - Status do sistema em tempo real
+• `/stats` - Estatísticas globais
+• `/subscribe` - Configurar alertas
+• `/ping` - Testar conectividade
 
-**💡 Dica:** Use os botões para navegar mais facilmente\\!""",
+**💡 Dica:** Use os botões para navegar mais facilmente!""",
 
             "help_alerts": """🔔 **SISTEMA DE ALERTAS**
 
 **Tipos de Subscrição:**
-• 🔔 **Todas as Tips** \\- Recebe todas as análises
-• 💎 **Alto Valor** \\- EV > 10% apenas
-• 🎯 **Alta Confiança** \\- Probabilidade > 80%
-• 👑 **Premium** \\- EV > 15% \\+ Conf > 85%
+• 🔔 **Todas as Tips** - Recebe todas as análises
+• 💎 **Alto Valor** - EV > 10% apenas
+• 🎯 **Alta Confiança** - Probabilidade > 80%
+• 👑 **Premium** - EV > 15% + Conf > 85%
 
 **Como Funciona:**
-1\\. Sistema monitora partidas ao vivo
-2\\. IA analisa dados em tempo real
-3\\. Filtra por critérios rigorosos
-4\\. Envia apenas tips de qualidade""",
+1. Sistema monitora partidas ao vivo
+2. IA analisa dados em tempo real
+3. Filtra por critérios rigorosos
+4. Envia apenas tips de qualidade""",
 
             "help_tips": """📊 **COMO INTERPRETAR TIPS**
 
 **Elementos de uma Tip:**
-• **EV \\(Expected Value\\):** Retorno esperado em %
+• **EV (Expected Value):** Retorno esperado em %
 • **Confiança:** Probabilidade de acerto
 • **Odds:** Cotação da casa de apostas
 • **Unidades:** Quantidade sugerida para apostar
 
 **Indicadores de Qualidade:**
-• 🔥 EV > 15% \\- Oportunidade excepcional
-• 📊 EV 10\\-15% \\- Boa oportunidade
-• 💡 EV 5\\-10% \\- Oportunidade moderada
+• 🔥 EV > 15% - Oportunidade excepcional
+• 📊 EV 10-15% - Boa oportunidade
+• 💡 EV 5-10% - Oportunidade moderada
 
 **Gestão de Risco:**
-Sempre aposte com responsabilidade\\!""",
+Sempre aposte com responsabilidade!""",
 
             "help_settings": """⚙️ **CONFIGURAÇÕES**
 
@@ -1407,7 +1347,7 @@ Sempre aposte com responsabilidade\\!""",
 • 🔕 Modo silencioso
 
 **Filtros Avançados:**
-• Ligas específicas \\(LEC, LCS, etc\\.\\)
+• Ligas específicas (LEC, LCS, etc.)
 • Valores mínimos de EV/Confiança
 • Times favoritos
 • Tipos de mercado""",
@@ -1415,16 +1355,16 @@ Sempre aposte com responsabilidade\\!""",
             "help_faq": """❓ **PERGUNTAS FREQUENTES**
 
 **Q: Quantas tips recebo por dia?**
-A: Depende da subscrição \\(1\\-5 tips/dia\\)
+A: Depende da subscrição (1-5 tips/dia)
 
 **Q: Como é calculado o EV?**
-A: Algoritmos ML \\+ análise estatística
+A: Algoritmos ML + análise estatística
 
 **Q: Posso pausar temporariamente?**
 A: Sim, use `/subscribe` para gerenciar
 
 **Q: As tips são garantidas?**
-A: Não\\! Apostas sempre envolvem risco
+A: Não! Apostas sempre envolvem risco
 
 **Q: Suporte a outras ligas?**
 A: Focamos nas principais: LEC, LCS, LPL, LCK""",
@@ -1442,13 +1382,13 @@ A: Focamos nas principais: LEC, LCS, LPL, LCK""",
 • Bot lento → Verificar `/status`
 
 **Contato:**
-Sistema automatizado \\- suporte via bot apenas"""
+Sistema automatizado - suporte via bot apenas"""
         }
         
         section_text = help_sections.get(data, "Seção não encontrada")
         
         await query.edit_message_text(
-            section_text,
+            self._escape_markdown_v2(section_text),
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
         )
@@ -1466,7 +1406,7 @@ Sistema automatizado \\- suporte via bot apenas"""
 
 **Frequência:**
 • Imediato
-• Agrupado \\(1x/hora\\)
+• Agrupado (1x/hora)
 • Resumo diário
 
 Configuração atual: **Todas ativas**""",
@@ -1475,48 +1415,30 @@ Configuração atual: **Todas ativas**""",
 
 **Horário de funcionamento:**
 • 24/7 disponível
-• Pico: 14h\\-23h \\(horário BR\\)
+• Pico: 14h-23h (horário BR)
 • Partidas: Principalmente noite
 
 **Suas preferências:**
 • Receber: Qualquer horário
 • Não incomodar: Desabilitado
-• Timezone: UTC\\-3 \\(Brasil\\)""",
+• Timezone: UTC-3 (Brasil)""",
 
             "settings_filters": """📊 **FILTROS DE TIPS**
 
 **Critérios disponíveis:**
 • EV mínimo: 5%
-• Confiança mínima: 65%
-• Odds: 1\\.30 \\- 3\\.50
+• Confiança mínima: 60%
 • Ligas: Todas principais
+• Horário: 24/7
 
-**Filtros ativos:**
-• ✅ Filtro qualidade
-• ✅ Anti\\-spam
-• ❌ Filtro por time
-
-Configure filtros personalizados\\!""",
-
-            "settings_language": """🌍 **IDIOMA**
-
-**Idiomas disponíveis:**
-• 🇧🇷 Português \\(atual\\)
-• 🇺🇸 English
-• 🇪🇸 Español
-
-**Formatação:**
-• Números: Brasileiro
-• Horário: 24h
-• Moeda: R$ \\(Real\\)
-
-Mudanças aplicam\\-se imediatamente\\."""
+**Configuração atual:**
+Padrão recomendado ativo"""
         }
         
-        section_text = settings_sections.get(data, "Configuração não encontrada")
+        section_text = settings_sections.get(data, "Seção não encontrada")
         
         await query.edit_message_text(
-            section_text,
+            self._escape_markdown_v2(section_text),
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
         )
