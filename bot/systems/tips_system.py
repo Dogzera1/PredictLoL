@@ -382,13 +382,23 @@ class ProfessionalTipsSystem:
                 logger.error(f"Erro ao processar partida {match.match_id}: {e}")
 
     async def _generate_tip_for_match(self, match: MatchData) -> Optional[ProfessionalTip]:
-        """Gera tip profissional para uma partida"""
+        """Gera tip profissional para uma partida (apenas dados reais)"""
         try:
-            # Busca odds da partida
+            # Verifica se é partida real (não mock)
+            if not self._is_real_match_data(match):
+                logger.debug(f"Partida rejeitada: dados não são reais - {match.match_id}")
+                return None
+            
+            # Busca odds reais da partida
             odds_data = await self.pandascore_client.get_match_odds(match.match_id)
             
             if not odds_data:
-                logger.debug(f"Sem odds disponíveis para {match.match_id}")
+                logger.debug(f"Sem odds reais disponíveis para {match.match_id}")
+                return None
+            
+            # Verifica se são odds reais (não simuladas)
+            if not self._are_real_odds(odds_data):
+                logger.debug(f"Odds rejeitadas: não são dados reais - {match.match_id}")
                 return None
             
             # Gera predição e tip
@@ -398,7 +408,7 @@ class ProfessionalTipsSystem:
             
             if tip_generation_result.is_valid and tip_generation_result.tip:
                 logger.info(
-                    f"Tip válida gerada: {tip_generation_result.tip.tip_on_team} @ "
+                    f"✅ Tip REAL gerada: {tip_generation_result.tip.tip_on_team} @ "
                     f"{tip_generation_result.tip.odds} ({tip_generation_result.tip.units}u)"
                 )
                 return tip_generation_result.tip
@@ -409,6 +419,60 @@ class ProfessionalTipsSystem:
         except Exception as e:
             logger.error(f"Erro ao gerar tip para {match.match_id}: {e}")
             return None
+
+    def _is_real_match_data(self, match: MatchData) -> bool:
+        """Verifica se os dados da partida são reais (não mock/simulados)"""
+        # Verifica indicadores de dados mock
+        if hasattr(match, 'match_id') and match.match_id:
+            if 'mock' in str(match.match_id).lower():
+                return False
+            if 'test' in str(match.match_id).lower():
+                return False
+            if 'fake' in str(match.match_id).lower():
+                return False
+        
+        # Verifica se tem dados básicos obrigatórios
+        if not match.team1_name or not match.team2_name:
+            return False
+        
+        # Verifica se tem liga válida
+        if not match.league or isinstance(match.league, dict):
+            return False
+        
+        # Verifica se tem status válido
+        if not match.status:
+            return False
+        
+        return True
+
+    def _are_real_odds(self, odds_data: Dict) -> bool:
+        """Verifica se as odds são reais (não simuladas)"""
+        # Verifica se tem marcador de dados simulados
+        if odds_data.get("source") == "simulated":
+            return False
+        
+        if odds_data.get("mock") is True:
+            return False
+        
+        if odds_data.get("test") is True:
+            return False
+        
+        # Verifica se tem estrutura de odds reais
+        if "odds" not in odds_data:
+            return False
+        
+        odds = odds_data["odds"]
+        if not isinstance(odds, dict) or len(odds) < 2:
+            return False
+        
+        # Verifica se odds são valores realistas
+        for team, odd_value in odds.items():
+            if not isinstance(odd_value, (int, float)):
+                return False
+            if odd_value < 1.01 or odd_value > 50.0:  # Range realista de odds
+                return False
+        
+        return True
 
     async def _handle_generated_tip(self, tip: ProfessionalTip, match: MatchData) -> None:
         """Processa tip gerada"""

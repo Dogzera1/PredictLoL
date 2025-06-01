@@ -181,12 +181,22 @@ class RiotAPIClient:
         # Rate limiting
         await self.rate_limiter.acquire()
 
-        # Constrói URL
-        url = urljoin(base_url, endpoint)
+        # Constrói URL corretamente
+        if endpoint.startswith("/"):
+            url = base_url + endpoint
+        else:
+            url = f"{base_url}/{endpoint}"
+
+        # Headers para esta requisição (garantindo x-api-key)
+        request_headers = {
+            **HTTP_HEADERS,
+            "x-api-key": self.api_key,
+        }
 
         try:
             logger.debug(f"Fazendo requisição: {url}")
-            async with self.session.get(url, params=params) as response:
+            logger.debug(f"Headers: {request_headers}")
+            async with self.session.get(url, params=params, headers=request_headers) as response:
                 response_data = await response.json()
 
                 if response.status == 200:
@@ -226,7 +236,7 @@ class RiotAPIClient:
             locale: Locale para dados (padrão pt-BR)
             
         Returns:
-            Lista de partidas ao vivo
+            Lista de partidas ao vivo (apenas dados reais)
         """
         try:
             endpoint = "/getLive"
@@ -246,39 +256,13 @@ class RiotAPIClient:
             
         except RiotAPIError as e:
             if e.status_code == 403:
-                logger.warning("Riot API: Autenticação falhou, retornando dados mock")
-                return self._get_mock_live_matches()
+                logger.warning("Riot API: Autenticação falhou - sem dados disponíveis")
+                return []  # Retorna lista vazia ao invés de dados mock
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
             return []
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
             return []
-    
-    def _get_mock_live_matches(self) -> List[Dict[str, Any]]:
-        """Retorna dados mock quando a API real não está disponível"""
-        return [
-            {
-                "id": "mock_1",
-                "type": "match",
-                "state": "inProgress",
-                "league": {"name": "LCK Spring", "id": "1"},
-                "match": {
-                    "id": "mock_match_1",
-                    "teams": [
-                        {"name": "T1", "code": "T1", "id": "t1"},
-                        {"name": "GenG", "code": "GEN", "id": "geng"}
-                    ],
-                    "strategy": {"type": "bestOf", "count": 3},
-                    "games": [
-                        {
-                            "id": "mock_game_1",
-                            "state": "inProgress",
-                            "number": 1
-                        }
-                    ]
-                }
-            }
-        ]
 
     async def get_leagues(self, locale: str = "pt-BR") -> List[Dict[str, Any]]:
         """
@@ -632,21 +616,40 @@ class RiotAPIClient:
             return []
 
     async def health_check(self) -> bool:
-        """Verifica se a API está funcionando"""
+        """
+        Verifica se a API está funcionando (apenas dados reais)
+        
+        Returns:
+            True se API funciona, False caso contrário
+        """
         try:
-            # Testa com um endpoint simples
-            await self._make_request(self.ESPORTS_API_BASE, "/getLeagues", {"hl": "en-US"}, cache_ttl=60)
-            logger.info("Health check da Riot API: OK")
-            return True
+            await self.start_session()
+            data = await self._make_request(
+                self.ESPORTS_API_BASE,
+                "/getLive",
+                {"hl": "en-US"},
+                cache_ttl=60
+            )
+            
+            # Verifica se resposta é válida
+            if isinstance(data, dict) and "data" in data:
+                logger.info("Riot API: Health check passou")
+                return True
+            else:
+                logger.warning("Riot API: Resposta inválida no health check")
+                return False
+                
         except RiotAPIError as e:
             if e.status_code == 403:
-                logger.warning("Riot API: Chave inválida, usando modo mock")
-                return True  # Permite continuar em modo mock
-            logger.error(f"Health check da Riot API falhou: {e}")
+                logger.warning("Riot API: Falha de autenticação - API indisponível")
+                return False
+            logger.error(f"Riot API: Erro no health check - {e}")
             return False
         except Exception as e:
-            logger.error(f"Health check da Riot API falhou: {e}")
+            logger.error(f"Riot API: Health check falhou - {e}")
             return False
+        finally:
+            await self.close_session()
 
     def cleanup_cache(self) -> None:
         """Limpa cache expirado"""

@@ -61,7 +61,7 @@ RIOT_API_ENDPOINTS = {
 }
 
 # Chave de API da Riot para desenvolvimento/teste (atualizada)
-RIOT_API_KEY = "RGAPI-7b5ce87e-4bb8-4d9d-b905-8df7d7b4f8c2"
+RIOT_API_KEY = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
 
 # PandaScore API
 PANDASCORE_API_KEY = "90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ"
@@ -247,4 +247,9 @@ ML_FEATURE_WEIGHTS = {
     "game_phase": 0.05,
     "crucial_events": 0.10,
     "has_momentum": 0.08
-} 
+}
+
+# Configurações de Qualidade de Dados
+USE_ONLY_REAL_DATA = True  # Sistema trabalha apenas com dados reais, sem mocks/simulações
+REQUIRE_LIVE_ODDS = True   # Exige odds reais para gerar tips
+MIN_DATA_QUALITY_THRESHOLD = 0.8  # Qualidade mínima de dados para aceitar 
