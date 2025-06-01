@@ -917,13 +917,42 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             member = await self.bot.get_chat_member(chat.id, user.id)
             if member.status not in ['administrator', 'creator']:
                 await update.message.reply_text(
-                    "❌ Apenas administradores podem ativar alertas no grupo!"
+                    "❌ Apenas administradores podem ativar alertas no grupo!\n\n"
+                    f"👤 Seu status atual: {member.status}\n"
+                    f"ℹ️ Peça a um admin para tornar você administrador."
                 )
                 return
-        except Exception as e:
-            logger.error(f"Erro ao verificar admin: {e}")
+        except Forbidden as e:
+            logger.error(f"Bot sem permissão para verificar membros do grupo {chat.id}: {e}")
             await update.message.reply_text(
-                "❌ Erro ao verificar permissões."
+                "❌ O bot não tem permissão para verificar membros do grupo!\n\n"
+                "🔧 SOLUÇÃO:\n"
+                "1. Torne o bot ADMINISTRADOR do grupo\n"
+                "2. Dê ao bot a permissão 'Ver lista de membros'\n"
+                "3. Tente novamente o comando\n\n"
+                "ℹ️ O bot precisa ser admin para verificar quem pode configurar alertas."
+            )
+            return
+        except BadRequest as e:
+            logger.error(f"Erro de requisição ao verificar admin do grupo {chat.id}: {e}")
+            await update.message.reply_text(
+                "❌ Erro ao acessar informações do grupo!\n\n"
+                "🔧 POSSÍVEIS CAUSAS:\n"
+                "• Grupo é muito restritivo\n"
+                "• Bot não tem permissões suficientes\n"
+                "• Problema temporário da API do Telegram\n\n"
+                "💡 Tente tornar o bot administrador do grupo."
+            )
+            return
+        except Exception as e:
+            logger.error(f"Erro inesperado ao verificar admin do grupo {chat.id}: {e}")
+            await update.message.reply_text(
+                f"❌ Erro inesperado ao verificar permissões!\n\n"
+                f"🔍 Detalhes técnicos: {str(e)[:100]}...\n\n"
+                f"🔧 SOLUÇÕES:\n"
+                f"1. Certifique-se de que o bot é administrador\n"
+                f"2. Verifique se o grupo permite bots\n"
+                f"3. Tente remover e adicionar o bot novamente"
             )
             return
         

@@ -17,7 +17,7 @@ async def test_group_functionality():
     print("🧪 Testando funcionalidades de grupo...")
     
     # Simula dados do sistema
-    BOT_TOKEN = "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg"
+    BOT_TOKEN = "7584060058:AAHkSPdwIRd87KiyoRAFuHkjqR72pcwOxP4"
     
     try:
         # Inicializa sistema de alertas
