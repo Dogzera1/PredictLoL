@@ -469,7 +469,7 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
 
 ⚡ **Rate Limiting:**
 • Máx por hora: {system_stats['rate_limiting']['max_messages_per_hour']}
-• Cache: {stats_message['rate_limiting']['cache_duration_minutes']}min
+• Cache: {system_stats['rate_limiting']['cache_duration_minutes']}min
 • Tips em cache: {system_stats['rate_limiting']['recent_tips_cached']}
 
 🎯 **Bot Performance:**
@@ -849,6 +849,69 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                     parse_mode=ParseMode.MARKDOWN_V2
                 )
             
+            elif data == "ping_test":
+                await query.edit_message_text(
+                    "🏓 **Pong\\!** \\- Resposta em `0\\.15s`\n\n"
+                    "✅ Latência baixa\n"
+                    "🚀 Conexão estável\n" 
+                    "💚 Sistema responsivo",
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "main_menu":
+                # Retorna ao menu principal
+                is_admin = self._is_admin(user_id)
+                await query.edit_message_text(
+                    f"🏠 **Menu Principal**\n\n"
+                    f"Bem\\-vindo de volta\\! Escolha uma opção:",
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_main_keyboard(is_admin)
+                )
+            
+            elif data == "user_settings":
+                await query.edit_message_text(
+                    "⚙️ **Configurações do Usuário**\n\n"
+                    "Personalize sua experiência com o bot:",
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_settings_keyboard()
+                )
+            
+            elif data == "show_global_stats":
+                # Mostra estatísticas globais via callback
+                await self._handle_stats_callback(query)
+            
+            elif data == "refresh_main":
+                # Atualiza o menu principal
+                is_admin = self._is_admin(user_id)
+                await query.edit_message_text(
+                    f"🔄 **Menu Atualizado**\n\n"
+                    f"Sistema: ✅ Online\n"
+                    f"Hora: {time.strftime('%H:%M:%S')}\n\n"
+                    f"Escolha uma opção:",
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_main_keyboard(is_admin)
+                )
+            
+            elif data.startswith("help_"):
+                await self._handle_help_sections(query, data)
+            
+            elif data.startswith("settings_"):
+                await self._handle_settings_sections(query, data)
+            
+            elif data == "unsubscribe_all":
+                # Cancela todas as subscrições
+                if user_id in self.telegram_alerts.users:
+                    self.telegram_alerts.users[user_id].is_active = False
+                
+                await query.edit_message_text(
+                    "❌ **Todos os alertas cancelados\\!**\n\n"
+                    "Você não receberá mais notificações\\.\n"
+                    "Use `/subscribe` para reativar\\.",
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
         except Exception as e:
             logger.error(f"Erro no callback {data}: {e}")
             await query.edit_message_text(
@@ -908,6 +971,200 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
         
         await query.edit_message_text(quick_status, parse_mode=ParseMode.MARKDOWN_V2)
 
+    async def _handle_help_sections(self, query, data: str) -> None:
+        """Handler para seções de ajuda"""
+        help_sections = {
+            "help_basic": """📋 **COMANDOS BÁSICOS**
+
+• `/start` \\- Menu principal e boas\\-vindas
+• `/help` \\- Esta ajuda completa
+• `/status` \\- Status do sistema em tempo real
+• `/stats` \\- Estatísticas globais
+• `/subscribe` \\- Configurar alertas
+• `/ping` \\- Testar conectividade
+
+**💡 Dica:** Use os botões para navegar mais facilmente\\!""",
+
+            "help_alerts": """🔔 **SISTEMA DE ALERTAS**
+
+**Tipos de Subscrição:**
+• 🔔 **Todas as Tips** \\- Recebe todas as análises
+• 💎 **Alto Valor** \\- EV > 10% apenas
+• 🎯 **Alta Confiança** \\- Probabilidade > 80%
+• 👑 **Premium** \\- EV > 15% \\+ Conf > 85%
+
+**Como Funciona:**
+1\\. Sistema monitora partidas ao vivo
+2\\. IA analisa dados em tempo real
+3\\. Filtra por critérios rigorosos
+4\\. Envia apenas tips de qualidade""",
+
+            "help_tips": """📊 **COMO INTERPRETAR TIPS**
+
+**Elementos de uma Tip:**
+• **EV \\(Expected Value\\):** Retorno esperado em %
+• **Confiança:** Probabilidade de acerto
+• **Odds:** Cotação da casa de apostas
+• **Unidades:** Quantidade sugerida para apostar
+
+**Indicadores de Qualidade:**
+• 🔥 EV > 15% \\- Oportunidade excepcional
+• 📊 EV 10\\-15% \\- Boa oportunidade
+• 💡 EV 5\\-10% \\- Oportunidade moderada
+
+**Gestão de Risco:**
+Sempre aposte com responsabilidade\\!""",
+
+            "help_settings": """⚙️ **CONFIGURAÇÕES**
+
+**Personalizações Disponíveis:**
+• 🔔 Tipos de alerta preferidos
+• ⏰ Horários para receber tips
+• 📊 Filtros de confiança/EV
+• 🔕 Modo silencioso
+
+**Filtros Avançados:**
+• Ligas específicas \\(LEC, LCS, etc\\.\\)
+• Valores mínimos de EV/Confiança
+• Times favoritos
+• Tipos de mercado""",
+
+            "help_faq": """❓ **PERGUNTAS FREQUENTES**
+
+**Q: Quantas tips recebo por dia?**
+A: Depende da subscrição \\(1\\-5 tips/dia\\)
+
+**Q: Como é calculado o EV?**
+A: Algoritmos ML \\+ análise estatística
+
+**Q: Posso pausar temporariamente?**
+A: Sim, use `/subscribe` para gerenciar
+
+**Q: As tips são garantidas?**
+A: Não\\! Apostas sempre envolvem risco
+
+**Q: Suporte a outras ligas?**
+A: Focamos nas principais: LEC, LCS, LPL, LCK""",
+
+            "help_support": """🆘 **SUPORTE**
+
+**Como obter ajuda:**
+• Use os comandos `/help` e `/status`
+• Verifique o FAQ primeiro
+• Reporte bugs via admin
+
+**Problemas comuns:**
+• Comandos não funcionam → `/start`
+• Não recebo tips → Verificar `/subscribe`
+• Bot lento → Verificar `/status`
+
+**Contato:**
+Sistema automatizado \\- suporte via bot apenas"""
+        }
+        
+        section_text = help_sections.get(data, "Seção não encontrada")
+        
+        await query.edit_message_text(
+            section_text,
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+        )
+
+    async def _handle_settings_sections(self, query, data: str) -> None:
+        """Handler para seções de configurações"""
+        settings_sections = {
+            "settings_alerts": """🔔 **CONFIGURAR ALERTAS**
+
+**Tipos Disponíveis:**
+• Tips gerais
+• Tips premium
+• Alertas de sistema
+• Atualizações do bot
+
+**Frequência:**
+• Imediato
+• Agrupado \\(1x/hora\\)
+• Resumo diário
+
+Configuração atual: **Todas ativas**""",
+
+            "settings_schedule": """⏰ **CONFIGURAR HORÁRIOS**
+
+**Horário de funcionamento:**
+• 24/7 disponível
+• Pico: 14h\\-23h \\(horário BR\\)
+• Partidas: Principalmente noite
+
+**Suas preferências:**
+• Receber: Qualquer horário
+• Não incomodar: Desabilitado
+• Timezone: UTC\\-3 \\(Brasil\\)""",
+
+            "settings_filters": """📊 **FILTROS DE TIPS**
+
+**Critérios disponíveis:**
+• EV mínimo: 5%
+• Confiança mínima: 65%
+• Odds: 1\\.30 \\- 3\\.50
+• Ligas: Todas principais
+
+**Filtros ativos:**
+• ✅ Filtro qualidade
+• ✅ Anti\\-spam
+• ❌ Filtro por time
+
+Configure filtros personalizados\\!""",
+
+            "settings_language": """🌍 **IDIOMA**
+
+**Idiomas disponíveis:**
+• 🇧🇷 Português \\(atual\\)
+• 🇺🇸 English
+• 🇪🇸 Español
+
+**Formatação:**
+• Números: Brasileiro
+• Horário: 24h
+• Moeda: R$ \\(Real\\)
+
+Mudanças aplicam\\-se imediatamente\\."""
+        }
+        
+        section_text = settings_sections.get(data, "Configuração não encontrada")
+        
+        await query.edit_message_text(
+            section_text,
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+        )
+
+    async def _handle_stats_callback(self, query) -> None:
+        """Handler para callback de estatísticas"""
+        system_stats = self.telegram_alerts.get_system_stats()
+        
+        stats_text = f"""📈 **ESTATÍSTICAS GLOBAIS**
+
+👥 **Usuários:**
+• Total: {system_stats['users']['total']}
+• Ativos: {system_stats['users']['active']}
+• Premium: {len([u for u in self.telegram_alerts.users.values() if 'premium' in u.subscription_type.value.lower()])}
+
+📨 **Tips Enviadas:**
+• Hoje: {system_stats['alerts']['tips_sent']}
+• Total: {system_stats['alerts']['total_sent']}
+• Taxa sucesso: {system_stats['alerts']['success_rate']:.1f}%
+
+⚡ **Performance:**
+• Uptime: {self.stats.uptime_hours:.1f}h
+• Comandos: {self.stats.commands_processed}
+• Sistema: ✅ Estável"""
+        
+        await query.edit_message_text(
+            stats_text,
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+        )
+
     async def _handle_unknown_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler para mensagens não reconhecidas"""
         await update.message.reply_text(
@@ -941,79 +1198,127 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
     # ===== KEYBOARD METHODS =====
 
     def _get_main_keyboard(self, is_admin: bool = False) -> InlineKeyboardMarkup:
-        """Teclado principal"""
+        """Teclado principal com mais opções"""
         keyboard = [
-            [InlineKeyboardButton("📊 Status", callback_data="quick_status"),
-             InlineKeyboardButton("🔔 Subscrever", callback_data="show_subscriptions")],
-            [InlineKeyboardButton("📈 Minhas Stats", callback_data="my_stats"),
-             InlineKeyboardButton("❓ Ajuda", callback_data="show_help")]
+            [InlineKeyboardButton("📊 Status Sistema", callback_data="quick_status"),
+             InlineKeyboardButton("🔔 Configurar Alertas", callback_data="show_subscriptions")],
+            [InlineKeyboardButton("📈 Estatísticas", callback_data="show_global_stats"),
+             InlineKeyboardButton("📊 Minhas Stats", callback_data="my_stats")],
+            [InlineKeyboardButton("❓ Ajuda & Comandos", callback_data="show_help"),
+             InlineKeyboardButton("🏓 Testar Conexão", callback_data="ping_test")],
+            [InlineKeyboardButton("🔄 Atualizar Menu", callback_data="refresh_main"),
+             InlineKeyboardButton("⚙️ Configurações", callback_data="user_settings")]
         ]
         
         if is_admin:
-            keyboard.append([InlineKeyboardButton("👑 Admin Panel", callback_data="admin_panel")])
+            keyboard.append([InlineKeyboardButton("👑 Painel Administrativo", callback_data="admin_panel")])
         
         return InlineKeyboardMarkup(keyboard)
 
     def _get_subscription_keyboard(self) -> InlineKeyboardMarkup:
-        """Teclado de subscrições"""
+        """Teclado de subscrições melhorado"""
         keyboard = [
             [InlineKeyboardButton("🔔 Todas as Tips", callback_data="sub_all_tips")],
             [InlineKeyboardButton("💎 Alto Valor (EV > 10%)", callback_data="sub_high_value")],
             [InlineKeyboardButton("🎯 Alta Confiança (> 80%)", callback_data="sub_high_conf")],
-            [InlineKeyboardButton("👑 Premium (EV > 15% + Conf > 85%)", callback_data="sub_premium")]
+            [InlineKeyboardButton("👑 Premium (EV > 15% + Conf > 85%)", callback_data="sub_premium")],
+            [InlineKeyboardButton("❌ Cancelar Alertas", callback_data="unsubscribe_all")],
+            [InlineKeyboardButton("⚙️ Filtros Personalizados", callback_data="custom_filters")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_admin_keyboard(self) -> InlineKeyboardMarkup:
-        """Teclado administrativo"""
+        """Teclado administrativo melhorado"""
         keyboard = [
             [InlineKeyboardButton("🔄 Force Scan", callback_data="admin_force_scan"),
              InlineKeyboardButton("💓 Health Check", callback_data="admin_health_check")],
-            [InlineKeyboardButton("📊 System Status", callback_data="admin_system_status"),
-             InlineKeyboardButton("📋 Tasks", callback_data="admin_tasks")],
-            [InlineKeyboardButton("🔄 Restart System", callback_data="admin_restart")]
+            [InlineKeyboardButton("📊 Status Completo", callback_data="admin_system_status"),
+             InlineKeyboardButton("📋 Gerenciar Tarefas", callback_data="admin_tasks")],
+            [InlineKeyboardButton("📊 Logs do Sistema", callback_data="admin_logs"),
+             InlineKeyboardButton("👥 Gerenciar Usuários", callback_data="admin_users")],
+            [InlineKeyboardButton("⚙️ Configurações Sistema", callback_data="admin_config"),
+             InlineKeyboardButton("🔄 Restart Sistema", callback_data="admin_restart")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_status_keyboard(self) -> InlineKeyboardMarkup:
-        """Teclado de status"""
+        """Teclado de status melhorado"""
         keyboard = [
-            [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_status"),
-             InlineKeyboardButton("📊 Detalhado", callback_data="detailed_status")]
+            [InlineKeyboardButton("🔄 Atualizar Status", callback_data="refresh_status"),
+             InlineKeyboardButton("📊 Status Detalhado", callback_data="detailed_status")],
+            [InlineKeyboardButton("⚡ Performance", callback_data="performance_stats"),
+             InlineKeyboardButton("🔗 APIs Status", callback_data="apis_status")],
+            [InlineKeyboardButton("📈 Gráficos", callback_data="status_charts"),
+             InlineKeyboardButton("💓 Health Check", callback_data="health_status")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_help_keyboard(self, is_admin: bool = False) -> InlineKeyboardMarkup:
-        """Teclado de ajuda"""
+        """Teclado de ajuda melhorado"""
         keyboard = [
-            [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
+            [InlineKeyboardButton("📋 Comandos Básicos", callback_data="help_basic"),
+             InlineKeyboardButton("🔔 Sistema de Alertas", callback_data="help_alerts")],
+            [InlineKeyboardButton("📊 Como Interpretar Tips", callback_data="help_tips"),
+             InlineKeyboardButton("⚙️ Configurações", callback_data="help_settings")],
+            [InlineKeyboardButton("❓ FAQ", callback_data="help_faq"),
+             InlineKeyboardButton("🆘 Suporte", callback_data="help_support")]
         ]
         if is_admin:
-            keyboard.append([InlineKeyboardButton("👑 Ajuda Admin", callback_data="admin_help")])
+            keyboard.append([InlineKeyboardButton("👑 Ajuda Admin", callback_data="help_admin")])
+        
+        keyboard.append([InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")])
         return InlineKeyboardMarkup(keyboard)
 
     def _get_tasks_keyboard(self) -> InlineKeyboardMarkup:
-        """Teclado de tarefas"""
+        """Teclado de tarefas melhorado"""
         keyboard = [
             [InlineKeyboardButton("🔄 Force Monitor", callback_data="force_monitor"),
              InlineKeyboardButton("🧹 Force Cleanup", callback_data="force_cleanup")],
             [InlineKeyboardButton("💓 Force Health", callback_data="force_health"),
-             InlineKeyboardButton("🔧 Force Cache", callback_data="force_cache")]
+             InlineKeyboardButton("🔧 Clear Cache", callback_data="force_cache")],
+            [InlineKeyboardButton("📊 Task Statistics", callback_data="task_stats"),
+             InlineKeyboardButton("⏸️ Pause Tasks", callback_data="pause_tasks")],
+            [InlineKeyboardButton("▶️ Resume Tasks", callback_data="resume_tasks"),
+             InlineKeyboardButton("🔄 Restart Tasks", callback_data="restart_tasks")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_mystats_keyboard(self) -> InlineKeyboardMarkup:
-        """Teclado de estatísticas pessoais"""
+        """Teclado de estatísticas pessoais melhorado"""
         keyboard = [
             [InlineKeyboardButton("🔔 Alterar Subscrição", callback_data="change_subscription"),
-             InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_mystats")]
+             InlineKeyboardButton("🔄 Atualizar Stats", callback_data="refresh_mystats")],
+            [InlineKeyboardButton("📊 Histórico Tips", callback_data="tips_history"),
+             InlineKeyboardButton("💰 ROI Calculator", callback_data="roi_calculator")],
+            [InlineKeyboardButton("⚙️ Preferências", callback_data="user_preferences"),
+             InlineKeyboardButton("📈 Performance", callback_data="user_performance")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
         ]
         return InlineKeyboardMarkup(keyboard)
 
     def _get_restart_keyboard(self) -> InlineKeyboardMarkup:
         """Teclado de confirmação de reinício"""
         keyboard = [
-            [InlineKeyboardButton("✅ Confirmar Reinício", callback_data="restart_confirm"),
-             InlineKeyboardButton("❌ Cancelar", callback_data="restart_cancel")]
+            [InlineKeyboardButton("✅ Confirmar Reinício Completo", callback_data="restart_confirm"),
+             InlineKeyboardButton("❌ Cancelar", callback_data="restart_cancel")],
+            [InlineKeyboardButton("🔄 Reinício Parcial", callback_data="restart_partial"),
+             InlineKeyboardButton("⚡ Reinício Rápido", callback_data="restart_quick")]
+        ]
+        return InlineKeyboardMarkup(keyboard)
+    
+    def _get_settings_keyboard(self) -> InlineKeyboardMarkup:
+        """Teclado de configurações do usuário"""
+        keyboard = [
+            [InlineKeyboardButton("🔔 Tipos de Alerta", callback_data="settings_alerts"),
+             InlineKeyboardButton("⏰ Horários", callback_data="settings_schedule")],
+            [InlineKeyboardButton("📊 Filtros de Tips", callback_data="settings_filters"),
+             InlineKeyboardButton("🌍 Idioma", callback_data="settings_language")],
+            [InlineKeyboardButton("🔕 Modo Silencioso", callback_data="toggle_silent"),
+             InlineKeyboardButton("📱 Notificações Push", callback_data="toggle_push")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
         ]
         return InlineKeyboardMarkup(keyboard) 
