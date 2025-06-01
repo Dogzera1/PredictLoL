@@ -155,14 +155,10 @@ async def test_estimated_odds():
     print(f"\n🔬 Testando sistema de odds estimadas...")
     
     try:
-        # Importa o sistema de tips
-        from bot.systems.professional_tips_system import ProfessionalTipsSystem
-        from bot.systems.prediction.dynamic_prediction_system import DynamicPredictionSystem
-        from bot.systems.lol_game_analyzer import LoLGameAnalyzer
-        
         # Inicializa componentes
-        prediction_system = DynamicPredictionSystem()
-        tips_system = ProfessionalTipsSystem(prediction_system)
+        from bot.systems.tips_system import ProfessionalTipsSystem
+        from bot.core_logic.prediction_system import DynamicPredictionSystem
+        from bot.core_logic.game_analyzer import LoLGameAnalyzer
         
         # Testa geração de odds estimadas
         print("✅ Sistema de tips inicializado")

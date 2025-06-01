@@ -105,9 +105,9 @@ class ProductionAPI:
             logger.info(f"📡 Endpoints disponíveis:")
             logger.info(f"   • GET  /api/status - Status do sistema")
             logger.info(f"   • GET  /api/health - Health check")
-            logger.info(f"   • POST /api/restart/{component} - Restart componente")
+            logger.info(f"   • POST /api/restart/{{component}} - Restart componente")
             logger.info(f"   • POST /api/emergency-recovery - Recuperação de emergência")
-            logger.info(f"   • GET  /api/report/{days} - Relatório de performance")
+            logger.info(f"   • GET  /api/report/{{days}} - Relatório de performance")
             logger.info(f"   • GET  /dashboard - Dashboard web")
             logger.info(f"   • WS   /ws/metrics - Métricas em tempo real")
             
@@ -587,10 +587,10 @@ class ProductionAPI:
                 {"method": "GET", "path": "/dashboard", "description": "Dashboard web"},
                 {"method": "GET", "path": "/api/status", "description": "Status completo"},
                 {"method": "GET", "path": "/api/health", "description": "Health check"},
-                {"method": "GET", "path": "/api/report/{days}", "description": "Relatório de performance"},
+                {"method": "GET", "path": "/api/report/{{days}}", "description": "Relatório de performance"},
                 {"method": "GET", "path": "/api/predictions", "description": "Dados das predições"},
                 {"method": "GET", "path": "/api/metrics/current", "description": "Métricas atuais"},
-                {"method": "POST", "path": "/api/restart/{component}", "description": "Reiniciar componente"},
+                {"method": "POST", "path": "/api/restart/{{component}}", "description": "Reiniciar componente"},
                 {"method": "POST", "path": "/api/emergency-recovery", "description": "Recuperação de emergência"},
                 {"method": "WS", "path": "/ws/metrics", "description": "Métricas em tempo real"}
             ]

@@ -230,8 +230,16 @@ async def test_data_processing():
         
         # 1. Verifica se pode importar sistemas de análise
         try:
-            from bot.systems.lol_game_analyzer import LoLGameAnalyzer
-            print("✅ LoLGameAnalyzer importado com sucesso")
+            from bot.core_logic.game_analyzer import LoLGameAnalyzer
+            print("✅ LoLGameAnalyzer disponível")
+            
+            # Tenta importar sistema de predição
+            from bot.core_logic.prediction_system import DynamicPredictionSystem
+            print("✅ DynamicPredictionSystem disponível")
+            
+            # Tenta importar sistema de tips
+            from bot.systems.tips_system import ProfessionalTipsSystem
+            print("✅ ProfessionalTipsSystem disponível")
             
             analyzer = LoLGameAnalyzer()
             print("✅ Analyzer inicializado")
@@ -241,9 +249,6 @@ async def test_data_processing():
         
         # 2. Verifica sistema de predição
         try:
-            from bot.systems.prediction.dynamic_prediction_system import DynamicPredictionSystem
-            print("✅ DynamicPredictionSystem importado com sucesso")
-            
             prediction = DynamicPredictionSystem()
             print("✅ Sistema de predição inicializado")
             
@@ -252,7 +257,6 @@ async def test_data_processing():
         
         # 3. Verifica sistema de tips
         try:
-            from bot.systems.professional_tips_system import ProfessionalTipsSystem
             print("✅ ProfessionalTipsSystem importado com sucesso")
             
         except Exception as e:
