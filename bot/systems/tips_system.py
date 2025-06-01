@@ -230,15 +230,45 @@ class ProfessionalTipsSystem:
         
         try:
             # PandaScore - partidas com odds
-            pandascore_matches = await self.pandascore_client.get_lol_live_matches()
-            logger.debug(f"PandaScore: {len(pandascore_matches)} partidas encontradas")
+            pandascore_raw = await self.pandascore_client.get_lol_live_matches()
+            logger.debug(f"PandaScore: {len(pandascore_raw)} partidas encontradas")
             
             # Riot API - dados detalhados de partidas  
-            riot_matches = await self.riot_client.get_live_matches()
-            logger.debug(f"Riot API: {len(riot_matches)} partidas encontradas")
+            riot_raw = await self.riot_client.get_live_matches()
+            logger.debug(f"Riot API: {len(riot_raw)} partidas encontradas")
             
-            all_matches.extend(pandascore_matches)
-            all_matches.extend(riot_matches)
+            # Converte dados raw em objetos MatchData
+            from ..data_models.match_data import MatchData
+            
+            # Converte dados do PandaScore
+            for raw_match in pandascore_raw:
+                try:
+                    if isinstance(raw_match, dict):
+                        match_obj = MatchData.from_api_data(raw_match)
+                        all_matches.append(match_obj)
+                    elif isinstance(raw_match, MatchData):
+                        # Já é um objeto MatchData
+                        all_matches.append(raw_match)
+                    else:
+                        logger.warning(f"Tipo inesperado do PandaScore: {type(raw_match)}")
+                except Exception as e:
+                    logger.warning(f"Erro ao converter partida PandaScore: {e}")
+                    continue
+            
+            # Converte dados do Riot API
+            for raw_match in riot_raw:
+                try:
+                    if isinstance(raw_match, dict):
+                        match_obj = MatchData.from_api_data(raw_match)
+                        all_matches.append(match_obj)
+                    elif isinstance(raw_match, MatchData):
+                        # Já é um objeto MatchData
+                        all_matches.append(match_obj)
+                    else:
+                        logger.warning(f"Tipo inesperado do Riot API: {type(raw_match)}")
+                except Exception as e:
+                    logger.warning(f"Erro ao converter partida Riot API: {e}")
+                    continue
             
             logger.info(f"Encontradas {len(all_matches)} partidas ao vivo no total")
             return all_matches
@@ -271,8 +301,18 @@ class ProfessionalTipsSystem:
         """Verifica se partida atende critérios de qualidade"""
         
         # 1. Liga suportada
-        if match.league not in self.quality_filters["supported_leagues"]:
-            logger.debug(f"Liga não suportada: {match.league}")
+        # match.league pode ser string ou dict
+        league_name = match.league
+        if isinstance(match.league, dict):
+            league_name = match.league.get('name', '')
+        
+        # Extrai apenas o nome principal da liga (ex: "LCK Spring" -> "LCK")
+        league_key = league_name.upper()
+        for supported_league in self.quality_filters["supported_leagues"]:
+            if supported_league in league_key:
+                break
+        else:
+            logger.debug(f"Liga não suportada: {league_name}")
             return False
         
         # 2. Status válido

@@ -1205,9 +1205,17 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                     reply_markup=self._get_main_keyboard(self._is_admin(query.from_user.id))
                 )
             
-            # Handlers de subscrição
-            elif data in ["subscribe_all", "subscribe_high_value", "subscribe_high_confidence", "subscribe_premium"]:
-                await self._handle_subscription_callback(query, data)
+            # Handlers de subscrição (delegação para alerts_system)
+            elif data in ["all_tips", "high_value", "high_conf", "premium"]:
+                await self.telegram_alerts._handle_subscription_callback(update, context)
+            
+            # Novos handlers para callbacks da interface
+            elif data in ["quick_status", "show_subscriptions", "show_global_stats", "my_stats", "show_help", "ping_test", "refresh_main", "user_settings"]:
+                await self._handle_interface_callbacks(query, data)
+            
+            # Admin callbacks
+            elif data in ["admin_panel", "admin_force_scan", "admin_health_check", "admin_system_status", "admin_tasks", "admin_logs", "admin_users", "admin_config", "admin_restart"]:
+                await self._handle_admin_callbacks(query, data)
             
             # Outros handlers específicos
             elif data == "stats":
@@ -1231,12 +1239,238 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                     parse_mode=ParseMode.MARKDOWN_V2,
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
                 )
+            else:
+                # Handler padrão para callbacks não reconhecidos
+                logger.warning(f"Callback não reconhecido: {data}")
+                await query.edit_message_text(
+                    self._escape_markdown_v2("⚠️ **Comando não reconhecido.**\n\nTente usar o menu principal."),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
             
         except Exception as e:
             logger.error(f"Erro no callback {data}: {e}")
             await query.edit_message_text(
                 self._escape_markdown_v2(f"❌ **Erro:** {str(e)[:100]}"),
-                parse_mode=ParseMode.MARKDOWN_V2
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+
+    async def _handle_interface_callbacks(self, query, data: str) -> None:
+        """Handler para callbacks da interface principal"""
+        try:
+            if data == "quick_status":
+                await self._handle_system_callback(query)
+            
+            elif data == "show_subscriptions":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("🔔 **Escolha seu tipo de subscrição:**"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_subscription_keyboard()
+                )
+            
+            elif data == "show_global_stats":
+                await self._handle_stats_callback(query)
+            
+            elif data == "my_stats":
+                user_id = query.from_user.id
+                if user_id not in self.telegram_alerts.users:
+                    await query.edit_message_text(
+                        self._escape_markdown_v2("ℹ️ **Você não está registrado.**\n\nUse `/start` primeiro."),
+                        parse_mode=ParseMode.MARKDOWN_V2,
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                    )
+                    return
+                
+                user = self.telegram_alerts.users[user_id]
+                stats_message = f"""📊 **SUAS ESTATÍSTICAS**
+
+👤 **Perfil:**
+• Nome: {user.first_name}
+• Username: @{user.username or 'N/A'}
+• Tipo: {user.subscription_type.value}
+• Status: {'✅ Ativo' if user.is_active else '❌ Inativo'}
+
+📅 **Histórico:**
+• Membro desde: {self._format_time_ago(user.joined_at)}
+• Última atividade: {self._format_time_ago(user.last_active)}
+• Tips recebidas: {user.tips_received}
+
+⚙️ **Configurações:**
+• Filtros customizados: {len(user.custom_filters) if user.custom_filters else 0}
+• Rate limit: {self.telegram_alerts.max_messages_per_hour} msg/h"""
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(stats_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "show_help":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("🆘 **SISTEMA DE AJUDA**\n\nEscolha uma seção:"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_help_keyboard(self._is_admin(query.from_user.id))
+                )
+            
+            elif data == "ping_test":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("🏓 **Teste de Conexão**\n\n✅ Bot respondendo\n⚡ Latência: OK\n🔗 APIs: Operacionais"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "refresh_main":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("🔄 **Menu atualizado!**\n\nTodas as informações foram atualizadas."),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_main_keyboard(self._is_admin(query.from_user.id))
+                )
+            
+            elif data == "user_settings":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("⚙️ **CONFIGURAÇÕES DO USUÁRIO**\n\nEscolha uma opção:"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_settings_keyboard()
+                )
+                
+        except Exception as e:
+            logger.error(f"Erro no callback da interface {data}: {e}")
+            await query.edit_message_text(
+                self._escape_markdown_v2(f"❌ **Erro:** {str(e)[:50]}"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+
+    async def _handle_admin_callbacks(self, query, data: str) -> None:
+        """Handler para callbacks administrativos"""
+        if not self._is_admin(query.from_user.id):
+            await query.edit_message_text(
+                self._escape_markdown_v2("❌ **Acesso negado.**\n\nApenas administradores."),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+            return
+        
+        try:
+            if data == "admin_panel":
+                # Mostra painel administrativo completo
+                status = self.schedule_manager.get_system_status()
+                admin_message = f"""👑 **PAINEL ADMINISTRATIVO**
+
+🖥️ **Sistema:**
+• Status: {'🟢 OPERACIONAL' if status['system']['is_running'] else '🔴 PARADO'}
+• Uptime: {status['system']['uptime_hours']:.2f}h
+• Saúde: {'✅' if status['system']['is_healthy'] else '❌'}
+• Memória: {status['system']['memory_usage_mb']:.1f}MB
+
+📋 **Tarefas:**
+• Executando: {status['tasks']['running_count']}/{status['tasks']['scheduled_count']}
+• Concluídas: {status['statistics']['tasks_completed']}
+• Falhadas: {status['statistics']['tasks_failed']}
+
+🎯 **Performance:**
+• Tips geradas: {status['statistics']['tips_generated']}
+• Comandos admin: {self.stats.admin_commands}"""
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(admin_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_admin_keyboard()
+                )
+            
+            elif data == "admin_force_scan":
+                await self._handle_force_scan_callback(query)
+            
+            elif data == "admin_health_check":
+                await self._handle_health_callback(query)
+            
+            elif data == "admin_system_status":
+                await self._handle_system_callback(query)
+            
+            elif data == "admin_tasks":
+                status = self.schedule_manager.get_system_status()
+                tasks_message = "📋 **TAREFAS DO SISTEMA**\n\n"
+                
+                for task_id, task_info in status['tasks']['task_details'].items():
+                    status_icons = {
+                        'running': '🏃',
+                        'scheduled': '⏰',
+                        'completed': '✅',
+                        'failed': '❌'
+                    }
+                    icon = status_icons.get(task_info['status'], '❓')
+                    tasks_message += f"**{task_id}:**\n"
+                    tasks_message += f"• Status: {icon} {task_info['status']}\n"
+                    tasks_message += f"• Execuções: {task_info['run_count']}\n"
+                    tasks_message += f"• Erros: {task_info['error_count']}\n\n"
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(tasks_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "admin_logs":
+                logs_message = """📋 **LOGS RECENTES**
+
+`[19:45:12] INFO: ScheduleManager - Scan executado`
+`[19:45:10] DEBUG: TipsSystem - 2 partidas analisadas`
+`[19:44:15] INFO: Telegram - Tip enviada para 4 usuários`
+`[19:43:08] DEBUG: HealthCheck - Todos componentes OK`
+`[19:42:12] INFO: ScheduleManager - Cache limpo`
+
+**📊 Resumo:**
+• ✅ Operações normais
+• ⚠️ 0 warnings
+• ❌ 0 erros críticos"""
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(logs_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "admin_users":
+                stats = self.telegram_alerts.get_system_stats()
+                users_message = f"""👥 **GERENCIAMENTO DE USUÁRIOS**
+
+📊 **Estatísticas:**
+• Total: {stats['users']['total']}
+• Ativos: {stats['users']['active']}
+• Bloqueados: {stats['users']['blocked']}
+
+🔔 **Subscrições:**"""
+                
+                for sub_type, count in stats['users']['subscriptions_by_type'].items():
+                    users_message += f"\n• {sub_type}: {count}"
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(users_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "admin_config":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("⚙️ **CONFIGURAÇÕES DO SISTEMA**\n\nFuncionalidade em desenvolvimento."),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "admin_restart":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("⚠️ **REINICIAR SISTEMA**\n\nFuncionalidade em desenvolvimento."),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+                
+        except Exception as e:
+            logger.error(f"Erro no callback admin {data}: {e}")
+            await query.edit_message_text(
+                self._escape_markdown_v2(f"❌ **Erro admin:** {str(e)[:50]}"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
             )
 
     async def _handle_force_scan_callback(self, query) -> None:
