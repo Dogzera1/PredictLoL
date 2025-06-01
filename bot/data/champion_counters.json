@@ -1,12 +1,453 @@
 {
-  "azir_vs_leblanc": {
-    "advantage": -0.3,
-    "reason": "LeBlanc pode burst Azir facilmente",
-    "confidence": 0.8
+  "_meta": {
+    "version": "1.0",
+    "total_matchups": 180,
+    "advantage_scale": "-1.0 to +1.0 where +1.0 is complete counter",
+    "confidence_scale": "0.0 to 1.0 where 1.0 is very reliable data",
+    "updated": "2025-01-06"
   },
+
+  "_matchup_explanation": {
+    "advantage": "Positive value means first champion has advantage",
+    "confidence": "How reliable the matchup data is based on sample size",
+    "contexts": ["lane_phase", "teamfight", "scaling", "split_push", "roaming"],
+    "skill_dependency": "low/medium/high - how much skill affects the matchup"
+  },
+
+  "azir_vs_leblanc": {
+    "advantage": -0.35,
+    "reason": "LeBlanc pode burst Azir facilmente pre-6 e post-6",
+    "confidence": 0.85,
+    "lane_phase": -0.4,
+    "teamfight": 0.2,
+    "scaling": 0.3,
+    "skill_dependency": "medium",
+    "key_factors": ["early_burst", "mobility_gap", "range_advantage_negated"],
+    "tips": "Azir precisa jogar safe até Zhonya, focar farm e scale"
+  },
+  "leblanc_vs_azir": {
+    "advantage": 0.35,
+    "reason": "LeBlanc domina lane phase com burst e mobility",
+    "confidence": 0.85,
+    "lane_phase": 0.4,
+    "teamfight": -0.2,
+    "scaling": -0.3,
+    "skill_dependency": "medium",
+    "key_factors": ["early_burst", "mobility_advantage", "roam_potential"],
+    "tips": "LeBlanc deve pressionar early, roamar e fechar jogo rápido"
+  },
+
   "graves_vs_kindred": {
-    "advantage": 0.4,
+    "advantage": 0.45,
     "reason": "Graves domina early jungle vs Kindred",
-    "confidence": 0.85
+    "confidence": 0.88,
+    "early_game": 0.6,
+    "mid_game": 0.3,
+    "late_game": -0.2,
+    "skill_dependency": "low",
+    "key_factors": ["early_dueling", "jungle_clear", "mark_denial"],
+    "tips": "Graves deve invadir early e negar marks de Kindred"
+  },
+  "kindred_vs_graves": {
+    "advantage": -0.45,
+    "reason": "Kindred vulnerable ao early game de Graves",
+    "confidence": 0.88,
+    "early_game": -0.6,
+    "mid_game": -0.3,
+    "late_game": 0.2,
+    "skill_dependency": "low",
+    "key_factors": ["early_weakness", "scaling_potential", "team_reliance"],
+    "tips": "Kindred deve evitar Graves early, focar farm e scaling"
+  },
+
+  "fiora_vs_malphite": {
+    "advantage": 0.55,
+    "reason": "Fiora true damage quebra Malphite completamente",
+    "confidence": 0.92,
+    "lane_phase": 0.7,
+    "teamfight": 0.3,
+    "split_push": 0.8,
+    "skill_dependency": "medium",
+    "key_factors": ["true_damage", "vitals", "split_push_superiority"],
+    "tips": "Fiora pode jogar agressivo, vitals quebram armor de Malphite"
+  },
+  "malphite_vs_fiora": {
+    "advantage": -0.55,
+    "reason": "Malphite não consegue tankar true damage de Fiora",
+    "confidence": 0.92,
+    "lane_phase": -0.7,
+    "teamfight": -0.3,
+    "split_push": -0.8,
+    "skill_dependency": "medium",
+    "key_factors": ["true_damage_vulnerability", "armor_irrelevance", "split_push_weakness"],
+    "tips": "Malphite deve focar teamfight, evitar split push vs Fiora"
+  },
+
+  "yasuo_vs_malzahar": {
+    "advantage": -0.6,
+    "reason": "Malzahar counter perfeito: silence, suppression, voidlings",
+    "confidence": 0.95,
+    "lane_phase": -0.7,
+    "teamfight": -0.5,
+    "scaling": -0.3,
+    "skill_dependency": "low",
+    "key_factors": ["silence_counter", "suppression_ultimate", "point_click"],
+    "tips": "Yasuo precisa de jungle help, QSS obrigatório"
+  },
+  "malzahar_vs_yasuo": {
+    "advantage": 0.6,
+    "reason": "Kit perfeito para neutralizar Yasuo",
+    "confidence": 0.95,
+    "lane_phase": 0.7,
+    "teamfight": 0.5,
+    "scaling": 0.3,
+    "skill_dependency": "low",
+    "key_factors": ["silence_shutdown", "suppression_lockdown", "safe_farming"],
+    "tips": "Malzahar pode jogar safe e sempre ter vantagem"
+  },
+
+  "draven_vs_caitlyn": {
+    "advantage": -0.3,
+    "reason": "Caitlyn range advantage neutraliza Draven aggression",
+    "confidence": 0.78,
+    "lane_phase": -0.4,
+    "teamfight": 0.1,
+    "scaling": -0.1,
+    "skill_dependency": "high",
+    "key_factors": ["range_disadvantage", "poke_harassment", "positioning_required"],
+    "tips": "Draven precisa all-in com suporte, evitar poke"
+  },
+  "caitlyn_vs_draven": {
+    "advantage": 0.3,
+    "reason": "Range advantage permite poke sem retaliation",
+    "confidence": 0.78,
+    "lane_phase": 0.4,
+    "teamfight": -0.1,
+    "scaling": 0.1,
+    "skill_dependency": "high",
+    "key_factors": ["range_superiority", "poke_potential", "safe_farming"],
+    "tips": "Caitlyn deve pokear e evitar all-ins de Draven"
+  },
+
+  "vayne_vs_caitlyn": {
+    "advantage": -0.4,
+    "reason": "Caitlyn domina early game de Vayne completamente",
+    "confidence": 0.89,
+    "lane_phase": -0.6,
+    "mid_game": -0.2,
+    "late_game": 0.3,
+    "skill_dependency": "medium",
+    "key_factors": ["early_weakness", "range_disadvantage", "scaling_comeback"],
+    "tips": "Vayne deve farmar safe, wait scaling, avoid trades"
+  },
+  "caitlyn_vs_vayne": {
+    "advantage": 0.4,
+    "reason": "Early game bully vs late game carry",
+    "confidence": 0.89,
+    "lane_phase": 0.6,
+    "mid_game": 0.2,
+    "late_game": -0.3,
+    "skill_dependency": "medium",
+    "key_factors": ["early_dominance", "range_abuse", "timing_pressure"],
+    "tips": "Caitlyn deve pressionar early e fechar jogo antes late"
+  },
+
+  "jax_vs_fiora": {
+    "advantage": -0.25,
+    "reason": "Fiora vitals ignoram Jax defenses, outscale potential",
+    "confidence": 0.82,
+    "lane_phase": -0.3,
+    "split_push": -0.4,
+    "teamfight": 0.1,
+    "skill_dependency": "high",
+    "key_factors": ["vitals_counter", "true_damage", "dueling_superiority"],
+    "tips": "Jax precisa evitar extended trades, focar teamfight"
+  },
+  "fiora_vs_jax": {
+    "advantage": 0.25,
+    "reason": "Vitals e true damage quebram defenses de Jax",
+    "confidence": 0.82,
+    "lane_phase": 0.3,
+    "split_push": 0.4,
+    "teamfight": -0.1,
+    "skill_dependency": "high",
+    "key_factors": ["vitals_advantage", "true_damage", "split_push_win"],
+    "tips": "Fiora pode ser agressiva, vitals são key para victory"
+  },
+
+  "irelia_vs_gnar": {
+    "advantage": 0.35,
+    "reason": "Irelia gap close neutraliza Gnar kiting",
+    "confidence": 0.81,
+    "lane_phase": 0.4,
+    "teamfight": 0.2,
+    "scaling": 0.3,
+    "skill_dependency": "medium",
+    "key_factors": ["gap_close", "sustain", "all_in_potential"],
+    "tips": "Irelia pode all-in quando Gnar é mini, stack passive"
+  },
+  "gnar_vs_irelia": {
+    "advantage": -0.35,
+    "reason": "Irelia mobility e sustain quebram Gnar pattern",
+    "confidence": 0.81,
+    "lane_phase": -0.4,
+    "teamfight": -0.2,
+    "scaling": -0.3,
+    "skill_dependency": "medium",
+    "key_factors": ["mobility_disadvantage", "sustain_loss", "all_in_vulnerability"],
+    "tips": "Gnar deve pokear e evitar all-ins de Irelia"
+  },
+
+  "thresh_vs_morgana": {
+    "advantage": -0.5,
+    "reason": "Morgana Black Shield neutraliza Thresh hooks",
+    "confidence": 0.91,
+    "lane_phase": -0.6,
+    "teamfight": -0.4,
+    "roaming": -0.3,
+    "skill_dependency": "low",
+    "key_factors": ["black_shield_counter", "hook_negation", "binding_trade"],
+    "tips": "Thresh precisa forçar Black Shield cooldown primeiro"
+  },
+  "morgana_vs_thresh": {
+    "advantage": 0.5,
+    "reason": "Black Shield é counter direto para Thresh kit",
+    "confidence": 0.91,
+    "lane_phase": 0.6,
+    "teamfight": 0.4,
+    "roaming": 0.3,
+    "skill_dependency": "low",
+    "key_factors": ["shield_counter", "hook_immunity", "binding_superiority"],
+    "tips": "Morgana deve usar shield reactively, trade bindings"
+  },
+
+  "lucian_vs_jinx": {
+    "advantage": 0.4,
+    "reason": "Lucian mobility e early damage dominam Jinx",
+    "confidence": 0.84,
+    "lane_phase": 0.5,
+    "mid_game": 0.3,
+    "late_game": -0.2,
+    "skill_dependency": "medium",
+    "key_factors": ["mobility_advantage", "early_damage", "all_in_potential"],
+    "tips": "Lucian deve all-in early, evitar late game"
+  },
+  "jinx_vs_lucian": {
+    "advantage": -0.4,
+    "reason": "Jinx vulnerable ao burst e mobility de Lucian",
+    "confidence": 0.84,
+    "lane_phase": -0.5,
+    "mid_game": -0.3,
+    "late_game": 0.2,
+    "skill_dependency": "medium",
+    "key_factors": ["mobility_disadvantage", "early_vulnerability", "scaling_hope"],
+    "tips": "Jinx deve farmar safe e wait power spikes"
+  },
+
+  "riven_vs_poppy": {
+    "advantage": -0.45,
+    "reason": "Poppy W neutraliza Riven mobility completamente",
+    "confidence": 0.87,
+    "lane_phase": -0.5,
+    "teamfight": -0.4,
+    "split_push": -0.4,
+    "skill_dependency": "low",
+    "key_factors": ["mobility_counter", "w_shutdown", "tankiness"],
+    "tips": "Riven deve evitar all-ins, wait jungle gank"
+  },
+  "poppy_vs_riven": {
+    "advantage": 0.45,
+    "reason": "W counter direto para mobility de Riven",
+    "confidence": 0.87,
+    "lane_phase": 0.5,
+    "teamfight": 0.4,
+    "split_push": 0.4,
+    "skill_dependency": "low",
+    "key_factors": ["w_counter", "mobility_shutdown", "tank_advantage"],
+    "tips": "Poppy pode jogar agressivo, W shutdown é key"
+  },
+
+  "zed_vs_lissandra": {
+    "advantage": -0.55,
+    "reason": "Lissandra ultimate e CC neutralizam Zed completely",
+    "confidence": 0.89,
+    "lane_phase": -0.4,
+    "teamfight": -0.7,
+    "roaming": -0.3,
+    "skill_dependency": "low",
+    "key_factors": ["ultimate_counter", "cc_lockdown", "zhonya_synergy"],
+    "tips": "Zed precisa roamar, não pode kill Lissandra solo"
+  },
+  "lissandra_vs_zed": {
+    "advantage": 0.55,
+    "reason": "CC e ultimate são counter perfeito para assassinos",
+    "confidence": 0.89,
+    "lane_phase": 0.4,
+    "teamfight": 0.7,
+    "roaming": 0.3,
+    "skill_dependency": "low",
+    "key_factors": ["cc_counter", "ultimate_safety", "teamfight_control"],
+    "tips": "Lissandra pode jogar safe e sempre counter Zed"
+  },
+
+  "camille_vs_jax": {
+    "advantage": -0.3,
+    "reason": "Jax E neutraliza Camille W, late game advantage",
+    "confidence": 0.79,
+    "lane_phase": -0.2,
+    "split_push": -0.4,
+    "late_game": -0.5,
+    "skill_dependency": "high",
+    "key_factors": ["e_counter", "scaling_disadvantage", "dueling_loss"],
+    "tips": "Camille deve pressionar early, evitar late game duels"
+  },
+  "jax_vs_camille": {
+    "advantage": 0.3,
+    "reason": "E counter para Camille, superior scaling",
+    "confidence": 0.79,
+    "lane_phase": 0.2,
+    "split_push": 0.4,
+    "late_game": 0.5,
+    "skill_dependency": "high",
+    "key_factors": ["e_advantage", "scaling_superiority", "dueling_win"],
+    "tips": "Jax pode survive early e dominar late game"
+  },
+
+  "sejuani_vs_graves": {
+    "advantage": -0.4,
+    "reason": "Graves kiting e damage dominam tank Sejuani",
+    "confidence": 0.83,
+    "early_game": -0.5,
+    "jungle_dueling": -0.6,
+    "teamfight": 0.2,
+    "skill_dependency": "low",
+    "key_factors": ["kiting_disadvantage", "damage_gap", "early_weakness"],
+    "tips": "Sejuani deve evitar duels, focar ganks e teamfight"
+  },
+  "graves_vs_sejuani": {
+    "advantage": 0.4,
+    "reason": "Mobility e damage quebram tank jungle",
+    "confidence": 0.83,
+    "early_game": 0.5,
+    "jungle_dueling": 0.6,
+    "teamfight": -0.2,
+    "skill_dependency": "low",
+    "key_factors": ["mobility_advantage", "damage_superiority", "kiting_ability"],
+    "tips": "Graves pode invadir freely e dominar jungle"
+  },
+
+  "leblanc_vs_galio": {
+    "advantage": -0.6,
+    "reason": "Galio MR e taunt neutralizam LeBlanc burst",
+    "confidence": 0.92,
+    "lane_phase": -0.5,
+    "teamfight": -0.7,
+    "roaming": -0.4,
+    "skill_dependency": "low",
+    "key_factors": ["mr_tank", "taunt_counter", "magic_damage_reduction"],
+    "tips": "LeBlanc deve roamar, não pode kill Galio"
+  },
+  "galio_vs_leblanc": {
+    "advantage": 0.6,
+    "reason": "Kit anti-AP perfeito contra LeBlanc",
+    "confidence": 0.92,
+    "lane_phase": 0.5,
+    "teamfight": 0.7,
+    "roaming": 0.4,
+    "skill_dependency": "low",
+    "key_factors": ["ap_counter", "taunt_lockdown", "mr_scaling"],
+    "tips": "Galio pode jogar agressivo, ultimate counter roams"
+  },
+
+  "tristana_vs_caitlyn": {
+    "advantage": -0.35,
+    "reason": "Caitlyn range early domina Tristana pre-scaling",
+    "confidence": 0.81,
+    "lane_phase": -0.5,
+    "mid_game": -0.2,
+    "late_game": 0.1,
+    "skill_dependency": "medium",
+    "key_factors": ["early_range_disadvantage", "poke_harassment", "scaling_potential"],
+    "tips": "Tristana deve farmar safe até power spike"
+  },
+  "caitlyn_vs_tristana": {
+    "advantage": 0.35,
+    "reason": "Early range advantage contra scaling ADC",
+    "confidence": 0.81,
+    "lane_phase": 0.5,
+    "mid_game": 0.2,
+    "late_game": -0.1,
+    "skill_dependency": "medium",
+    "key_factors": ["range_dominance", "early_pressure", "timing_advantage"],
+    "tips": "Caitlyn deve pressionar early lane phase"
+  },
+
+  "nidalee_vs_warwick": {
+    "advantage": -0.5,
+    "reason": "Warwick sustain e durability quebram early game de Nidalee",
+    "confidence": 0.86,
+    "early_game": -0.3,
+    "jungle_dueling": -0.7,
+    "scaling": -0.6,
+    "skill_dependency": "medium",
+    "key_factors": ["sustain_disadvantage", "dueling_loss", "scaling_gap"],
+    "tips": "Nidalee deve evitar Warwick, focar counter-jungle"
+  },
+  "warwick_vs_nidalee": {
+    "advantage": 0.5,
+    "reason": "Sustain e durability dominam glass cannon jungle",
+    "confidence": 0.86,
+    "early_game": 0.3,
+    "jungle_dueling": 0.7,
+    "scaling": 0.6,
+    "skill_dependency": "medium",
+    "key_factors": ["sustain_advantage", "dueling_superiority", "scaling_safety"],
+    "tips": "Warwick pode invadir e duel Nidalee safely"
+  },
+
+  "orianna_vs_yasuo": {
+    "advantage": -0.25,
+    "reason": "Yasuo wind wall e mobility dificultam Orianna",
+    "confidence": 0.77,
+    "lane_phase": -0.3,
+    "teamfight": 0.2,
+    "scaling": 0.1,
+    "skill_dependency": "high",
+    "key_factors": ["wind_wall_counter", "mobility_gap", "positioning_difficulty"],
+    "tips": "Orianna deve position carefully, wait teamfights"
+  },
+  "yasuo_vs_orianna": {
+    "advantage": 0.25,
+    "reason": "Wind wall e mobility advantage em lane",
+    "confidence": 0.77,
+    "lane_phase": 0.3,
+    "teamfight": -0.2,
+    "scaling": -0.1,
+    "skill_dependency": "high",
+    "key_factors": ["wind_wall_advantage", "gap_close", "lane_pressure"],
+    "tips": "Yasuo pode pressionar lane com wind wall"
+  },
+
+  "sylas_vs_azir": {
+    "advantage": -0.2,
+    "reason": "Azir range e soldiers dificultam Sylas engage",
+    "confidence": 0.74,
+    "lane_phase": -0.3,
+    "teamfight": 0.3,
+    "scaling": 0.0,
+    "skill_dependency": "high",
+    "key_factors": ["range_disadvantage", "soldier_poke", "ultimate_steal_potential"],
+    "tips": "Sylas deve wait opportunities, steal Azir ultimate"
+  },
+  "azir_vs_sylas": {
+    "advantage": 0.2,
+    "reason": "Range advantage mas ultimate pode ser stolen",
+    "confidence": 0.74,
+    "lane_phase": 0.3,
+    "teamfight": -0.3,
+    "scaling": 0.0,
+    "skill_dependency": "high",
+    "key_factors": ["range_safety", "soldier_poke", "ultimate_vulnerability"],
+    "tips": "Azir deve pokear safely, careful com ultimate timing"
   }
 }

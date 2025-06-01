@@ -1,34 +1,387 @@
 {
+  "aatrox": {
+    "base_strength": 7.5,
+    "type": "fighter",
+    "positions": {"top": 1.0, "jungle": 0.3},
+    "early_game": 6.5,
+    "mid_game": 8.0,
+    "late_game": 7.5,
+    "tags": ["tank", "bruiser", "sustain"],
+    "counters": ["fiora", "jax", "vayne"],
+    "good_against": ["squishy_mages", "low_mobility"]
+  },
+  "ahri": {
+    "base_strength": 7.2,
+    "type": "mage",
+    "positions": {"mid": 1.0},
+    "early_game": 6.0,
+    "mid_game": 8.0,
+    "late_game": 7.0,
+    "tags": ["assassin", "mobility", "cc"],
+    "counters": ["yasuo", "fizz", "leblanc"],
+    "good_against": ["immobile_mages", "adcs"]
+  },
+  "akali": {
+    "base_strength": 7.8,
+    "type": "assassin",
+    "positions": {"mid": 1.0, "top": 0.7},
+    "early_game": 5.5,
+    "mid_game": 9.0,
+    "late_game": 8.0,
+    "tags": ["assassin", "mobility", "burst"],
+    "counters": ["galio", "malzahar", "lissandra"],
+    "good_against": ["squishy_carries", "low_cc_teams"]
+  },
   "azir": {
     "base_strength": 7.8,
     "type": "mage",
-    "positions": {
-      "mid": 1.0,
-      "adc": 0.6
-    },
+    "positions": {"mid": 1.0, "adc": 0.6},
     "early_game": 4.0,
     "mid_game": 7.0,
-    "late_game": 9.0
+    "late_game": 9.5,
+    "tags": ["control_mage", "scaling", "range"],
+    "counters": ["leblanc", "fizz", "zed"],
+    "good_against": ["melee_champions", "teamfights"]
+  },
+  "caitlyn": {
+    "base_strength": 7.5,
+    "type": "marksman",
+    "positions": {"adc": 1.0},
+    "early_game": 7.5,
+    "mid_game": 6.5,
+    "late_game": 8.5,
+    "tags": ["adc", "range", "siege"],
+    "counters": ["draven", "lucian", "tristana"],
+    "good_against": ["short_range_adcs", "low_mobility"]
+  },
+  "camille": {
+    "base_strength": 8.0,
+    "type": "fighter",
+    "positions": {"top": 1.0, "jungle": 0.4},
+    "early_game": 6.0,
+    "mid_game": 8.5,
+    "late_game": 8.0,
+    "tags": ["bruiser", "mobility", "true_damage"],
+    "counters": ["jax", "fiora", "riven"],
+    "good_against": ["tanks", "low_mobility"]
+  },
+  "draven": {
+    "base_strength": 8.2,
+    "type": "marksman",
+    "positions": {"adc": 1.0},
+    "early_game": 9.0,
+    "mid_game": 8.5,
+    "late_game": 7.5,
+    "tags": ["adc", "early_game", "snowball"],
+    "counters": ["caitlyn", "ezreal", "jhin"],
+    "good_against": ["scaling_adcs", "passive_lanes"]
+  },
+  "fiora": {
+    "base_strength": 7.8,
+    "type": "fighter",
+    "positions": {"top": 1.0},
+    "early_game": 7.0,
+    "mid_game": 8.0,
+    "late_game": 9.0,
+    "tags": ["duelist", "split_push", "true_damage"],
+    "counters": ["malphite", "poppy", "quinn"],
+    "good_against": ["tanks", "melee_champions"]
+  },
+  "gnar": {
+    "base_strength": 7.5,
+    "type": "fighter",
+    "positions": {"top": 1.0},
+    "early_game": 6.5,
+    "mid_game": 7.5,
+    "late_game": 8.0,
+    "tags": ["tank", "engage", "range_melee"],
+    "counters": ["irelia", "riven", "yasuo"],
+    "good_against": ["melee_champions", "teamfights"]
   },
   "graves": {
     "base_strength": 8.2,
     "type": "marksman",
-    "positions": {
-      "jungle": 1.0,
-      "adc": 0.7
-    },
+    "positions": {"jungle": 1.0, "adc": 0.7},
     "early_game": 8.0,
     "mid_game": 8.5,
-    "late_game": 7.0
+    "late_game": 7.0,
+    "tags": ["jungle", "burst", "mobility"],
+    "counters": ["kindred", "kha_zix", "rengar"],
+    "good_against": ["squishy_junglers", "late_game_junglers"]
+  },
+  "irelia": {
+    "base_strength": 7.6,
+    "type": "fighter",
+    "positions": {"top": 1.0, "mid": 0.8},
+    "early_game": 7.0,
+    "mid_game": 8.5,
+    "late_game": 7.5,
+    "tags": ["bruiser", "mobility", "sustain"],
+    "counters": ["jax", "fiora", "sett"],
+    "good_against": ["squishy_champions", "low_cc"]
+  },
+  "jax": {
+    "base_strength": 8.0,
+    "type": "fighter",
+    "positions": {"top": 1.0, "jungle": 0.6},
+    "early_game": 6.0,
+    "mid_game": 8.0,
+    "late_game": 9.5,
+    "tags": ["bruiser", "scaling", "split_push"],
+    "counters": ["malphite", "poppy", "quinn"],
+    "good_against": ["auto_attackers", "late_game"]
+  },
+  "jayce": {
+    "base_strength": 7.3,
+    "type": "fighter",
+    "positions": {"top": 1.0, "mid": 0.7},
+    "early_game": 8.5,
+    "mid_game": 7.0,
+    "late_game": 6.0,
+    "tags": ["poke", "early_game", "range_melee"],
+    "counters": ["irelia", "yasuo", "malphite"],
+    "good_against": ["tanks", "melee_champions"]
+  },
+  "jinx": {
+    "base_strength": 8.0,
+    "type": "marksman",
+    "positions": {"adc": 1.0},
+    "early_game": 5.5,
+    "mid_game": 7.5,
+    "late_game": 9.5,
+    "tags": ["adc", "scaling", "teamfight"],
+    "counters": ["draven", "lucian", "tristana"],
+    "good_against": ["tanks", "teamfights"]
+  },
+  "kindred": {
+    "base_strength": 7.0,
+    "type": "marksman",
+    "positions": {"jungle": 1.0},
+    "early_game": 6.0,
+    "mid_game": 7.5,
+    "late_game": 9.0,
+    "tags": ["jungle", "scaling", "marks"],
+    "counters": ["graves", "nidalee", "kha_zix"],
+    "good_against": ["tanks", "late_game"]
+  },
+  "leblanc": {
+    "base_strength": 7.5,
+    "type": "assassin",
+    "positions": {"mid": 1.0},
+    "early_game": 7.5,
+    "mid_game": 8.5,
+    "late_game": 6.5,
+    "tags": ["assassin", "burst", "mobility"],
+    "counters": ["galio", "malzahar", "lissandra"],
+    "good_against": ["squishy_mages", "immobile_champions"]
+  },
+  "leona": {
+    "base_strength": 7.8,
+    "type": "tank",
+    "positions": {"support": 1.0},
+    "early_game": 8.0,
+    "mid_game": 8.5,
+    "late_game": 7.5,
+    "tags": ["support", "engage", "cc"],
+    "counters": ["morgana", "lux", "brand"],
+    "good_against": ["melee_supports", "squishy_adcs"]
+  },
+  "lucian": {
+    "base_strength": 7.5,
+    "type": "marksman",
+    "positions": {"adc": 1.0, "mid": 0.6},
+    "early_game": 8.0,
+    "mid_game": 7.5,
+    "late_game": 6.5,
+    "tags": ["adc", "mobility", "early_game"],
+    "counters": ["caitlyn", "jhin", "ashe"],
+    "good_against": ["immobile_adcs", "short_range"]
+  },
+  "lulu": {
+    "base_strength": 7.2,
+    "type": "enchanter",
+    "positions": {"support": 1.0, "top": 0.3},
+    "early_game": 6.5,
+    "mid_game": 8.0,
+    "late_game": 8.5,
+    "tags": ["support", "enchanter", "utility"],
+    "counters": ["nautilus", "leona", "thresh"],
+    "good_against": ["assassins", "dive_champions"]
+  },
+  "malphite": {
+    "base_strength": 7.0,
+    "type": "tank",
+    "positions": {"top": 1.0, "jungle": 0.4},
+    "early_game": 5.5,
+    "mid_game": 7.5,
+    "late_game": 8.5,
+    "tags": ["tank", "engage", "ap"],
+    "counters": ["fiora", "jax", "vayne"],
+    "good_against": ["ad_champions", "teamfights"]
+  },
+  "nidalee": {
+    "base_strength": 6.8,
+    "type": "assassin",
+    "positions": {"jungle": 1.0},
+    "early_game": 8.5,
+    "mid_game": 6.5,
+    "late_game": 5.0,
+    "tags": ["jungle", "early_game", "poke"],
+    "counters": ["graves", "udyr", "warwick"],
+    "good_against": ["scaling_junglers", "squishy_champions"]
+  },
+  "orianna": {
+    "base_strength": 7.5,
+    "type": "mage",
+    "positions": {"mid": 1.0},
+    "early_game": 6.0,
+    "mid_game": 8.0,
+    "late_game": 8.5,
+    "tags": ["control_mage", "utility", "teamfight"],
+    "counters": ["yasuo", "fizz", "leblanc"],
+    "good_against": ["melee_champions", "teamfights"]
+  },
+  "riven": {
+    "base_strength": 7.5,
+    "type": "fighter",
+    "positions": {"top": 1.0},
+    "early_game": 7.5,
+    "mid_game": 8.5,
+    "late_game": 7.0,
+    "tags": ["bruiser", "mobility", "burst"],
+    "counters": ["poppy", "malphite", "quinn"],
+    "good_against": ["squishy_champions", "low_cc"]
+  },
+  "sejuani": {
+    "base_strength": 7.2,
+    "type": "tank",
+    "positions": {"jungle": 1.0},
+    "early_game": 6.5,
+    "mid_game": 8.0,
+    "late_game": 8.5,
+    "tags": ["jungle", "tank", "engage"],
+    "counters": ["graves", "nidalee", "kindred"],
+    "good_against": ["squishy_junglers", "teamfights"]
+  },
+  "sett": {
+    "base_strength": 7.8,
+    "type": "fighter",
+    "positions": {"top": 1.0, "support": 0.5},
+    "early_game": 8.0,
+    "mid_game": 8.5,
+    "late_game": 7.0,
+    "tags": ["bruiser", "engage", "true_damage"],
+    "counters": ["fiora", "vayne", "gnar"],
+    "good_against": ["melee_champions", "tanks"]
   },
   "thresh": {
     "base_strength": 8.0,
     "type": "support",
-    "positions": {
-      "support": 1.0
-    },
+    "positions": {"support": 1.0},
     "early_game": 7.0,
     "mid_game": 8.0,
-    "late_game": 7.5
+    "late_game": 7.5,
+    "tags": ["support", "engage", "utility"],
+    "counters": ["morgana", "sivir", "ezreal"],
+    "good_against": ["immobile_champions", "squishy_carries"]
+  },
+  "tristana": {
+    "base_strength": 7.3,
+    "type": "marksman",
+    "positions": {"adc": 1.0},
+    "early_game": 7.0,
+    "mid_game": 6.0,
+    "late_game": 8.5,
+    "tags": ["adc", "mobility", "scaling"],
+    "counters": ["caitlyn", "jhin", "ashe"],
+    "good_against": ["short_range_adcs", "assassins"]
+  },
+  "vayne": {
+    "base_strength": 7.5,
+    "type": "marksman",
+    "positions": {"adc": 1.0, "top": 0.4},
+    "early_game": 4.5,
+    "mid_game": 7.0,
+    "late_game": 9.5,
+    "tags": ["adc", "scaling", "true_damage"],
+    "counters": ["caitlyn", "draven", "lucian"],
+    "good_against": ["tanks", "melee_champions"]
+  },
+  "viktor": {
+    "base_strength": 7.5,
+    "type": "mage",
+    "positions": {"mid": 1.0},
+    "early_game": 5.5,
+    "mid_game": 7.5,
+    "late_game": 9.0,
+    "tags": ["control_mage", "scaling", "aoe"],
+    "counters": ["yasuo", "fizz", "leblanc"],
+    "good_against": ["melee_champions", "teamfights"]
+  },
+  "yasuo": {
+    "base_strength": 7.8,
+    "type": "fighter",
+    "positions": {"mid": 1.0, "top": 0.7},
+    "early_game": 6.5,
+    "mid_game": 8.5,
+    "late_game": 8.0,
+    "tags": ["fighter", "crit", "mobility"],
+    "counters": ["malzahar", "annie", "pantheon"],
+    "good_against": ["ranged_champions", "projectile_champions"]
+  },
+  "zed": {
+    "base_strength": 7.7,
+    "type": "assassin",
+    "positions": {"mid": 1.0},
+    "early_game": 7.0,
+    "mid_game": 9.0,
+    "late_game": 7.0,
+    "tags": ["assassin", "mobility", "burst"],
+    "counters": ["malzahar", "lissandra", "kayle"],
+    "good_against": ["squishy_mages", "immobile_champions"]
+  },
+  "aphelios": {
+    "base_strength": 7.4,
+    "type": "marksman",
+    "positions": {"adc": 1.0},
+    "early_game": 5.0,
+    "mid_game": 7.5,
+    "late_game": 9.0,
+    "tags": ["adc", "scaling", "utility"],
+    "counters": ["draven", "lucian", "tristana"],
+    "good_against": ["tanks", "teamfights"]
+  },
+  "sylas": {
+    "base_strength": 7.6,
+    "type": "mage",
+    "positions": {"mid": 1.0, "jungle": 0.6},
+    "early_game": 6.5,
+    "mid_game": 8.5,
+    "late_game": 7.5,
+    "tags": ["ap_assassin", "mobility", "sustain"],
+    "counters": ["azir", "cassiopeia", "vel_koz"],
+    "good_against": ["ultimate_reliant", "melee_champions"]
+  },
+  "gwen": {
+    "base_strength": 7.3,
+    "type": "fighter",
+    "positions": {"top": 1.0, "jungle": 0.4},
+    "early_game": 6.0,
+    "mid_game": 8.0,
+    "late_game": 8.5,
+    "tags": ["ap_bruiser", "sustain", "true_damage"],
+    "counters": ["fiora", "jax", "irelia"],
+    "good_against": ["tanks", "teamfights"]
+  },
+  "viego": {
+    "base_strength": 7.4,
+    "type": "assassin",
+    "positions": {"jungle": 1.0},
+    "early_game": 6.5,
+    "mid_game": 8.5,
+    "late_game": 8.0,
+    "tags": ["jungle", "resets", "sustain"],
+    "counters": ["graves", "udyr", "diana"],
+    "good_against": ["squishy_champions", "teamfights"]
   }
 }

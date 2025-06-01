@@ -7,6 +7,7 @@ from enum import Enum
 
 from .game_analyzer import LoLGameAnalyzer, GameAnalysis, GamePhase
 from .units_system import ProfessionalUnitsSystem, TipRecommendation
+from ..analyzers.composition_analyzer import CompositionAnalyzer
 from ..data_models.match_data import MatchData
 from ..data_models.tip_data import ProfessionalTip
 from ..utils.constants import (
@@ -107,6 +108,7 @@ class DynamicPredictionSystem:
         """
         self.game_analyzer = game_analyzer
         self.units_system = units_system
+        self.composition_analyzer = CompositionAnalyzer()
         
         # Cache de predições
         self.predictions_cache: Dict[str, PredictionResult] = {}
@@ -118,13 +120,22 @@ class DynamicPredictionSystem:
             "algorithm_predictions": 0,
             "hybrid_predictions": 0,
             "tips_generated": 0,
-            "tips_rejected": 0
+            "tips_rejected": 0,
+            "composition_analyses": 0
         }
         
-        # Configurações do modelo ML (simplificado)
+        # Configurações do modelo ML (com composições integradas)
         self.ml_config = self._initialize_ml_config()
         
-        logger.info("DynamicPredictionSystem inicializado com sucesso")
+        # Pesos aprimorados do modelo híbrido
+        self.feature_weights = {
+            "real_time_data": 0.40,        # Dados em tempo real (40%)
+            "composition_analysis": 0.35,   # Análise de composições (35%) - NOVO
+            "historical_performance": 0.15, # Performance histórica (15%)
+            "contextual_factors": 0.10      # Fatores contextuais (10%)
+        }
+        
+        logger.info("DynamicPredictionSystem inicializado com CompositionAnalyzer integrado")
 
     async def predict_live_match(
         self, 
@@ -157,26 +168,30 @@ class DynamicPredictionSystem:
             # Análise do jogo primeiro
             game_analysis = await self.game_analyzer.analyze_live_match(match_data)
             
+            # **NOVO: Análise de composições**
+            composition_analysis = await self._analyze_team_compositions(match_data)
+            
             # Executa predições baseadas no método escolhido
             ml_prediction = None
             algorithm_prediction = None
             
             if method in [PredictionMethod.MACHINE_LEARNING, PredictionMethod.HYBRID]:
-                ml_prediction = await self._predict_with_ml(game_analysis, match_data)
+                ml_prediction = await self._predict_with_ml(game_analysis, match_data, composition_analysis)
             
             if method in [PredictionMethod.ALGORITHM_BASED, PredictionMethod.HYBRID]:
-                algorithm_prediction = await self._predict_with_algorithms(game_analysis, match_data)
+                algorithm_prediction = await self._predict_with_algorithms(game_analysis, match_data, composition_analysis)
             
             # Combina predições se usando método híbrido
             final_prediction = self._combine_predictions(
                 ml_prediction, 
                 algorithm_prediction, 
                 game_analysis,
-                method
+                method,
+                composition_analysis
             )
             
             # Calcula métricas de qualidade
-            prediction_strength = self._calculate_prediction_strength(final_prediction, game_analysis)
+            prediction_strength = self._calculate_prediction_strength(final_prediction, game_analysis, composition_analysis)
             data_quality = match_data.calculate_data_quality()
             model_agreement = self._calculate_model_agreement(ml_prediction, algorithm_prediction)
             
@@ -615,7 +630,7 @@ class DynamicPredictionSystem:
         # Por agora, um placeholder - futuramente pode incluir dados reais de histórico
         return f"📊 Analisando histórico recente de {team1} vs {team2}\n• Dados de confrontos diretos em análise\n• Performance em partidas similares calculada"
 
-    async def _predict_with_ml(self, game_analysis: GameAnalysis, match_data: MatchData) -> Dict:
+    async def _predict_with_ml(self, game_analysis: GameAnalysis, match_data: MatchData, composition_analysis: Dict) -> Dict:
         """Predição usando Machine Learning (simulado)"""
         try:
             # Em uma implementação real, aqui teria um modelo ML treinado
@@ -632,7 +647,8 @@ class DynamicPredictionSystem:
                 "game_phase": game_analysis.current_phase.value,
                 "game_time_normalized": min(game_analysis.game_time_seconds / (45 * 60), 1.0),
                 "crucial_events": game_analysis.crucial_events_count,
-                "has_momentum": 1.0 if game_analysis.momentum_team else 0.0
+                "has_momentum": 1.0 if game_analysis.momentum_team else 0.0,
+                "composition_analysis": composition_analysis["composition_score"]
             }
             
             # Simula predição ML com base nas features
@@ -656,11 +672,14 @@ class DynamicPredictionSystem:
                 "error": str(e)
             }
 
-    async def _predict_with_algorithms(self, game_analysis: GameAnalysis, match_data: MatchData) -> Dict:
+    async def _predict_with_algorithms(self, game_analysis: GameAnalysis, match_data: MatchData, composition_analysis: Dict) -> Dict:
         """Predição usando algoritmos heurísticos"""
         try:
             # Algoritmo baseado nas vantagens calculadas pelo game analyzer
             overall_advantage = game_analysis.team1_advantage.overall_advantage
+            
+            # **NOVO: Incorpora vantagem de composição**
+            composition_factor = composition_analysis["composition_score"] / 100  # Normaliza para -1 a +1
             
             # Modificadores por fase do jogo
             phase_modifiers = {
@@ -678,8 +697,14 @@ class DynamicPredictionSystem:
             elif game_analysis.momentum_team == match_data.team2_name:
                 momentum_modifier = 0.9
             
-            # Calcula probabilidade final
-            adjusted_advantage = overall_advantage * phase_modifier * momentum_modifier
+            # **NOVO: Combina vantagens usando os pesos do sistema**
+            combined_advantage = (
+                overall_advantage * self.feature_weights["real_time_data"] +
+                composition_factor * self.feature_weights["composition_analysis"]
+            )
+            
+            # Aplica modificadores
+            adjusted_advantage = combined_advantage * phase_modifier * momentum_modifier
             
             # Converte para probabilidade (sigmoid-like)
             probability = 0.5 + (adjusted_advantage * 0.35)  # Fator de suavização
@@ -694,9 +719,11 @@ class DynamicPredictionSystem:
                 "probability": win_prob,
                 "confidence": game_analysis.confidence_score,
                 "overall_advantage": overall_advantage,
+                "composition_advantage": composition_factor,
+                "combined_advantage": combined_advantage,
                 "phase_modifier": phase_modifier,
                 "momentum_modifier": momentum_modifier,
-                "algorithm_version": "heuristic_v2.0"
+                "algorithm_version": "heuristic_v2.1_with_compositions"
             }
             
         except Exception as e:
@@ -713,7 +740,8 @@ class DynamicPredictionSystem:
         ml_pred: Optional[Dict], 
         algo_pred: Optional[Dict],
         game_analysis: GameAnalysis,
-        method: PredictionMethod
+        method: PredictionMethod,
+        composition_analysis: Dict
     ) -> Dict:
         """Combina predições de diferentes métodos"""
         
@@ -776,7 +804,8 @@ class DynamicPredictionSystem:
             "overall_advantage": 0.30,
             "game_phase": 0.05,
             "crucial_events": 0.10,
-            "has_momentum": 0.08
+            "has_momentum": 0.08,
+            "composition_analysis": 0.05
         }
         
         # Normaliza features
@@ -790,6 +819,7 @@ class DynamicPredictionSystem:
         normalized_features["game_phase"] = 0.5 if "early" in features["game_phase"] else 1.0
         normalized_features["crucial_events"] = min(1, features["crucial_events"] / 5)
         normalized_features["has_momentum"] = features["has_momentum"]
+        normalized_features["composition_analysis"] = max(-1, min(1, features["composition_analysis"] / 100))
         
         # Calcula score
         score = sum(weights.get(k, 0) * v for k, v in normalized_features.items())
@@ -856,52 +886,47 @@ class DynamicPredictionSystem:
         ev_percentage: float,
         tip_recommendation: TipRecommendation
     ) -> str:
-        """Gera análise textual da tip"""
+        """Gera reasoning detalhado da análise"""
         
-        game_analysis = self.game_analyzer.get_match_analysis(match_data.match_id)
-        if not game_analysis:
-            return "Análise baseada em predição do sistema."
+        reasoning_parts = []
         
-        minutes = match_data.get_game_time_minutes()
-        phase_names = {
-            GamePhase.EARLY_GAME: "Early Game",
-            GamePhase.MID_GAME: "Mid Game", 
-            GamePhase.LATE_GAME: "Late Game"
-        }
+        # Informações básicas da predição
+        reasoning_parts.append(f"🎯 **PREDIÇÃO: {prediction.predicted_winner}** (Confiança: {prediction.confidence_level.value})")
+        reasoning_parts.append(f"📊 **Probabilidade de vitória:** {prediction.win_probability:.1%}")
+        reasoning_parts.append(f"💰 **Expected Value:** {ev_percentage:+.1f}%")
         
-        reasoning = f"""🎯 **Análise Profissional ({minutes}min - {phase_names[game_analysis.current_phase]})**
-
-📊 **Situação Atual:**
-• {prediction.predicted_winner} está com {prediction.win_probability:.1%} de chance de vitória
-• Vantagem geral: {game_analysis.team1_advantage.overall_advantage:+.1%}
-• Confiança do modelo: {prediction.confidence_level.value.title()}
-
-⚡ **Fatores Decisivos:**
-• Ouro: {game_analysis.team1_advantage.gold_advantage:+.0f} gold
-• Torres: {game_analysis.team1_advantage.tower_advantage:+d}
-• Objetivos: {game_analysis.team1_advantage.objective_control:.1%} controle"""
-
-        if game_analysis.momentum_team:
-            reasoning += f"\n• Momentum: {game_analysis.momentum_team} tem vantagem recente"
+        # **NOVO: Análise de composições**
+        if hasattr(prediction, 'ml_prediction') and prediction.ml_prediction:
+            ml_pred = prediction.ml_prediction
+            if "composition_analysis" in ml_pred.get("features", {}):
+                comp_score = ml_pred["features"]["composition_analysis"]
+                if abs(comp_score) > 10:  # Diferença significativa
+                    advantage_team = prediction.predicted_winner if comp_score > 0 else "time adversário"
+                    reasoning_parts.append(f"⚔️ **Vantagem de Composição:** {advantage_team} (+{abs(comp_score):.0f} pontos)")
         
-        reasoning += f"""
-
-💰 **Justificativa da Aposta:**
-• Expected Value: +{ev_percentage:.1f}% (excelente)
-• Método: {prediction.method_used.value.upper()}
-• Qualidade dos dados: {prediction.data_quality:.1%}
-
-🎲 **Gestão de Risco:**
-• {tip_recommendation.units} unidades ({tip_recommendation.risk_level})
-• Baseado em {tip_recommendation.confidence_percentage:.0f}% confiança
-"""
-
+        # Informações do algoritmo se disponível
+        if hasattr(prediction, 'algorithm_prediction') and prediction.algorithm_prediction:
+            algo_pred = prediction.algorithm_prediction
+            if "composition_advantage" in algo_pred:
+                comp_factor = algo_pred["composition_advantage"]
+                if abs(comp_factor) > 0.1:  # Diferença significativa
+                    reasoning_parts.append(f"🎮 **Draft Analysis:** Vantagem de {comp_factor:+.1f} na composição")
+        
+        # Fatores técnicos
+        reasoning_parts.append(f"⚙️ **Método:** {prediction.method_used.value.upper()}")
+        reasoning_parts.append(f"📈 **Força da Predição:** {prediction.prediction_strength:.1%}")
+        reasoning_parts.append(f"🎲 **Qualidade dos Dados:** {prediction.data_quality:.1%}")
+        
         if prediction.model_agreement > 0.8:
-            reasoning += "• Alto acordo entre modelos ML e algoritmos"
+            reasoning_parts.append("✅ **Alta concordância entre modelos**")
         
-        return reasoning
+        # Recomendação de unidades
+        reasoning_parts.append(f"💵 **Unidades Recomendadas:** {tip_recommendation.units:.1f}")
+        reasoning_parts.append(f"🎯 **Nível de Confiança:** {tip_recommendation.confidence_level}")
+        
+        return "\n".join(reasoning_parts)
 
-    def _calculate_prediction_strength(self, prediction: Dict, game_analysis: GameAnalysis) -> float:
+    def _calculate_prediction_strength(self, prediction: Dict, game_analysis: GameAnalysis, composition_analysis: Dict) -> float:
         """Calcula força da predição"""
         strength = 0.0
         
@@ -919,6 +944,10 @@ class DynamicPredictionSystem:
         # Força baseada no tempo de jogo
         time_strength = min(game_analysis.game_time_seconds / (20 * 60), 1.0)
         strength += time_strength * 0.1
+        
+        # Força baseada na análise de composições
+        comp_strength = composition_analysis["composition_score"] * 0.1
+        strength += comp_strength * 0.1
         
         return min(strength, 1.0)
 
@@ -991,35 +1020,213 @@ class DynamicPredictionSystem:
             "features": [
                 "gold_advantage", "tower_advantage", "dragon_advantage",
                 "baron_advantage", "kill_advantage", "overall_advantage",
-                "game_phase", "crucial_events", "has_momentum"
+                "game_phase", "crucial_events", "has_momentum",
+                "composition_analysis"
             ],
             "prediction_threshold": 0.6,
             "confidence_threshold": 0.7
         }
 
     def get_prediction_stats(self) -> Dict:
-        """Retorna estatísticas do sistema"""
+        """Retorna estatísticas de performance do sistema"""
+        total_predictions = self.prediction_stats["total_predictions"]
+        
         return {
-            **self.prediction_stats,
-            "cache_size": len(self.predictions_cache),
-            "success_rate": (
-                self.prediction_stats["tips_generated"] / 
-                max(self.prediction_stats["total_predictions"], 1)
-            ) * 100
+            "total_predictions": total_predictions,
+            "method_breakdown": {
+                "ml_predictions": self.prediction_stats["ml_predictions"],
+                "algorithm_predictions": self.prediction_stats["algorithm_predictions"],
+                "hybrid_predictions": self.prediction_stats["hybrid_predictions"]
+            },
+            "tip_generation": {
+                "tips_generated": self.prediction_stats["tips_generated"],
+                "tips_rejected": self.prediction_stats["tips_rejected"],
+                "acceptance_rate": (
+                    self.prediction_stats["tips_generated"] / 
+                    max(self.prediction_stats["tips_generated"] + self.prediction_stats["tips_rejected"], 1)
+                ) * 100
+            },
+            "composition_analysis": {
+                "total_analyses": self.prediction_stats["composition_analyses"],
+                "usage_rate": (
+                    self.prediction_stats["composition_analyses"] / max(total_predictions, 1)
+                ) * 100 if total_predictions > 0 else 0
+            },
+            "feature_weights": self.feature_weights,
+            "cache_status": {
+                "cached_predictions": len(self.predictions_cache),
+                "cache_hit_rate": "Not implemented"
+            }
         }
 
     def clear_old_predictions(self, max_age_hours: int = 24) -> None:
         """Remove predições antigas do cache"""
         current_time = time.time()
-        max_age_seconds = max_age_hours * 3600
+        cutoff_time = current_time - (max_age_hours * 3600)
         
         old_predictions = [
             match_id for match_id, prediction in self.predictions_cache.items()
-            if current_time - prediction.prediction_timestamp > max_age_seconds
+            if prediction.prediction_timestamp < cutoff_time
         ]
         
         for match_id in old_predictions:
             del self.predictions_cache[match_id]
         
         if old_predictions:
-            logger.info(f"Removidas {len(old_predictions)} predições antigas do cache") 
+            logger.info(f"Removidas {len(old_predictions)} predições antigas do cache")
+
+    async def _analyze_team_compositions(self, match_data: MatchData) -> Dict:
+        """
+        Analisa composições dos times usando o CompositionAnalyzer
+        
+        Args:
+            match_data: Dados da partida com informações dos times
+            
+        Returns:
+            Dict com análise de composições e vantagem relativa
+        """
+        try:
+            # Incrementa estatísticas
+            self.prediction_stats["composition_analyses"] += 1
+            
+            # Extrai dados de composição do match_data
+            team1_composition = self._extract_team_composition(match_data, "team1")
+            team2_composition = self._extract_team_composition(match_data, "team2")
+            
+            if not team1_composition or not team2_composition:
+                logger.warning("Dados de composição insuficientes, usando análise básica")
+                return {
+                    "composition_score": 0.0,  # Neutro
+                    "team1_analysis": None,
+                    "team2_analysis": None,
+                    "advantage_team": None,
+                    "confidence": 0.3
+                }
+            
+            # Análise detalhada de cada composição
+            team1_analysis = await self.composition_analyzer.analyze_team_composition(
+                team_picks=team1_composition,
+                enemy_picks=team2_composition,
+                patch_version=getattr(match_data, 'patch_version', '14.10')
+            )
+            
+            team2_analysis = await self.composition_analyzer.analyze_team_composition(
+                team_picks=team2_composition,
+                enemy_picks=team1_composition,
+                patch_version=getattr(match_data, 'patch_version', '14.10')
+            )
+            
+            # Calcula vantagem relativa (Team1 vs Team2)
+            team1_score = team1_analysis["overall_score"]
+            team2_score = team2_analysis["overall_score"]
+            composition_advantage = team1_score - team2_score  # -10 a +10
+            
+            # Normaliza para -100 a +100 (compatível com outras métricas)
+            normalized_score = composition_advantage * 10
+            
+            # Determina time com vantagem
+            advantage_team = None
+            if abs(composition_advantage) > 0.5:  # Diferença significativa
+                advantage_team = match_data.team1_name if composition_advantage > 0 else match_data.team2_name
+            
+            # Calcula confiança baseada na qualidade das análises
+            confidence = min(
+                team1_analysis.get("team_synergies", 5.0) / 10,
+                team2_analysis.get("team_synergies", 5.0) / 10
+            )
+            
+            logger.info(f"Análise de composições: {match_data.team1_name} {team1_score:.1f} vs {match_data.team2_name} {team2_score:.1f}")
+            
+            return {
+                "composition_score": normalized_score,
+                "team1_analysis": team1_analysis,
+                "team2_analysis": team2_analysis,
+                "advantage_team": advantage_team,
+                "confidence": confidence,
+                "raw_scores": {
+                    "team1": team1_score,
+                    "team2": team2_score
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro na análise de composições: {e}")
+            return {
+                "composition_score": 0.0,
+                "team1_analysis": None,
+                "team2_analysis": None,
+                "advantage_team": None,
+                "confidence": 0.1,
+                "error": str(e)
+            }
+
+    def _extract_team_composition(self, match_data: MatchData, team_key: str) -> List[Dict]:
+        """
+        Extrai composição do time dos dados da partida
+        
+        Args:
+            match_data: Dados da partida
+            team_key: "team1" ou "team2"
+            
+        Returns:
+            Lista de picks do time no formato esperado pelo CompositionAnalyzer
+        """
+        try:
+            # Tenta extrair de diferentes estruturas possíveis
+            composition = []
+            
+            # Verifica se há dados de picks & bans
+            if hasattr(match_data, 'draft_data') and match_data.draft_data:
+                draft = match_data.draft_data
+                team_picks = draft.get(f"{team_key}_picks", [])
+                
+                for i, pick in enumerate(team_picks):
+                    if isinstance(pick, dict):
+                        champion = pick.get("champion", pick.get("champion_name", ""))
+                        position = pick.get("position", pick.get("role", self._guess_position(i)))
+                        
+                        composition.append({
+                            "champion": champion,
+                            "position": position,
+                            "pick_order": i + 1
+                        })
+            
+            # Fallback: tenta extrair dos dados gerais do match
+            elif hasattr(match_data, 'teams') and match_data.teams:
+                team_data = match_data.teams.get(team_key, {})
+                players = team_data.get('players', [])
+                
+                for i, player in enumerate(players):
+                    if isinstance(player, dict):
+                        champion = player.get("champion", player.get("champion_name", ""))
+                        position = player.get("position", player.get("role", self._guess_position(i)))
+                        
+                        if champion:
+                            composition.append({
+                                "champion": champion,
+                                "position": position,
+                                "pick_order": i + 1
+                            })
+            
+            # Se ainda não tem dados, tenta estrutura simples
+            else:
+                team_attr = getattr(match_data, f"{team_key}_composition", None)
+                if team_attr and isinstance(team_attr, list):
+                    for i, champion in enumerate(team_attr):
+                        composition.append({
+                            "champion": champion,
+                            "position": self._guess_position(i),
+                            "pick_order": i + 1
+                        })
+            
+            logger.debug(f"Composição extraída para {team_key}: {[pick['champion'] for pick in composition]}")
+            return composition
+            
+        except Exception as e:
+            logger.error(f"Erro ao extrair composição do {team_key}: {e}")
+            return []
+
+    def _guess_position(self, pick_order: int) -> str:
+        """Estima posição baseada na ordem de pick (convenção padrão)"""
+        positions = ["top", "jungle", "mid", "adc", "support"]
+        return positions[pick_order] if pick_order < len(positions) else "unknown" 

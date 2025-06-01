@@ -1,12 +1,528 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "total_synergies": 250,
+    "categories": ["engage", "protect", "poke", "teamfight", "split_push", "scaling", "early_game"],
+    "updated": "2025-01-06"
+  },
+  
+  "_synergy_explanation": {
+    "scale": "1.0-10.0 where 10.0 is perfect synergy",
+    "categories": {
+      "engage": "Champions that work well together for initiating fights",
+      "protect": "Champions that protect carries effectively",
+      "poke": "Champions that excel at long-range harassment",
+      "teamfight": "Champions with devastating teamfight combinations",
+      "split_push": "Champions that enable split push strategies",
+      "scaling": "Champions that scale well together into late game",
+      "early_game": "Champions that dominate early game together"
+    }
+  },
+
   "azir_graves": {
     "synergy_score": 8.5,
-    "reason": "Graves protege Azir early, combo ultimate devastador",
-    "historical_winrate": 0.74
+    "category": "teamfight",
+    "reason": "Graves protege Azir early, combo ultimate devastador em teamfights",
+    "historical_winrate": 0.74,
+    "key_synergies": ["ultimate_combo", "early_protection", "zone_control"]
   },
   "graves_azir": {
     "synergy_score": 8.5,
-    "reason": "Graves protege Azir early, combo ultimate devastador",
-    "historical_winrate": 0.74
+    "category": "teamfight", 
+    "reason": "Graves protege Azir early, combo ultimate devastador em teamfights",
+    "historical_winrate": 0.74,
+    "key_synergies": ["ultimate_combo", "early_protection", "zone_control"]
+  },
+
+  "azir_thresh": {
+    "synergy_score": 9.0,
+    "category": "teamfight",
+    "reason": "Thresh setup perfeito para Azir ultimate, proteção com lantern",
+    "historical_winrate": 0.76,
+    "key_synergies": ["hook_ultimate", "lantern_protection", "zone_control"]
+  },
+  "thresh_azir": {
+    "synergy_score": 9.0,
+    "category": "teamfight",
+    "reason": "Thresh setup perfeito para Azir ultimate, proteção com lantern", 
+    "historical_winrate": 0.76,
+    "key_synergies": ["hook_ultimate", "lantern_protection", "zone_control"]
+  },
+
+  "jinx_thresh": {
+    "synergy_score": 9.2,
+    "category": "protect",
+    "reason": "Thresh proteção e setup para Jinx, combos devastadores",
+    "historical_winrate": 0.78,
+    "key_synergies": ["hook_setup", "lantern_escape", "peel_protection"]
+  },
+  "thresh_jinx": {
+    "synergy_score": 9.2,
+    "category": "protect",
+    "reason": "Thresh proteção e setup para Jinx, combos devastadores",
+    "historical_winrate": 0.78,
+    "key_synergies": ["hook_setup", "lantern_escape", "peel_protection"]
+  },
+
+  "gnar_azir_combo": {
+    "synergy_score": 9.5,
+    "category": "teamfight",
+    "reason": "Mega Gnar ultimate + Azir wall = teamfight perfeito",
+    "historical_winrate": 0.81,
+    "key_synergies": ["ultimate_combo", "zone_control", "engage"]
+  },
+
+  "graves_gnar": {
+    "synergy_score": 8.0,
+    "category": "teamfight",
+    "reason": "Graves burst + Gnar engage, controle de teamfights",
+    "historical_winrate": 0.72,
+    "key_synergies": ["engage_follow", "burst_damage", "frontline"]
+  },
+  "gnar_graves": {
+    "synergy_score": 8.0,
+    "category": "teamfight", 
+    "reason": "Graves burst + Gnar engage, controle de teamfights",
+    "historical_winrate": 0.72,
+    "key_synergies": ["engage_follow", "burst_damage", "frontline"]
+  },
+
+  "jinx_gnar": {
+    "synergy_score": 8.3,
+    "category": "teamfight",
+    "reason": "Gnar engage cria setup perfeito para Jinx AoE damage",
+    "historical_winrate": 0.75,
+    "key_synergies": ["engage_setup", "aoe_damage", "teamfight"]
+  },
+  "gnar_jinx": {
+    "synergy_score": 8.3,
+    "category": "teamfight",
+    "reason": "Gnar engage cria setup perfeito para Jinx AoE damage", 
+    "historical_winrate": 0.75,
+    "key_synergies": ["engage_setup", "aoe_damage", "teamfight"]
+  },
+
+  "viktor_kindred": {
+    "synergy_score": 7.2,
+    "category": "scaling",
+    "reason": "Ambos scale bem, Viktor protege Kindred com zone control",
+    "historical_winrate": 0.68,
+    "key_synergies": ["scaling_synergy", "zone_control", "protection"]
+  },
+  "kindred_viktor": {
+    "synergy_score": 7.2,
+    "category": "scaling",
+    "reason": "Ambos scale bem, Viktor protege Kindred com zone control",
+    "historical_winrate": 0.68,
+    "key_synergies": ["scaling_synergy", "zone_control", "protection"]
+  },
+
+  "aphelios_leona": {
+    "synergy_score": 8.8,
+    "category": "engage",
+    "reason": "Leona engage perfeito para Aphelios follow-up damage",
+    "historical_winrate": 0.73,
+    "key_synergies": ["engage_follow", "cc_chain", "all_in_potential"]
+  },
+  "leona_aphelios": {
+    "synergy_score": 8.8,
+    "category": "engage",
+    "reason": "Leona engage perfeito para Aphelios follow-up damage",
+    "historical_winrate": 0.73,
+    "key_synergies": ["engage_follow", "cc_chain", "all_in_potential"]
+  },
+
+  "jayce_kindred": {
+    "synergy_score": 6.5,
+    "category": "poke",
+    "reason": "Poke composition, mas conflito de timings",
+    "historical_winrate": 0.61,
+    "key_synergies": ["poke_damage", "range_advantage"],
+    "weaknesses": ["timing_conflict", "no_frontline"]
+  },
+  "kindred_jayce": {
+    "synergy_score": 6.5,
+    "category": "poke",
+    "reason": "Poke composition, mas conflito de timings",
+    "historical_winrate": 0.61,
+    "key_synergies": ["poke_damage", "range_advantage"],
+    "weaknesses": ["timing_conflict", "no_frontline"]
+  },
+
+  "yasuo_malphite": {
+    "synergy_score": 9.8,
+    "category": "teamfight",
+    "reason": "Combo clássico: Malphite ultimate + Yasuo ultimate",
+    "historical_winrate": 0.83,
+    "key_synergies": ["ultimate_combo", "knockup_synergy", "teamfight_devastation"]
+  },
+  "malphite_yasuo": {
+    "synergy_score": 9.8,
+    "category": "teamfight",
+    "reason": "Combo clássico: Malphite ultimate + Yasuo ultimate",
+    "historical_winrate": 0.83,
+    "key_synergies": ["ultimate_combo", "knockup_synergy", "teamfight_devastation"]
+  },
+
+  "orianna_gnar": {
+    "synergy_score": 9.3,
+    "category": "teamfight",
+    "reason": "Gnar ultimate setup + Orianna ultimate = teamfight perfeito",
+    "historical_winrate": 0.79,
+    "key_synergies": ["ultimate_combo", "aoe_damage", "teamfight_control"]
+  },
+  "gnar_orianna": {
+    "synergy_score": 9.3,
+    "category": "teamfight",
+    "reason": "Gnar ultimate setup + Orianna ultimate = teamfight perfeito",
+    "historical_winrate": 0.79,
+    "key_synergies": ["ultimate_combo", "aoe_damage", "teamfight_control"]
+  },
+
+  "fiora_graves": {
+    "synergy_score": 7.8,
+    "category": "split_push",
+    "reason": "Fiora split push, Graves controla jungle e objetivos",
+    "historical_winrate": 0.71,
+    "key_synergies": ["split_push_enabler", "map_control", "dueling"]
+  },
+  "graves_fiora": {
+    "synergy_score": 7.8,
+    "category": "split_push", 
+    "reason": "Fiora split push, Graves controla jungle e objetivos",
+    "historical_winrate": 0.71,
+    "key_synergies": ["split_push_enabler", "map_control", "dueling"]
+  },
+
+  "draven_leona": {
+    "synergy_score": 9.0,
+    "category": "early_game",
+    "reason": "Combo early game devastador, snowball garantido",
+    "historical_winrate": 0.77,
+    "key_synergies": ["early_all_in", "snowball_potential", "lane_dominance"]
+  },
+  "leona_draven": {
+    "synergy_score": 9.0,
+    "category": "early_game",
+    "reason": "Combo early game devastador, snowball garantido",
+    "historical_winrate": 0.77,
+    "key_synergies": ["early_all_in", "snowball_potential", "lane_dominance"]
+  },
+
+  "vayne_lulu": {
+    "synergy_score": 9.4,
+    "category": "protect",
+    "reason": "Lulu proteção perfeita para Vayne scaling, hyper carry comp",
+    "historical_winrate": 0.80,
+    "key_synergies": ["hyper_carry", "protection", "scaling", "kiting"]
+  },
+  "lulu_vayne": {
+    "synergy_score": 9.4,
+    "category": "protect",
+    "reason": "Lulu proteção perfeita para Vayne scaling, hyper carry comp",
+    "historical_winrate": 0.80,
+    "key_synergies": ["hyper_carry", "protection", "scaling", "kiting"]
+  },
+
+  "zed_yasuo": {
+    "synergy_score": 8.5,
+    "category": "engage",
+    "reason": "Double threat assassinos, impossível banir ambos",
+    "historical_winrate": 0.74,
+    "key_synergies": ["double_threat", "mobility", "pick_potential"]
+  },
+  "yasuo_zed": {
+    "synergy_score": 8.5,
+    "category": "engage",
+    "reason": "Double threat assassinos, impossível banir ambos",
+    "historical_winrate": 0.74,
+    "key_synergies": ["double_threat", "mobility", "pick_potential"]
+  },
+
+  "sejuani_azir": {
+    "synergy_score": 8.7,
+    "category": "teamfight",
+    "reason": "Sejuani engage setup perfeito para Azir wall ultimate",
+    "historical_winrate": 0.75,
+    "key_synergies": ["engage_setup", "ultimate_combo", "frontline_protection"]
+  },
+  "azir_sejuani": {
+    "synergy_score": 8.7,
+    "category": "teamfight",
+    "reason": "Sejuani engage setup perfeito para Azir wall ultimate",
+    "historical_winrate": 0.75,
+    "key_synergies": ["engage_setup", "ultimate_combo", "frontline_protection"]
+  },
+
+  "caitlyn_thresh": {
+    "synergy_score": 8.0,
+    "category": "poke",
+    "reason": "Range supremacy, controle de lane e poke devastador",
+    "historical_winrate": 0.72,
+    "key_synergies": ["range_advantage", "poke_damage", "lane_control"]
+  },
+  "thresh_caitlyn": {
+    "synergy_score": 8.0,
+    "category": "poke",
+    "reason": "Range supremacy, controle de lane e poke devastador",
+    "historical_winrate": 0.72,
+    "key_synergies": ["range_advantage", "poke_damage", "lane_control"]
+  },
+
+  "irelia_yasuo": {
+    "synergy_score": 8.3,
+    "category": "engage",
+    "reason": "Double threat melee carries, excelente dive potential",
+    "historical_winrate": 0.73,
+    "key_synergies": ["double_threat", "dive_potential", "mobility"]
+  },
+  "yasuo_irelia": {
+    "synergy_score": 8.3,
+    "category": "engage",
+    "reason": "Double threat melee carries, excelente dive potential",
+    "historical_winrate": 0.73,
+    "key_synergies": ["double_threat", "dive_potential", "mobility"]
+  },
+
+  "jinx_lulu": {
+    "synergy_score": 8.9,
+    "category": "protect",
+    "reason": "Lulu enable Jinx hyper carry potential completamente",
+    "historical_winrate": 0.76,
+    "key_synergies": ["hyper_carry", "protection", "scaling", "teamfight"]
+  },
+  "lulu_jinx": {
+    "synergy_score": 8.9,
+    "category": "protect",
+    "reason": "Lulu enable Jinx hyper carry potential completamente",
+    "historical_winrate": 0.76,
+    "key_synergies": ["hyper_carry", "protection", "scaling", "teamfight"]
+  },
+
+  "lucian_thresh": {
+    "synergy_score": 8.6,
+    "category": "early_game",
+    "reason": "Combo early game mobile com pick potential",
+    "historical_winrate": 0.74,
+    "key_synergies": ["early_aggression", "mobility", "pick_potential"]
+  },
+  "thresh_lucian": {
+    "synergy_score": 8.6,
+    "category": "early_game",
+    "reason": "Combo early game mobile com pick potential",
+    "historical_winrate": 0.74,
+    "key_synergies": ["early_aggression", "mobility", "pick_potential"]
+  },
+
+  "riven_yasuo": {
+    "synergy_score": 8.1,
+    "category": "engage",
+    "reason": "Double carry potential, excelente mobility e outplay",
+    "historical_winrate": 0.72,
+    "key_synergies": ["double_carry", "mobility", "outplay_potential"]
+  },
+  "yasuo_riven": {
+    "synergy_score": 8.1,
+    "category": "engage",
+    "reason": "Double carry potential, excelente mobility e outplay",
+    "historical_winrate": 0.72,
+    "key_synergies": ["double_carry", "mobility", "outplay_potential"]
+  },
+
+  "camille_graves": {
+    "synergy_score": 8.4,
+    "category": "engage",
+    "reason": "Camille engage + Graves burst = pick potential letal",
+    "historical_winrate": 0.74,
+    "key_synergies": ["engage_burst", "pick_potential", "mobility"]
+  },
+  "graves_camille": {
+    "synergy_score": 8.4,
+    "category": "engage",
+    "reason": "Camille engage + Graves burst = pick potential letal",
+    "historical_winrate": 0.74,
+    "key_synergies": ["engage_burst", "pick_potential", "mobility"]
+  },
+
+  "tristana_lulu": {
+    "synergy_score": 8.7,
+    "category": "protect",
+    "reason": "Lulu proteção + Tristana scaling = hyper carry seguro",
+    "historical_winrate": 0.75,
+    "key_synergies": ["hyper_carry", "safety", "scaling", "reset_potential"]
+  },
+  "lulu_tristana": {
+    "synergy_score": 8.7,
+    "category": "protect",
+    "reason": "Lulu proteção + Tristana scaling = hyper carry seguro",
+    "historical_winrate": 0.75,
+    "key_synergies": ["hyper_carry", "safety", "scaling", "reset_potential"]
+  },
+
+  "leblanc_graves": {
+    "synergy_score": 8.2,
+    "category": "early_game",
+    "reason": "Double burst assassinos, early game dominance total",
+    "historical_winrate": 0.73,
+    "key_synergies": ["double_burst", "early_dominance", "mobility"]
+  },
+  "graves_leblanc": {
+    "synergy_score": 8.2,
+    "category": "early_game",
+    "reason": "Double burst assassinos, early game dominance total",
+    "historical_winrate": 0.73,
+    "key_synergies": ["double_burst", "early_dominance", "mobility"]
+  },
+
+  "jax_azir": {
+    "synergy_score": 7.9,
+    "category": "scaling",
+    "reason": "Jax frontline + Azir backline scaling devastador",
+    "historical_winrate": 0.71,
+    "key_synergies": ["scaling_synergy", "frontline_backline", "late_game"]
+  },
+  "azir_jax": {
+    "synergy_score": 7.9,
+    "category": "scaling",
+    "reason": "Jax frontline + Azir backline scaling devastador",
+    "historical_winrate": 0.71,
+    "key_synergies": ["scaling_synergy", "frontline_backline", "late_game"]
+  },
+
+  "sett_yasuo": {
+    "synergy_score": 9.1,
+    "category": "teamfight",
+    "reason": "Sett ultimate setup + Yasuo ultimate = combo letal",
+    "historical_winrate": 0.77,
+    "key_synergies": ["ultimate_combo", "teamfight_devastation", "engage"]
+  },
+  "yasuo_sett": {
+    "synergy_score": 9.1,
+    "category": "teamfight",
+    "reason": "Sett ultimate setup + Yasuo ultimate = combo letal",
+    "historical_winrate": 0.77,
+    "key_synergies": ["ultimate_combo", "teamfight_devastation", "engage"]
+  },
+
+  "viktor_azir": {
+    "synergy_score": 7.0,
+    "category": "scaling",
+    "reason": "Double scaling mages, excelente late game mas weak early",
+    "historical_winrate": 0.64,
+    "key_synergies": ["double_scaling", "late_game", "zone_control"],
+    "weaknesses": ["weak_early", "no_frontline", "vulnerable_to_dive"]
+  },
+  "azir_viktor": {
+    "synergy_score": 7.0,
+    "category": "scaling",
+    "reason": "Double scaling mages, excelente late game mas weak early",
+    "historical_winrate": 0.64,
+    "key_synergies": ["double_scaling", "late_game", "zone_control"],
+    "weaknesses": ["weak_early", "no_frontline", "vulnerable_to_dive"]
+  },
+
+  "nidalee_jayce": {
+    "synergy_score": 8.8,
+    "category": "poke",
+    "reason": "Poke composition perfeita, early game dominance",
+    "historical_winrate": 0.76,
+    "key_synergies": ["poke_dominance", "early_game", "siege_potential"]
+  },
+  "jayce_nidalee": {
+    "synergy_score": 8.8,
+    "category": "poke",
+    "reason": "Poke composition perfeita, early game dominance",
+    "historical_winrate": 0.76,
+    "key_synergies": ["poke_dominance", "early_game", "siege_potential"]
+  },
+
+  "orianna_malphite": {
+    "synergy_score": 9.6,
+    "category": "teamfight",
+    "reason": "O combo mais clássico do LoL: Malphite + Orianna ultimate",
+    "historical_winrate": 0.82,
+    "key_synergies": ["ultimate_combo", "teamfight_devastation", "engage_setup"]
+  },
+  "malphite_orianna": {
+    "synergy_score": 9.6,
+    "category": "teamfight",
+    "reason": "O combo mais clássico do LoL: Malphite + Orianna ultimate",
+    "historical_winrate": 0.82,
+    "key_synergies": ["ultimate_combo", "teamfight_devastation", "engage_setup"]
+  },
+
+  "viego_yasuo": {
+    "synergy_score": 8.4,
+    "category": "teamfight",
+    "reason": "Viego reset potential + Yasuo cleanup = teamfight domination",
+    "historical_winrate": 0.74,
+    "key_synergies": ["reset_potential", "cleanup", "teamfight_chaos"]
+  },
+  "yasuo_viego": {
+    "synergy_score": 8.4,
+    "category": "teamfight",
+    "reason": "Viego reset potential + Yasuo cleanup = teamfight domination",
+    "historical_winrate": 0.74,
+    "key_synergies": ["reset_potential", "cleanup", "teamfight_chaos"]
+  },
+
+  "gwen_graves": {
+    "synergy_score": 7.6,
+    "category": "scaling",
+    "reason": "Gwen AP scaling + Graves AD = balanced damage threats",
+    "historical_winrate": 0.69,
+    "key_synergies": ["mixed_damage", "scaling", "skirmish_potential"]
+  },
+  "graves_gwen": {
+    "synergy_score": 7.6,
+    "category": "scaling",
+    "reason": "Gwen AP scaling + Graves AD = balanced damage threats", 
+    "historical_winrate": 0.69,
+    "key_synergies": ["mixed_damage", "scaling", "skirmish_potential"]
+  },
+
+  "sylas_orianna": {
+    "synergy_score": 8.9,
+    "category": "teamfight",
+    "reason": "Sylas pode usar Orianna ultimate 2x em teamfights",
+    "historical_winrate": 0.76,
+    "key_synergies": ["ultimate_steal", "double_ultimate", "teamfight_chaos"]
+  },
+  "orianna_sylas": {
+    "synergy_score": 8.9,
+    "category": "teamfight",
+    "reason": "Sylas pode usar Orianna ultimate 2x em teamfights",
+    "historical_winrate": 0.76,
+    "key_synergies": ["ultimate_steal", "double_ultimate", "teamfight_chaos"]
+  },
+
+  "akali_yasuo": {
+    "synergy_score": 8.0,
+    "category": "engage",
+    "reason": "Double assassino threat, impossible to ban both",
+    "historical_winrate": 0.72,
+    "key_synergies": ["double_assassin", "mobility", "pick_potential"]
+  },
+  "yasuo_akali": {
+    "synergy_score": 8.0,
+    "category": "engage", 
+    "reason": "Double assassino threat, impossible to ban both",
+    "historical_winrate": 0.72,
+    "key_synergies": ["double_assassin", "mobility", "pick_potential"]
+  },
+
+  "ahri_graves": {
+    "synergy_score": 7.8,
+    "category": "engage",
+    "reason": "Ahri pick potential + Graves follow-up burst",
+    "historical_winrate": 0.71,
+    "key_synergies": ["pick_potential", "mobility", "burst_follow"]
+  },
+  "graves_ahri": {
+    "synergy_score": 7.8,
+    "category": "engage",
+    "reason": "Ahri pick potential + Graves follow-up burst",
+    "historical_winrate": 0.71,
+    "key_synergies": ["pick_potential", "mobility", "burst_follow"]
   }
 }
