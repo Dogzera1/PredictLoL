@@ -1,0 +1,107 @@
+{
+  "timestamp": "2025-06-01T16:05:43.578351",
+  "system_status": "maintenance",
+  "uptime_seconds": 29.948877573013306,
+  "uptime_formatted": "29s",
+  "resources": {
+    "cpu_percent": 50.7,
+    "memory_percent": 86.6,
+    "disk_percent": 63.566091611440555,
+    "network_sent_mb": 723.158618927002,
+    "network_recv_mb": 9911.401427268982,
+    "active_connections": 143
+  },
+  "performance": {
+    "total_predictions": 1,
+    "win_rate": 100.0,
+    "roi": 85.0,
+    "net_profit": 8.5,
+    "uptime_hours": 0.008992772433492873
+  },
+  "component_health": {
+    "system_resources": true,
+    "performance_monitor": true,
+    "dashboard_generator": true,
+    "file_system": true,
+    "network_connectivity": true
+  },
+  "recent_health_checks": [
+    {
+      "component": "performance_monitor",
+      "status": true,
+      "message": "Monitorando 0 predições",
+      "response_time_ms": 0.029325485229492188,
+      "timestamp": "2025-06-01T16:05:13.544956"
+    },
+    {
+      "component": "dashboard_generator",
+      "status": true,
+      "message": "Dashboard gerando HTML corretamente",
+      "response_time_ms": 0.16808509826660156,
+      "timestamp": "2025-06-01T16:05:13.545786"
+    },
+    {
+      "component": "file_system",
+      "status": true,
+      "message": "Filesystem leitura/escrita OK",
+      "response_time_ms": 18.562793731689453,
+      "timestamp": "2025-06-01T16:05:13.565048"
+    },
+    {
+      "component": "network_connectivity",
+      "status": true,
+      "message": "Conectividade de rede OK",
+      "response_time_ms": 60.221195220947266,
+      "timestamp": "2025-06-01T16:05:13.628829"
+    },
+    {
+      "component": "system_resources",
+      "status": true,
+      "message": "CPU: 49.6%, MEM: 86.5%",
+      "response_time_ms": 1017.0514583587646,
+      "timestamp": "2025-06-01T16:05:34.209337"
+    },
+    {
+      "component": "performance_monitor",
+      "status": true,
+      "message": "Monitorando 1 predições",
+      "response_time_ms": 0.03647804260253906,
+      "timestamp": "2025-06-01T16:05:34.209384"
+    },
+    {
+      "component": "file_system",
+      "status": true,
+      "message": "Filesystem leitura/escrita OK",
+      "response_time_ms": 2.457141876220703,
+      "timestamp": "2025-06-01T16:05:34.211847"
+    },
+    {
+      "component": "system_resources",
+      "status": true,
+      "message": "CPU: 49.3%, MEM: 86.6%",
+      "response_time_ms": 1017.2572135925293,
+      "timestamp": "2025-06-01T16:05:39.216728"
+    },
+    {
+      "component": "performance_monitor",
+      "status": true,
+      "message": "Monitorando 1 predições",
+      "response_time_ms": 0.028848648071289062,
+      "timestamp": "2025-06-01T16:05:39.216763"
+    },
+    {
+      "component": "file_system",
+      "status": true,
+      "message": "Filesystem leitura/escrita OK",
+      "response_time_ms": 5.0106048583984375,
+      "timestamp": "2025-06-01T16:05:39.221777"
+    }
+  ],
+  "active_alerts": [],
+  "configuration": {
+    "monitoring_interval": 5,
+    "health_check_interval": 10,
+    "dashboard_update_interval": 5,
+    "auto_recovery_enabled": true
+  }
+}

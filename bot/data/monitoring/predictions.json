@@ -1,0 +1,21 @@
+{
+  "pred_1748805367415": {
+    "prediction_id": "pred_1748805367415",
+    "match_id": "persistence_test",
+    "timestamp": 1748805367.4153304,
+    "predicted_winner": "Test Team",
+    "actual_winner": "Test Team",
+    "win_probability": 0.8,
+    "confidence_level": "very_high",
+    "method_used": "hybrid",
+    "odds_used": 2.0,
+    "stake_amount": 20.0,
+    "potential_return": 40.0,
+    "actual_return": 40.0,
+    "composition_score": 0.4,
+    "patch_score": 0.0,
+    "real_time_score": 0.0,
+    "is_resolved": true,
+    "processing_time_ms": 1000.0
+  }
+}

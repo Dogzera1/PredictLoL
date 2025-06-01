@@ -164,8 +164,8 @@ class ProductionAPI:
         # Rotas de arquivos estáticos
         self.app.router.add_get('/', self._handle_home)
         
-        # Rota catch-all para debugging
-        self.app.router.add_route('*', '/{path:.*}', self._handle_not_found)
+        # Rota para endpoints não encontrados - removendo para evitar conflito
+        # self.app.router.add_route('*', '/{path:.*}', self._handle_not_found)
 
     async def _handle_status(self, request: Request) -> Response:
         """Endpoint: GET /api/status - Status completo do sistema"""
@@ -525,26 +525,6 @@ class ProductionAPI:
             content_type='text/html',
             charset='utf-8'
         )
-
-    async def _handle_not_found(self, request: Request) -> Response:
-        """Handler para rotas não encontradas"""
-        return web.json_response({
-            "success": False,
-            "error": f"Endpoint não encontrado: {request.method} {request.path}",
-            "available_endpoints": [
-                "GET /",
-                "GET /dashboard", 
-                "GET /api/status",
-                "GET /api/health",
-                "GET /api/report/{days}",
-                "GET /api/predictions",
-                "GET /api/metrics/current",
-                "POST /api/restart/{component}",
-                "POST /api/emergency-recovery",
-                "WS /ws/metrics"
-            ],
-            "timestamp": datetime.now().isoformat()
-        }, status=404)
 
     async def _metrics_streaming_loop(self):
         """Loop para streaming de métricas via WebSocket"""
