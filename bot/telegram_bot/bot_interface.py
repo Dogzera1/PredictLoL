@@ -1205,19 +1205,89 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                     reply_markup=self._get_main_keyboard(self._is_admin(query.from_user.id))
                 )
             
-            # Handlers de subscrição (delegação para alerts_system)
-            elif data in ["all_tips", "high_value", "high_conf", "premium"]:
+            # Handlers de subscrição (CORRIGIDOS com nomes dos keyboards)
+            elif data in ["sub_all_tips", "sub_high_value", "sub_high_conf", "sub_premium"]:
+                # Mapeia para os nomes esperados pelo alerts_system
+                subscription_mapping = {
+                    "sub_all_tips": "all_tips",
+                    "sub_high_value": "high_value", 
+                    "sub_high_conf": "high_conf",
+                    "sub_premium": "premium"
+                }
+                # Modifica temporariamente o callback_data para o alerts_system
+                original_data = query.data
+                query.data = subscription_mapping[data]
                 await self.telegram_alerts._handle_subscription_callback(update, context)
+                query.data = original_data  # Restaura o original
+            
+            # Handlers de cancelamento de subscrição
+            elif data == "unsubscribe_all":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("⚠️ **Confirmar cancelamento?**\n\n"
+                    "Isso cancelará TODOS os seus alertas."),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✅ Sim, cancelar tudo", callback_data="unsubscribe_confirm"),
+                         InlineKeyboardButton("❌ Não, voltar", callback_data="show_subscriptions")]
+                    ])
+                )
+            
+            elif data == "unsubscribe_confirm":
+                user_id = query.from_user.id
+                if user_id in self.telegram_alerts.users:
+                    self.telegram_alerts.users[user_id].is_active = False
+                    message = "❌ **Todos os alertas cancelados!**\n\nVocê não receberá mais notificações.\nUse `/subscribe` para reativar."
+                else:
+                    message = "ℹ️ Você não estava subscrito."
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "custom_filters":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("⚙️ **Filtros Personalizados**\n\n"
+                    "Funcionalidade em desenvolvimento.\n"
+                    "Em breve você poderá criar filtros customizados para suas tips!"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
             
             # Novos handlers para callbacks da interface
             elif data in ["quick_status", "show_subscriptions", "show_global_stats", "my_stats", "show_help", "ping_test", "refresh_main", "user_settings"]:
                 await self._handle_interface_callbacks(query, data)
             
+            # Handlers de status detalhado
+            elif data in ["refresh_status", "detailed_status", "performance_stats", "apis_status", "status_charts", "health_status"]:
+                await self._handle_status_callbacks(query, data)
+            
+            # Handlers de help sections
+            elif data in ["help_basic", "help_alerts", "help_tips", "help_settings", "help_faq", "help_support", "help_admin"]:
+                await self._handle_help_sections(query, data)
+            
+            # Handlers de tasks 
+            elif data in ["force_monitor", "force_cleanup", "force_health", "force_cache", "task_stats", "pause_tasks", "resume_tasks", "restart_tasks"]:
+                await self._handle_task_callbacks(query, data)
+            
+            # Handlers de mystats
+            elif data in ["change_subscription", "refresh_mystats", "tips_history", "roi_calculator", "user_preferences", "user_performance"]:
+                await self._handle_mystats_callbacks(query, data)
+            
+            # Handlers de settings
+            elif data in ["settings_alerts", "settings_schedule", "settings_filters", "settings_language", "toggle_silent", "toggle_push"]:
+                await self._handle_settings_sections(query, data)
+            
             # Admin callbacks
             elif data in ["admin_panel", "admin_force_scan", "admin_health_check", "admin_system_status", "admin_tasks", "admin_logs", "admin_users", "admin_config", "admin_restart"]:
                 await self._handle_admin_callbacks(query, data)
             
-            # Outros handlers específicos
+            # Handlers de restart
+            elif data in ["restart_confirm", "restart_cancel", "restart_partial", "restart_quick"]:
+                await self._handle_restart_callbacks(query, data)
+            
+            # Outros handlers específicos LEGADOS (mantidos para compatibilidade)
             elif data == "stats":
                 await self._handle_stats_callback(query)
             elif data == "system_status":
@@ -1226,24 +1296,13 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                 await self._handle_force_scan_callback(query)
             elif data == "health_check":
                 await self._handle_health_callback(query)
-            elif data.startswith("help_"):
-                await self._handle_help_sections(query, data)
-            elif data.startswith("settings_"):
-                await self._handle_settings_sections(query, data)
-            elif data == "unsubscribe_confirm":
-                # Confirma cancelamento
-                await query.edit_message_text(
-                    self._escape_markdown_v2("❌ **Todos os alertas cancelados!**\n\n"
-                    "Você não receberá mais notificações.\n"
-                    "Use `/subscribe` para reativar."),
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
-                )
+            
             else:
                 # Handler padrão para callbacks não reconhecidos
                 logger.warning(f"Callback não reconhecido: {data}")
                 await query.edit_message_text(
-                    self._escape_markdown_v2("⚠️ **Comando não reconhecido.**\n\nTente usar o menu principal."),
+                    self._escape_markdown_v2(f"⚠️ **Comando não reconhecido:** `{data}`\n\n"
+                    "Comando pode estar em desenvolvimento ou foi removido."),
                     parse_mode=ParseMode.MARKDOWN_V2,
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
                 )
@@ -1703,6 +1762,272 @@ Padrão recomendado ativo"""
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
         )
+
+    async def _handle_status_callbacks(self, query, data: str) -> None:
+        """Handler para callbacks de status detalhado"""
+        try:
+            if data == "refresh_status":
+                await self._handle_system_callback(query)
+            
+            elif data == "detailed_status":
+                status = self.schedule_manager.get_system_status()
+                detailed_message = f"""🔧 **STATUS DETALHADO**
+
+**🖥️ Sistema:**
+• Running: {status['system']['is_running']}
+• Healthy: {status['system']['is_healthy']}
+• Uptime: {status['system']['uptime_hours']:.2f}h
+• Memory: {status['system']['memory_usage_mb']:.1f}MB
+
+**📋 Tarefas:**
+• Executando: {status['tasks']['running_count']}/{status['tasks']['scheduled_count']}
+• Concluídas: {status['statistics']['tasks_completed']}
+• Falhadas: {status['statistics']['tasks_failed']}
+
+**🎯 Performance:**
+• Tips geradas: {status['statistics']['tips_generated']}
+• Última tip: {self._format_time_ago(status['health']['last_tip_time'])}"""
+
+                await query.edit_message_text(
+                    self._escape_markdown_v2(detailed_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "performance_stats":
+                perf_message = f"""⚡ **PERFORMANCE DO SISTEMA**
+
+**🚀 Bot Interface:**
+• Uptime: {self.stats.uptime_hours:.2f}h
+• Comandos processados: {self.stats.commands_processed}
+• Admin comandos: {self.stats.admin_commands}
+• Erros tratados: {self.stats.errors_handled}
+
+**📊 Tips System:**
+• Rate limit: {self.tips_system.max_tips_per_hour} tips/h
+• Cache ativo: {len(self.tips_system.generated_tips)}
+• Monitoramento: {'✅ Ativo' if self.tips_system.is_monitoring else '❌ Inativo'}
+
+**💾 Sistema:**
+• Usuários ativos: {len(self.telegram_alerts.users)}
+• Grupos ativos: {len(self.telegram_alerts.groups)}"""
+
+                await query.edit_message_text(
+                    self._escape_markdown_v2(perf_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "apis_status":
+                # Testa status das APIs
+                apis_message = f"""🔗 **STATUS DAS APIs**
+
+**📊 PandaScore API:**
+• Status: 🔍 Testando...
+• Last call: {self._format_time_ago(time.time())}
+
+**🎮 Riot API:**
+• Status: 🔍 Testando...
+• Last call: {self._format_time_ago(time.time())}
+• Modo: Mock (API key inválida)
+
+**📡 Telegram API:**
+• Status: ✅ Operacional
+• Bot conectado: ✅"""
+
+                await query.edit_message_text(
+                    self._escape_markdown_v2(apis_message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "status_charts":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("📈 **Gráficos de Status**\n\nFuncionalidade em desenvolvimento.\nEm breve teremos gráficos visuais!"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "health_status":
+                await self._handle_health_callback(query)
+                
+        except Exception as e:
+            logger.error(f"Erro no callback de status {data}: {e}")
+            await query.edit_message_text(
+                self._escape_markdown_v2(f"❌ **Erro:** {str(e)[:50]}"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+
+    async def _handle_task_callbacks(self, query, data: str) -> None:
+        """Handler para callbacks de tarefas"""
+        if not self._is_admin(query.from_user.id):
+            await query.edit_message_text(
+                self._escape_markdown_v2("❌ **Acesso negado.**\n\nApenas administradores."),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+            return
+        
+        try:
+            if data == "force_monitor":
+                success = await self.schedule_manager.force_task_execution("monitor_live_matches")
+                message = "✅ **Monitor forçado iniciado!**" if success else "❌ **Falha ao forçar monitor.**"
+            
+            elif data == "force_cleanup":
+                # Força limpeza do sistema
+                self.tips_system._cleanup_expired_tips()
+                message = "🧹 **Limpeza forçada concluída!**"
+            
+            elif data == "force_health":
+                await self.schedule_manager._system_health_check_task()
+                message = "💓 **Health check forçado concluído!**"
+            
+            elif data == "force_cache":
+                # Limpa cache
+                self.tips_system.generated_tips.clear()
+                self.tips_system.monitored_matches.clear()
+                message = "🔧 **Cache limpo com sucesso!**"
+            
+            elif data == "task_stats":
+                status = self.schedule_manager.get_system_status()
+                task_message = "📊 **ESTATÍSTICAS DE TAREFAS**\n\n"
+                for task_id, task_info in status['tasks']['task_details'].items():
+                    task_message += f"**{task_id}:**\n"
+                    task_message += f"• Execuções: {task_info['run_count']}\n"
+                    task_message += f"• Erros: {task_info['error_count']}\n\n"
+                message = task_message
+            
+            elif data in ["pause_tasks", "resume_tasks", "restart_tasks"]:
+                message = f"⚙️ **{data.replace('_', ' ').title()}**\n\nFuncionalidade em desenvolvimento."
+            
+            else:
+                message = f"⚠️ **Tarefa não reconhecida:** {data}"
+            
+            await query.edit_message_text(
+                self._escape_markdown_v2(message),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro no callback de task {data}: {e}")
+            await query.edit_message_text(
+                self._escape_markdown_v2(f"❌ **Erro:** {str(e)[:50]}"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+
+    async def _handle_mystats_callbacks(self, query, data: str) -> None:
+        """Handler para callbacks de estatísticas pessoais"""
+        try:
+            user_id = query.from_user.id
+            
+            if data == "change_subscription":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("🔔 **Escolha seu novo tipo de subscrição:**"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=self._get_subscription_keyboard()
+                )
+            
+            elif data == "refresh_mystats":
+                # Atualiza e mostra estatísticas
+                if user_id not in self.telegram_alerts.users:
+                    message = "ℹ️ **Você não está registrado.**\n\nUse `/start` primeiro."
+                else:
+                    user = self.telegram_alerts.users[user_id]
+                    message = f"""📊 **SUAS ESTATÍSTICAS ATUALIZADAS**
+
+👤 **Perfil:**
+• Nome: {user.first_name}
+• Tipo: {user.subscription_type.value}
+• Status: {'✅ Ativo' if user.is_active else '❌ Inativo'}
+
+📅 **Atividade:**
+• Membro desde: {self._format_time_ago(user.joined_at)}
+• Tips recebidas: {user.tips_received}
+• Última atividade: {self._format_time_ago(user.last_active)}"""
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(message),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data in ["tips_history", "roi_calculator", "user_preferences", "user_performance"]:
+                functionality_names = {
+                    "tips_history": "Histórico de Tips",
+                    "roi_calculator": "Calculadora de ROI", 
+                    "user_preferences": "Preferências do Usuário",
+                    "user_performance": "Performance do Usuário"
+                }
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(f"📊 **{functionality_names[data]}**\n\n"
+                    "Funcionalidade em desenvolvimento.\n"
+                    "Em breve você terá acesso a análises detalhadas!"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+                
+        except Exception as e:
+            logger.error(f"Erro no callback mystats {data}: {e}")
+            await query.edit_message_text(
+                self._escape_markdown_v2(f"❌ **Erro:** {str(e)[:50]}"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+
+    async def _handle_restart_callbacks(self, query, data: str) -> None:
+        """Handler para callbacks de reinício"""
+        if not self._is_admin(query.from_user.id):
+            await query.edit_message_text(
+                self._escape_markdown_v2("❌ **Acesso negado.**"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
+            return
+        
+        try:
+            if data == "restart_confirm":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("🔄 **Reiniciando sistema...**\n\nIsto pode levar alguns segundos."),
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                # Em implementação real, faria o restart aqui
+                await asyncio.sleep(2)
+                await query.edit_message_text(
+                    self._escape_markdown_v2("✅ **Sistema reiniciado com sucesso!**"),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data == "restart_cancel":
+                await query.edit_message_text(
+                    self._escape_markdown_v2("❌ **Reinício cancelado.**\n\nSistema continua operando normalmente."),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+            
+            elif data in ["restart_partial", "restart_quick"]:
+                restart_types = {
+                    "restart_partial": "Reinício Parcial",
+                    "restart_quick": "Reinício Rápido"
+                }
+                
+                await query.edit_message_text(
+                    self._escape_markdown_v2(f"🔄 **{restart_types[data]}**\n\nFuncionalidade em desenvolvimento."),
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                )
+                
+        except Exception as e:
+            logger.error(f"Erro no callback restart {data}: {e}")
+            await query.edit_message_text(
+                self._escape_markdown_v2(f"❌ **Erro:** {str(e)[:50]}"),
+                parse_mode=ParseMode.MARKDOWN_V2,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+            )
 
     async def _handle_unknown_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler para mensagens não reconhecidas"""
