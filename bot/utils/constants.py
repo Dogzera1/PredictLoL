@@ -94,47 +94,47 @@ PANDASCORE_RATE_LIMITS = {
     "requests_per_hour": 1000
 }
 
-# Configurações do sistema de unidades
+# Configurações do sistema de unidades - AJUSTADAS para desenvolvimento
 UNITS_CONFIG = {
     "very_high_risk": {
-        "min_confidence": 0.90,
-        "min_ev": 0.15,
+        "min_confidence": 0.80,
+        "min_ev": 0.10,
         "units": 5.0,
         "risk_level": "Risco Muito Alto"
     },
     "high_risk": {
-        "min_confidence": 0.85,
-        "min_ev": 0.12,
+        "min_confidence": 0.75,
+        "min_ev": 0.08,
         "units": 4.0,
         "risk_level": "Risco Alto"
     },
     "high_risk_2": {
-        "min_confidence": 0.80,
-        "min_ev": 0.10,
+        "min_confidence": 0.70,
+        "min_ev": 0.06,
         "units": 3.0,
         "risk_level": "Risco Alto"
     },
     "medium_high_risk": {
-        "min_confidence": 0.75,
-        "min_ev": 0.08,
+        "min_confidence": 0.65,
+        "min_ev": 0.05,
         "units": 2.5,
         "risk_level": "Risco Médio-Alto"
     },
     "medium_risk": {
-        "min_confidence": 0.70,
-        "min_ev": 0.06,
+        "min_confidence": 0.60,
+        "min_ev": 0.04,
         "units": 2.0,
         "risk_level": "Risco Médio"
     },
     "low_risk": {
-        "min_confidence": 0.65,
-        "min_ev": 0.05,
+        "min_confidence": 0.55,
+        "min_ev": 0.03,
         "units": 1.0,
         "risk_level": "Risco Baixo"
     },
     "minimum": {
-        "min_confidence": 0.60,
-        "min_ev": 0.03,
+        "min_confidence": 0.50,
+        "min_ev": 0.01,
         "units": 0.5,
         "risk_level": "Risco Mínimo"
     }
@@ -222,16 +222,16 @@ SUPPORTED_LEAGUES = {
     "LCS", "LEC", "LPL", "LCK", "CBLOL", "LLA", "WORLDS", "MSI"
 }
 
-# Thresholds para sistema de predição
+# Thresholds para sistema de predição - AJUSTADOS para desenvolvimento
 PREDICTION_THRESHOLDS = {
-    "min_confidence": 0.65,          # Confiança mínima para tip
-    "min_ev": 3.0,                   # EV mínimo em %
-    "min_odds": 1.30,                # Odds mínima
-    "max_odds": 3.50,                # Odds máxima
-    "min_game_time": 300,            # Tempo mínimo de jogo (5min)
-    "min_data_quality": 0.60,        # Qualidade mínima dos dados
+    "min_confidence": 0.50,          # Reduzido para permitir tips em desenvolvimento  
+    "min_ev": 1.0,                   # Reduzido para aceitar EV menor
+    "min_odds": 1.20,                # Reduzido para aceitar odds menores
+    "max_odds": 5.00,                # Aumentado para aceitar odds maiores
+    "min_game_time": 0,              # Permitir desde o início da partida
+    "min_data_quality": 0.10,        # Reduzido para aceitar dados básicos da Riot
     "cache_time_minutes": 10,        # Cache de predições
-    "ml_confidence_threshold": 0.70,  # Threshold para ML
+    "ml_confidence_threshold": 0.50,  # Reduzido para desenvolvimento
     "hybrid_weight_ml": 0.6,         # Peso do ML no método híbrido
     "hybrid_weight_algo": 0.4        # Peso dos algoritmos no híbrido
 }

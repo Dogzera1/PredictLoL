@@ -556,29 +556,32 @@ class DynamicPredictionSystem:
         game_time: int,
         data_quality: float
     ) -> Dict[str, Any]:
-        """Valida se tip atende critérios profissionais"""
+        """Valida se tip atende aos critérios mínimos"""
         
-        # Critérios mínimos
-        meets_confidence = confidence >= 0.65  # 65% mínimo
-        meets_ev = ev_percentage >= 3.0        # 3% EV mínimo
-        meets_odds = 1.3 <= odds <= 3.5        # Odds entre 1.30 e 3.50
-        meets_timing = game_time >= 300        # Pelo menos 5 minutos
-        meets_quality = data_quality >= 0.6    # 60% qualidade mínima
+        # Importa thresholds das constantes
+        from ..utils.constants import PREDICTION_THRESHOLDS
+        
+        # Critérios baseados nas constantes
+        meets_confidence = confidence >= PREDICTION_THRESHOLDS["min_confidence"]
+        meets_ev = ev_percentage >= PREDICTION_THRESHOLDS["min_ev"]
+        meets_odds = PREDICTION_THRESHOLDS["min_odds"] <= odds <= PREDICTION_THRESHOLDS["max_odds"]
+        meets_timing = game_time >= PREDICTION_THRESHOLDS["min_game_time"]
+        meets_quality = data_quality >= PREDICTION_THRESHOLDS["min_data_quality"]
         
         is_valid = all([meets_confidence, meets_ev, meets_odds, meets_timing, meets_quality])
         
         # Determina motivo de rejeição
         reason = None
         if not meets_confidence:
-            reason = f"Confiança muito baixa: {confidence:.1%}"
+            reason = f"Confiança muito baixa: {confidence:.1%} (min: {PREDICTION_THRESHOLDS['min_confidence']:.1%})"
         elif not meets_ev:
-            reason = f"EV insuficiente: {ev_percentage:.1f}%"
+            reason = f"EV insuficiente: {ev_percentage:.1f}% (min: {PREDICTION_THRESHOLDS['min_ev']:.1f}%)"
         elif not meets_odds:
-            reason = f"Odds fora do range: {odds}"
+            reason = f"Odds fora do range: {odds} (range: {PREDICTION_THRESHOLDS['min_odds']}-{PREDICTION_THRESHOLDS['max_odds']})"
         elif not meets_timing:
-            reason = f"Jogo muito cedo: {game_time//60}min"
+            reason = f"Jogo muito cedo: {game_time//60}min (min: {PREDICTION_THRESHOLDS['min_game_time']//60}min)"
         elif not meets_quality:
-            reason = f"Qualidade dos dados baixa: {data_quality:.1%}"
+            reason = f"Qualidade dos dados baixa: {data_quality:.1%} (min: {PREDICTION_THRESHOLDS['min_data_quality']:.1%})"
         
         return {
             "is_valid": is_valid,
@@ -702,9 +705,15 @@ class DynamicPredictionSystem:
         else:
             return PredictionConfidence.VERY_LOW
 
-    def _get_league_tier(self, league: str) -> str:
+    def _get_league_tier(self, league) -> str:
         """Determina tier da liga"""
-        return LEAGUE_TIERS.get(league.upper(), "tier_2")
+        # Trata league como string ou dict
+        if isinstance(league, dict):
+            league_name = league.get('name', league.get('slug', 'unknown'))
+        else:
+            league_name = str(league) if league else 'unknown'
+        
+        return LEAGUE_TIERS.get(league_name.upper(), "tier_2")
 
     def _get_cached_prediction(self, match_id: str, max_age_minutes: int = 10) -> Optional[PredictionResult]:
         """Recupera predição do cache se ainda válida"""

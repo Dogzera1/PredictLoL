@@ -188,20 +188,35 @@ class TipsSystemDebugger:
             traceback.print_exc()
 
     async def _get_odds_for_match(self, match) -> Dict:
-        """Busca odds para uma partida (apenas dados reais)"""
+        """Busca odds para uma partida usando o sistema completo"""
         try:
-            # Busca odds reais do PandaScore
+            # 1. Busca odds reais do PandaScore por ID
+            odds = await self.pandascore_client.get_match_odds(match.match_id)
+            if odds:
+                print(f"   ✅ Odds reais encontradas por ID no PandaScore")
+                return odds
+                
+            # 2. Busca odds reais por nomes dos times
             odds = await self.pandascore_client.find_match_odds_by_teams(
                 match.team1_name, 
                 match.team2_name
             )
-            
             if odds:
-                print(f"   ✅ Odds reais encontradas no PandaScore")
+                print(f"   ✅ Odds reais encontradas por nomes no PandaScore")
                 return odds
             
-            # Sem fallback - apenas dados reais
-            print(f"   ❌ Nenhuma odd real encontrada para esta partida")
+            # 3. Usa sistema de odds estimadas do TipsSystem
+            print(f"   📊 Gerando odds estimadas...")
+            estimated_odds = self.tips_system._generate_estimated_odds(match)
+            
+            if estimated_odds:
+                print(f"   ✅ Odds estimadas geradas com sucesso")
+                # Mostra as odds geradas
+                for outcome in estimated_odds.get("outcomes", []):
+                    print(f"      {outcome.get('name', 'Team')}: {outcome.get('odd', 0):.2f}")
+                return estimated_odds
+            
+            print(f"   ❌ Falha ao gerar odds estimadas")
             return None
             
         except Exception as e:
