@@ -1,18 +1,5 @@
-[phases.setup]
-nixPkgs = ["python311", "pip"]
-
-[phases.install]
-cmds = [
-    "pip install --upgrade pip",
-    "pip install -r requirements.txt"
-]
-
-[phases.build]
-cmds = ["echo 'Build completed'"]
+[providers.python]
+version = "3.11"
 
 [start]
-cmd = "python main.py"
-
-[variables]
-PYTHONPATH = "/app"
-PYTHONUNBUFFERED = "1" 
+cmd = "python main.py" 

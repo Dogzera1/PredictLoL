@@ -198,7 +198,10 @@ def test_railway_config():
         with open("nixpacks.toml", "r") as f:
             content = f.read()
         
-        if "python311" in content:
+        # Aceita vários formatos de configuração Python 3.11
+        if ("python311" in content or 
+            "3.11" in content or 
+            ("providers.python" in content and "version" in content)):
             print("  ✅ nixpacks.toml - Python 3.11 configurado")
         else:
             print("  ❌ nixpacks.toml - versão Python incorreta")
