@@ -1794,7 +1794,7 @@ Padrão recomendado ativo"""
 • Sistema: ✅ Estável"""
         
         await query.edit_message_text(
-            stats_text,
+            self._escape_markdown_v2(stats_text),
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
         )
