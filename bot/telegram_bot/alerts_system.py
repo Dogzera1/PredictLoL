@@ -234,155 +234,100 @@ class TelegramAlertsSystem:
 
     async def send_professional_tip(self, tip: ProfessionalTip) -> bool:
         """
-        Envia tip profissional melhorada com experiência premium
+        Envia tip profissional para usuários e grupos cadastrados
         
         Args:
-            tip: Tip profissional com informações aprimoradas
+            tip: Tip profissional com informações completas
             
         Returns:
-            True se enviado com sucesso
+            True se enviado com sucesso para pelo menos um destinatário
         """
         try:
-            # Determina emoji de risco
-            risk_emoji = RISK_EMOJIS.get(tip.risk_level, "📊")
+            # Verifica cache para evitar duplicatas
+            tip_cache_key = f"{tip.team_a}_{tip.team_b}_{tip.odds}_{int(tip.timestamp)}"
+            current_time = time.time()
             
-            # Constrói mensagem com novo formato premium
-            message_parts = []
+            if tip_cache_key in self.recent_tips_cache:
+                if current_time - self.recent_tips_cache[tip_cache_key] < self.cache_duration:
+                    logger.debug(f"Tip duplicada ignorada (cache): {tip.team_a} vs {tip.team_b}")
+                    return False
             
-            # 1. Header
-            message_parts.append(TIP_TEMPLATE["header"])
-            message_parts.append("")
+            # Adiciona ao cache
+            self.recent_tips_cache[tip_cache_key] = current_time
             
-            # 2. Informações da partida
-            match_info = TIP_TEMPLATE["match_info"].format(
-                team_a=self._escape_markdown_v2(tip.team_a),
-                team_b=self._escape_markdown_v2(tip.team_b),
-                league=self._escape_markdown_v2(tip.league),
-                map_number=f"Mapa {tip.map_number}",
-                game_time=self._escape_markdown_v2(tip.game_time_at_tip),
-                match_status=tip.match_status
-            )
-            message_parts.append(match_info)
-            message_parts.append("")
+            # Formata mensagem
+            message = self._format_tip_message(tip)
             
-            # 3. Tip principal
-            tip_main = TIP_TEMPLATE["tip_main"].format(
-                tip_on_team=self._escape_markdown_v2(tip.tip_on_team),
-                odds=tip.odds,
-                min_odds=tip.min_odds
-            )
-            message_parts.append(tip_main)
-            message_parts.append("")
+            # Obter usuários e grupos elegíveis
+            eligible_users = self._get_eligible_users_for_tip(tip)
+            eligible_groups = self._get_eligible_groups_for_tip(tip)
             
-            # 4. Explicação didática
-            if tip.explanation_text:
-                explanation = TIP_TEMPLATE["tip_explanation"].format(
-                    explanation_text=self._escape_markdown_v2(tip.explanation_text)
-                )
-                message_parts.append(explanation)
-                message_parts.append("")
+            logger.info(f"📤 Enviando tip: {tip.team_a} vs {tip.team_b}")
+            logger.info(f"🎯 Destinatários: {len(eligible_users)} usuários + {len(eligible_groups)} grupos")
             
-            # 5. Gestão de risco
-            risk_management = TIP_TEMPLATE["risk_management"].format(
-                risk_emoji=risk_emoji,
-                units=tip.units,
-                risk_level=self._escape_markdown_v2(tip.risk_level),
-                unit_value=f"{tip.unit_value:.0f}",
-                bet_amount=f"{tip.bet_amount:.0f}"
-            )
-            message_parts.append(risk_management)
-            message_parts.append("")
+            # Contadores de sucesso
+            users_sent = 0
+            groups_sent = 0
             
-            # 6. Análise técnica
-            technical_analysis = TIP_TEMPLATE["technical_analysis"].format(
-                confidence_percentage=f"{tip.confidence_percentage:.0f}",
-                ev_percentage=f"{tip.ev_percentage:.1f}",
-                data_quality_score=f"{tip.data_quality_score*100:.0f}"
-            )
-            message_parts.append(technical_analysis)
-            message_parts.append("")
+            # Envia para usuários individuais
+            for user_id in eligible_users:
+                if self._can_send_to_user(user_id):
+                    try:
+                        success = await self._send_message_to_user(
+                            user_id, 
+                            message, 
+                            NotificationType.TIP_ALERT
+                        )
+                        if success:
+                            users_sent += 1
+                        
+                        # Rate limiting
+                        await asyncio.sleep(0.05)
+                        
+                    except Exception as e:
+                        logger.debug(f"Erro ao enviar para usuário {user_id}: {e}")
+                        continue
             
-            # 7. Situação atual do jogo
-            if tip.game_situation_text:
-                game_situation = TIP_TEMPLATE["game_situation"].format(
-                    game_situation_text=self._escape_markdown_v2(tip.game_situation_text)
-                )
-                message_parts.append(game_situation)
-                message_parts.append("")
-            
-            # 8. Próximos objetivos
-            if tip.objectives_text:
-                next_objectives = TIP_TEMPLATE["next_objectives"].format(
-                    objectives_text=self._escape_markdown_v2(tip.objectives_text)
-                )
-                message_parts.append(next_objectives)
-                message_parts.append("")
-            
-            # 9. Timing da aposta
-            if tip.timing_advice:
-                bet_timing = TIP_TEMPLATE["bet_timing"].format(
-                    timing_advice=self._escape_markdown_v2(tip.timing_advice)
-                )
-                message_parts.append(bet_timing)
-                message_parts.append("")
-            
-            # 10. Histórico dos times
-            if tip.history_text:
-                teams_history = TIP_TEMPLATE["teams_history"].format(
-                    history_text=self._escape_markdown_v2(tip.history_text)
-                )
-                message_parts.append(teams_history)
-                message_parts.append("")
-            
-            # 11. Alertas importantes
-            if tip.alerts_text:
-                alerts = TIP_TEMPLATE["alerts"].format(
-                    alerts_text=self._escape_markdown_v2(tip.alerts_text)
-                )
-                message_parts.append(alerts)
-                message_parts.append("")
-            
-            # 12. Rodapé
-            footer = TIP_TEMPLATE["footer"].format(
-                prediction_source=self._escape_markdown_v2(tip.prediction_source),
-                generated_time=tip.generated_time,
-                tip_id=tip.tip_id
-            )
-            message_parts.append(footer)
-            
-            # Junta todas as partes
-            full_message = "\n".join(message_parts)
-            
-            logger.info(f"Enviando tip premium para {len(self.active_users)} usuários")
-            
-            # Envia para todos os usuários ativos
-            success_count = 0
-            for user_id in self.active_users:
+            # Envia para grupos
+            for group_id in eligible_groups:
                 try:
-                    await self.application.bot.send_message(
-                        chat_id=user_id,
-                        text=full_message,
-                        parse_mode="MarkdownV2",
-                        disable_web_page_preview=True
+                    success = await self._send_message_to_group(
+                        group_id, 
+                        message, 
+                        NotificationType.TIP_ALERT
                     )
-                    success_count += 1
+                    if success:
+                        groups_sent += 1
+                        # Atualiza contador do grupo
+                        if group_id in self.groups:
+                            self.groups[group_id].tips_received += 1
                     
                     # Rate limiting
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.05)
                     
                 except Exception as e:
-                    logger.error(f"Erro ao enviar tip para usuário {user_id}: {e}")
+                    logger.debug(f"Erro ao enviar para grupo {group_id}: {e}")
                     continue
             
-            logger.info(f"Tip premium enviada com sucesso para {success_count}/{len(self.active_users)} usuários")
-            
-            # Salva tip no histórico
-            self._save_tip_to_history(tip)
-            
-            return success_count > 0
+            # Atualiza estatísticas
+            total_sent = users_sent + groups_sent
+            if total_sent > 0:
+                self.stats.tips_sent += 1
+                self.stats.total_alerts_sent += total_sent
+                self.users_notified_count = users_sent
+                self.groups_notified_count = groups_sent
+                
+                logger.info(f"✅ Tip enviada com sucesso!")
+                logger.info(f"📊 Entregues: {users_sent} usuários + {groups_sent} grupos")
+                
+                return True
+            else:
+                logger.warning(f"⚠️ Nenhum destinatário recebeu a tip")
+                return False
             
         except Exception as e:
-            logger.error(f"Erro ao enviar tip profissional: {e}")
+            logger.error(f"❌ Erro ao enviar tip profissional: {e}")
+            self.stats.failed_deliveries += 1
             return False
 
     async def send_match_update(self, analysis: GameAnalysis, match_id: str) -> None:
@@ -445,15 +390,8 @@ class TelegramAlertsSystem:
             logger.error(f"Erro ao enviar alerta do sistema: {e}")
 
     def _format_tip_message(self, tip: ProfessionalTip) -> str:
-        """Formata tip para Telegram com MarkdownV2"""
+        """Formata tip para Telegram (texto simples)"""
         try:
-            # Escapa caracteres especiais do MarkdownV2
-            def escape_md(text: str) -> str:
-                chars_to_escape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-                for char in chars_to_escape:
-                    text = text.replace(char, f'\\{char}')
-                return text
-            
             # Determina emoji do risco
             risk_emojis = {
                 "Risco Muito Alto": "🔥🔥🔥",
@@ -469,29 +407,30 @@ class TelegramAlertsSystem:
             # Formata EV com cor
             ev_icon = "📈" if tip.ev_percentage > 15 else "📊" if tip.ev_percentage > 5 else "📉"
             
-            message = f"""🚀 **TIP PROFISSIONAL LoL** 🚀
+            message = f"""🚀 TIP PROFISSIONAL LoL 🚀
 
-🎮 **{escape_md(tip.team_a)} vs {escape_md(tip.team_b)}**
-🏆 **Liga:** {escape_md(tip.league)}
-⚡ **Tip:** {escape_md(tip.tip_on_team)}
-💰 **Odds:** {tip.odds}
-{risk_emoji} **Unidades:** {tip.units} \\({escape_md(tip.risk_level)}\\)
-⏰ **Tempo:** {escape_md(tip.game_time_at_tip)}
+🎮 {tip.team_a} vs {tip.team_b}
+🏆 Liga: {tip.league}
+⚡ Tip: {tip.tip_on_team}
+💰 Odds: {tip.odds}
+{risk_emoji} Unidades: {tip.units} ({tip.risk_level})
+⏰ Tempo: {tip.game_time_at_tip}
 
-📊 **Análise:**
-{ev_icon} **EV:** \\+{tip.ev_percentage:.1f}%
-🎯 **Confiança:** {tip.confidence_percentage:.0f}%
-🤖 **Fonte:** {escape_md(tip.prediction_source)}
+📊 Análise:
+{ev_icon} EV: +{tip.ev_percentage:.1f}%
+🎯 Confiança: {tip.confidence_percentage:.0f}%
+🤖 Fonte: {tip.prediction_source}
 
-⭐ **Qualidade:** {tip.data_quality_score:.0%}
+⭐ Qualidade: {int(tip.data_quality_score * 100)}%
 
-🔥 **Bot LoL V3 Ultra Avançado**"""
+🔥 Bot LoL V3 Ultra Avançado"""
 
             return message
             
         except Exception as e:
             logger.error(f"Erro ao formatar tip: {e}")
-            return f"🚀 **TIP PROFISSIONAL**\n\n{tip.team_a} vs {tip.team_b}\nTip: {tip.tip_on_team} @ {tip.odds}"
+            # Fallback simples
+            return f"🚀 TIP PROFISSIONAL\n\n{tip.team_a} vs {tip.team_b}\nTip: {tip.tip_on_team} @ {tip.odds}\nEV: +{tip.ev_percentage:.1f}%"
 
     def _format_match_update(self, analysis: GameAnalysis, match_id: str) -> str:
         """Formata atualização de partida"""
@@ -614,7 +553,7 @@ class TelegramAlertsSystem:
             await self.bot.send_message(
                 chat_id=user_id,
                 text=message,
-                parse_mode=ParseMode.MARKDOWN_V2,
+                # parse_mode=ParseMode.MARKDOWN_V2,  # Removido temporariamente
                 disable_web_page_preview=True
             )
             
@@ -1144,11 +1083,11 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             # Filtra por tipo de subscrição
             if group.subscription_type == SubscriptionType.ALL_TIPS:
                 eligible_groups.append(group_id)
-            elif group.subscription_type == SubscriptionType.HIGH_VALUE and tip.expected_value > 0.10:
+            elif group.subscription_type == SubscriptionType.HIGH_VALUE and tip.ev_percentage > 10.0:
                 eligible_groups.append(group_id)
-            elif group.subscription_type == SubscriptionType.HIGH_CONFIDENCE and tip.confidence > 0.80:
+            elif group.subscription_type == SubscriptionType.HIGH_CONFIDENCE and tip.confidence_percentage > 80.0:
                 eligible_groups.append(group_id)
-            elif group.subscription_type == SubscriptionType.PREMIUM and tip.expected_value > 0.15 and tip.confidence > 0.85:
+            elif group.subscription_type == SubscriptionType.PREMIUM and tip.ev_percentage > 15.0 and tip.confidence_percentage > 85.0:
                 eligible_groups.append(group_id)
             elif group.subscription_type == SubscriptionType.CUSTOM and self._meets_custom_filters(tip, group.custom_filters):
                 eligible_groups.append(group_id)
@@ -1164,7 +1103,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             await self.bot.send_message(
                 chat_id=group_id,
                 text=message,
-                parse_mode=ParseMode.MARKDOWN_V2,
+                # parse_mode=ParseMode.MARKDOWN_V2,  # Removido temporariamente
                 disable_web_page_preview=True
             )
             
