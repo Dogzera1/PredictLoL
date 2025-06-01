@@ -8,6 +8,7 @@ from enum import Enum
 from .game_analyzer import LoLGameAnalyzer, GameAnalysis, GamePhase
 from .units_system import ProfessionalUnitsSystem, TipRecommendation
 from ..analyzers.composition_analyzer import CompositionAnalyzer
+from ..analyzers.patch_analyzer import PatchAnalyzer
 from ..data_models.match_data import MatchData
 from ..data_models.tip_data import ProfessionalTip
 from ..utils.constants import (
@@ -109,6 +110,7 @@ class DynamicPredictionSystem:
         self.game_analyzer = game_analyzer
         self.units_system = units_system
         self.composition_analyzer = CompositionAnalyzer()
+        self.patch_analyzer = PatchAnalyzer()
         
         # Cache de predições
         self.predictions_cache: Dict[str, PredictionResult] = {}
@@ -121,17 +123,18 @@ class DynamicPredictionSystem:
             "hybrid_predictions": 0,
             "tips_generated": 0,
             "tips_rejected": 0,
-            "composition_analyses": 0
+            "composition_analyses": 0,
+            "patch_analyses": 0
         }
         
-        # Configurações do modelo ML (com composições integradas)
+        # Configurações do modelo ML (com composições e patches integrados)
         self.ml_config = self._initialize_ml_config()
         
-        # Pesos aprimorados do modelo híbrido
+        # Pesos finais do modelo híbrido (Fase 2 completa)
         self.feature_weights = {
             "real_time_data": 0.40,        # Dados em tempo real (40%)
-            "composition_analysis": 0.35,   # Análise de composições (35%) - NOVO
-            "historical_performance": 0.15, # Performance histórica (15%)
+            "composition_analysis": 0.35,   # Análise de composições (35%)
+            "patch_meta_analysis": 0.15,    # Análise de patch/meta (15%) - NOVO
             "contextual_factors": 0.10      # Fatores contextuais (10%)
         }
         
@@ -171,15 +174,18 @@ class DynamicPredictionSystem:
             # **NOVO: Análise de composições**
             composition_analysis = await self._analyze_team_compositions(match_data)
             
+            # **NOVO: Análise de patch/meta**
+            patch_analysis = await self._analyze_patch_impact(match_data)
+            
             # Executa predições baseadas no método escolhido
             ml_prediction = None
             algorithm_prediction = None
             
             if method in [PredictionMethod.MACHINE_LEARNING, PredictionMethod.HYBRID]:
-                ml_prediction = await self._predict_with_ml(game_analysis, match_data, composition_analysis)
+                ml_prediction = await self._predict_with_ml(game_analysis, match_data, composition_analysis, patch_analysis)
             
             if method in [PredictionMethod.ALGORITHM_BASED, PredictionMethod.HYBRID]:
-                algorithm_prediction = await self._predict_with_algorithms(game_analysis, match_data, composition_analysis)
+                algorithm_prediction = await self._predict_with_algorithms(game_analysis, match_data, composition_analysis, patch_analysis)
             
             # Combina predições se usando método híbrido
             final_prediction = self._combine_predictions(
@@ -630,7 +636,7 @@ class DynamicPredictionSystem:
         # Por agora, um placeholder - futuramente pode incluir dados reais de histórico
         return f"📊 Analisando histórico recente de {team1} vs {team2}\n• Dados de confrontos diretos em análise\n• Performance em partidas similares calculada"
 
-    async def _predict_with_ml(self, game_analysis: GameAnalysis, match_data: MatchData, composition_analysis: Dict) -> Dict:
+    async def _predict_with_ml(self, game_analysis: GameAnalysis, match_data: MatchData, composition_analysis: Dict, patch_analysis: Dict) -> Dict:
         """Predição usando Machine Learning (simulado)"""
         try:
             # Em uma implementação real, aqui teria um modelo ML treinado
@@ -648,7 +654,8 @@ class DynamicPredictionSystem:
                 "game_time_normalized": min(game_analysis.game_time_seconds / (45 * 60), 1.0),
                 "crucial_events": game_analysis.crucial_events_count,
                 "has_momentum": 1.0 if game_analysis.momentum_team else 0.0,
-                "composition_analysis": composition_analysis["composition_score"]
+                "composition_analysis": composition_analysis["composition_score"],
+                "patch_meta_analysis": patch_analysis["patch_meta_score"]
             }
             
             # Simula predição ML com base nas features
@@ -672,7 +679,7 @@ class DynamicPredictionSystem:
                 "error": str(e)
             }
 
-    async def _predict_with_algorithms(self, game_analysis: GameAnalysis, match_data: MatchData, composition_analysis: Dict) -> Dict:
+    async def _predict_with_algorithms(self, game_analysis: GameAnalysis, match_data: MatchData, composition_analysis: Dict, patch_analysis: Dict) -> Dict:
         """Predição usando algoritmos heurísticos"""
         try:
             # Algoritmo baseado nas vantagens calculadas pelo game analyzer
@@ -680,6 +687,9 @@ class DynamicPredictionSystem:
             
             # **NOVO: Incorpora vantagem de composição**
             composition_factor = composition_analysis["composition_score"] / 100  # Normaliza para -1 a +1
+            
+            # **NOVO: Incorpora vantagem de patch/meta**
+            patch_factor = patch_analysis["patch_meta_score"] / 100  # Normaliza para -1 a +1
             
             # Modificadores por fase do jogo
             phase_modifiers = {
@@ -700,7 +710,8 @@ class DynamicPredictionSystem:
             # **NOVO: Combina vantagens usando os pesos do sistema**
             combined_advantage = (
                 overall_advantage * self.feature_weights["real_time_data"] +
-                composition_factor * self.feature_weights["composition_analysis"]
+                composition_factor * self.feature_weights["composition_analysis"] +
+                patch_factor * self.feature_weights["patch_meta_analysis"]
             )
             
             # Aplica modificadores
@@ -720,10 +731,11 @@ class DynamicPredictionSystem:
                 "confidence": game_analysis.confidence_score,
                 "overall_advantage": overall_advantage,
                 "composition_advantage": composition_factor,
+                "patch_meta_advantage": patch_factor,
                 "combined_advantage": combined_advantage,
                 "phase_modifier": phase_modifier,
                 "momentum_modifier": momentum_modifier,
-                "algorithm_version": "heuristic_v2.1_with_compositions"
+                "algorithm_version": "heuristic_v2.1_with_compositions_and_patch_meta"
             }
             
         except Exception as e:
@@ -805,7 +817,8 @@ class DynamicPredictionSystem:
             "game_phase": 0.05,
             "crucial_events": 0.10,
             "has_momentum": 0.08,
-            "composition_analysis": 0.05
+            "composition_analysis": 0.05,
+            "patch_meta_analysis": 0.03
         }
         
         # Normaliza features
@@ -820,6 +833,7 @@ class DynamicPredictionSystem:
         normalized_features["crucial_events"] = min(1, features["crucial_events"] / 5)
         normalized_features["has_momentum"] = features["has_momentum"]
         normalized_features["composition_analysis"] = max(-1, min(1, features["composition_analysis"] / 100))
+        normalized_features["patch_meta_analysis"] = max(-1, min(1, features["patch_meta_analysis"] / 100))
         
         # Calcula score
         score = sum(weights.get(k, 0) * v for k, v in normalized_features.items())
@@ -903,6 +917,13 @@ class DynamicPredictionSystem:
                 if abs(comp_score) > 10:  # Diferença significativa
                     advantage_team = prediction.predicted_winner if comp_score > 0 else "time adversário"
                     reasoning_parts.append(f"⚔️ **Vantagem de Composição:** {advantage_team} (+{abs(comp_score):.0f} pontos)")
+            
+            # **NOVO: Análise de patch/meta**
+            if "patch_meta_analysis" in ml_pred.get("features", {}):
+                patch_score = ml_pred["features"]["patch_meta_analysis"]
+                if abs(patch_score) > 5:  # Diferença significativa
+                    meta_team = prediction.predicted_winner if patch_score > 0 else "time adversário"
+                    reasoning_parts.append(f"📋 **Vantagem de Patch/Meta:** {meta_team} (+{abs(patch_score):.0f} pontos)")
         
         # Informações do algoritmo se disponível
         if hasattr(prediction, 'algorithm_prediction') and prediction.algorithm_prediction:
@@ -911,6 +932,12 @@ class DynamicPredictionSystem:
                 comp_factor = algo_pred["composition_advantage"]
                 if abs(comp_factor) > 0.1:  # Diferença significativa
                     reasoning_parts.append(f"🎮 **Draft Analysis:** Vantagem de {comp_factor:+.1f} na composição")
+            
+            # **NOVO: Análise de patch no algoritmo**
+            if "patch_meta_advantage" in algo_pred:
+                patch_factor = algo_pred["patch_meta_advantage"]
+                if abs(patch_factor) > 0.1:  # Diferença significativa
+                    reasoning_parts.append(f"🔄 **Meta Analysis:** Impacto de patch {patch_factor:+.1f}")
         
         # Fatores técnicos
         reasoning_parts.append(f"⚙️ **Método:** {prediction.method_used.value.upper()}")
@@ -1021,7 +1048,7 @@ class DynamicPredictionSystem:
                 "gold_advantage", "tower_advantage", "dragon_advantage",
                 "baron_advantage", "kill_advantage", "overall_advantage",
                 "game_phase", "crucial_events", "has_momentum",
-                "composition_analysis"
+                "composition_analysis", "patch_meta_analysis"
             ],
             "prediction_threshold": 0.6,
             "confidence_threshold": 0.7
@@ -1050,6 +1077,12 @@ class DynamicPredictionSystem:
                 "total_analyses": self.prediction_stats["composition_analyses"],
                 "usage_rate": (
                     self.prediction_stats["composition_analyses"] / max(total_predictions, 1)
+                ) * 100 if total_predictions > 0 else 0
+            },
+            "patch_analysis": {
+                "total_analyses": self.prediction_stats["patch_analyses"],
+                "usage_rate": (
+                    self.prediction_stats["patch_analyses"] / max(total_predictions, 1)
                 ) * 100 if total_predictions > 0 else 0
             },
             "feature_weights": self.feature_weights,
@@ -1229,4 +1262,177 @@ class DynamicPredictionSystem:
     def _guess_position(self, pick_order: int) -> str:
         """Estima posição baseada na ordem de pick (convenção padrão)"""
         positions = ["top", "jungle", "mid", "adc", "support"]
-        return positions[pick_order] if pick_order < len(positions) else "unknown" 
+        return positions[pick_order] if pick_order < len(positions) else "unknown"
+
+    async def _analyze_patch_impact(self, match_data: MatchData) -> Dict:
+        """
+        Analisa impacto do patch atual nas composições dos times
+        
+        Args:
+            match_data: Dados da partida com informações dos times
+            
+        Returns:
+            Dict com análise de impacto do patch e vantagem relativa
+        """
+        try:
+            # Incrementa estatísticas
+            self.prediction_stats["patch_analyses"] += 1
+            
+            # Obtém patch atual
+            patch_version = getattr(match_data, 'patch_version', self.patch_analyzer.current_patch)
+            
+            if not patch_version:
+                logger.warning("Versão do patch não disponível, usando análise básica")
+                return {
+                    "patch_meta_score": 0.0,
+                    "team1_patch_impact": 0.0,
+                    "team2_patch_impact": 0.0,
+                    "meta_shift": None,
+                    "confidence": 0.3
+                }
+            
+            # Extrai composições dos times
+            team1_composition = self._extract_team_composition(match_data, "team1")
+            team2_composition = self._extract_team_composition(match_data, "team2")
+            
+            if not team1_composition or not team2_composition:
+                logger.warning("Dados de composição insuficientes para análise de patch")
+                return {
+                    "patch_meta_score": 0.0,
+                    "team1_patch_impact": 0.0,
+                    "team2_patch_impact": 0.0,
+                    "meta_shift": None,
+                    "confidence": 0.2
+                }
+            
+            # Calcula impacto do patch em cada campeão
+            team1_patch_impact = 0.0
+            team1_champions_analyzed = 0
+            
+            for pick in team1_composition:
+                champion = pick.get("champion", "").lower()
+                if champion:
+                    strength_adjustment = self.patch_analyzer.get_champion_strength_adjustment(champion, patch_version)
+                    team1_patch_impact += strength_adjustment
+                    team1_champions_analyzed += 1
+            
+            team2_patch_impact = 0.0
+            team2_champions_analyzed = 0
+            
+            for pick in team2_composition:
+                champion = pick.get("champion", "").lower()
+                if champion:
+                    strength_adjustment = self.patch_analyzer.get_champion_strength_adjustment(champion, patch_version)
+                    team2_patch_impact += strength_adjustment
+                    team2_champions_analyzed += 1
+            
+            # Normaliza por número de campeões analisados
+            if team1_champions_analyzed > 0:
+                team1_patch_impact /= team1_champions_analyzed
+            if team2_champions_analyzed > 0:
+                team2_patch_impact /= team2_champions_analyzed
+            
+            # Calcula vantagem relativa (Team1 vs Team2)
+            patch_advantage = team1_patch_impact - team2_patch_impact
+            
+            # Normaliza para -100 a +100 (compatível com outras métricas)
+            normalized_score = patch_advantage * 10  # Ajuste de escala
+            
+            # Analisa meta shift geral
+            meta_shift = self._analyze_meta_shift(team1_composition, team2_composition, patch_version)
+            
+            # Calcula confiança baseada no número de campeões com dados de patch
+            total_champions = team1_champions_analyzed + team2_champions_analyzed
+            confidence = min(0.9, total_champions / 10)  # Máximo de 0.9 com 10 campeões
+            
+            logger.debug(f"Análise de patch: Team1 {team1_patch_impact:.2f}, Team2 {team2_patch_impact:.2f}, Vantagem: {patch_advantage:.2f}")
+            
+            return {
+                "patch_meta_score": normalized_score,
+                "team1_patch_impact": team1_patch_impact,
+                "team2_patch_impact": team2_patch_impact,
+                "meta_shift": meta_shift,
+                "confidence": confidence,
+                "patch_version": patch_version,
+                "champions_analyzed": total_champions
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro na análise de patch: {e}")
+            return {
+                "patch_meta_score": 0.0,
+                "team1_patch_impact": 0.0,
+                "team2_patch_impact": 0.0,
+                "meta_shift": None,
+                "confidence": 0.1,
+                "error": str(e)
+            }
+
+    def _analyze_meta_shift(self, team1_composition: List[Dict], team2_composition: List[Dict], patch_version: str) -> Dict:
+        """
+        Analisa mudanças no meta que afetam as composições
+        
+        Args:
+            team1_composition: Composição do time 1
+            team2_composition: Composição do time 2
+            patch_version: Versão do patch
+            
+        Returns:
+            Dict com análise de meta shift
+        """
+        try:
+            # Mapeamento de campeões para classes
+            champion_classes = {
+                "akali": "assassins", "zed": "assassins", "leblanc": "assassins",
+                "azir": "mages", "viktor": "mages", "orianna": "mages",
+                "jinx": "marksmen", "caitlyn": "marksmen", "vayne": "marksmen", "aphelios": "marksmen",
+                "malphite": "tanks", "leona": "tanks", "sejuani": "tanks",
+                "irelia": "fighters", "jax": "fighters", "fiora": "fighters", "gnar": "fighters", "graves": "fighters",
+                "thresh": "supports", "lulu": "supports"
+            }
+            
+            # Conta classes em cada time
+            team1_classes = {}
+            team2_classes = {}
+            
+            for pick in team1_composition:
+                champion = pick.get("champion", "").lower()
+                champion_class = champion_classes.get(champion, "unknown")
+                team1_classes[champion_class] = team1_classes.get(champion_class, 0) + 1
+            
+            for pick in team2_composition:
+                champion = pick.get("champion", "").lower()
+                champion_class = champion_classes.get(champion, "unknown")
+                team2_classes[champion_class] = team2_classes.get(champion_class, 0) + 1
+            
+            # Analisa força das classes no meta atual
+            meta_advantages = {}
+            
+            for class_name in ["assassins", "mages", "marksmen", "tanks", "fighters", "supports"]:
+                team1_count = team1_classes.get(class_name, 0)
+                team2_count = team2_classes.get(class_name, 0)
+                meta_strength = self.patch_analyzer.get_meta_strength(class_name, patch_version)
+                
+                # Vantagem = (diferença de campeões) * força no meta
+                class_advantage = (team1_count - team2_count) * meta_strength
+                meta_advantages[class_name] = class_advantage
+            
+            # Identifica mudança de meta mais significativa
+            strongest_shift = max(meta_advantages.items(), key=lambda x: abs(x[1]))
+            
+            return {
+                "class_advantages": meta_advantages,
+                "strongest_shift": {
+                    "class": strongest_shift[0],
+                    "advantage": strongest_shift[1]
+                },
+                "total_meta_impact": sum(meta_advantages.values())
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro ao analisar meta shift: {e}")
+            return {
+                "class_advantages": {},
+                "strongest_shift": {"class": "unknown", "advantage": 0.0},
+                "total_meta_impact": 0.0
+            } 
