@@ -1,0 +1,18 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python main.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[environments.production.variables]
+PYTHONPATH = "/app"
+PYTHONUNBUFFERED = "1"
+TZ = "America/Sao_Paulo"
+
+[environments.production.deploy]
+numReplicas = 1
+sleepApplication = false 

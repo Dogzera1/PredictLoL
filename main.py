@@ -17,6 +17,7 @@ Características:
 - Interface Telegram completa
 - Sistema resiliente a falhas
 - Performance enterprise-grade
+- Health check para Railway
 """
 
 import os
@@ -38,6 +39,15 @@ try:
     load_dotenv()
 except ImportError:
     logger.warning("⚠️ python-dotenv não disponível, usando apenas environment variables")
+
+# Health check para Railway
+try:
+    from health_check import start_health_server, set_bot_running, update_heartbeat
+    HEALTH_CHECK_AVAILABLE = True
+    logger.info("🏥 Health check disponível para Railway")
+except ImportError:
+    HEALTH_CHECK_AVAILABLE = False
+    logger.warning("⚠️ Health check não disponível")
 
 # Imports do sistema
 try:
@@ -195,11 +205,22 @@ class BotApplication:
         logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado...")
         
         try:
+            # RAILWAY: Inicia health check server
+            if HEALTH_CHECK_AVAILABLE:
+                logger.info("🏥 Iniciando health check server para Railway...")
+                start_health_server()
+                set_bot_running(False)  # Ainda não está rodando
+            
             # NOVO: Limpa instâncias anteriores automaticamente
             await self._cleanup_previous_instances()
             
             # Inicializa componentes
             await self.initialize_components()
+            
+            # RAILWAY: Marca bot como rodando
+            if HEALTH_CHECK_AVAILABLE:
+                set_bot_running(True)
+                logger.info("✅ Health check ativo - Railway pode monitorar")
             
             # Exibe resumo do sistema
             self._display_system_summary()
@@ -210,6 +231,16 @@ class BotApplication:
             logger.info("📱 Interface Telegram disponível")
             logger.info("⚡ ScheduleManager executando")
             
+            # Loop principal com heartbeat para Railway
+            if HEALTH_CHECK_AVAILABLE:
+                # Cria task para heartbeat
+                async def heartbeat_loop():
+                    while True:
+                        update_heartbeat()
+                        await asyncio.sleep(30)  # Heartbeat a cada 30s
+                
+                heartbeat_task = asyncio.create_task(heartbeat_loop())
+            
             # A interface principal gerencia tudo automaticamente
             await self.bot_interface.start_bot()
             
@@ -217,8 +248,14 @@ class BotApplication:
             logger.info("🛑 Shutdown solicitado pelo usuário")
         except Exception as e:
             logger.error(f"❌ Erro crítico: {e}")
+            # RAILWAY: Marca bot como não rodando em caso de erro
+            if HEALTH_CHECK_AVAILABLE:
+                set_bot_running(False)
             raise
         finally:
+            # RAILWAY: Marca bot como não rodando no shutdown
+            if HEALTH_CHECK_AVAILABLE:
+                set_bot_running(False)
             await self.shutdown()
 
     async def _cleanup_previous_instances(self) -> None:
