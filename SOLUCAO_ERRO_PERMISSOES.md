@@ -4,6 +4,8 @@
 
 **ATUALIZAÇÃO**: Os comandos de grupo agora podem ser usados por **qualquer membro do grupo**, não apenas administradores.
 
+**CORREÇÃO ADICIONAL**: Resolvido problema de "Comando não reconhecido: all_tips" - callbacks do sistema de alertas agora funcionam corretamente.
+
 ## 🎯 COMANDOS DISPONÍVEIS
 
 ### 👥 **Para Grupos (Qualquer Membro)**
@@ -23,7 +25,11 @@
 ### 1️⃣ **ATIVAR ALERTAS**
 1. **Adicione o bot** @BETLOLGPT_bot ao grupo
 2. **Qualquer membro** pode digitar: `/activate_group`
-3. **Escolha o tipo de alerta** no menu que aparece
+3. **Escolha o tipo de alerta** no menu que aparece:
+   - 🔔 **Todas as Tips** → Funciona ✅
+   - 💎 **Alto Valor** → Funciona ✅
+   - 🎯 **Alta Confiança** → Funciona ✅
+   - 👑 **Premium** → Funciona ✅
 4. **Pronto!** O grupo receberá tips automáticas
 
 ### 2️⃣ **VERIFICAR STATUS**
@@ -55,12 +61,26 @@
 - ❌ ~~Ser administrador~~
 - ❌ ~~Verificar permissões de usuários~~
 
+## 🛠️ PROBLEMAS CORRIGIDOS
+
+### ❌ **Problema Original**: "Erro ao verificar permissões"
+**✅ Solução**: Removida verificação de administrador
+
+### ❌ **Problema Adicional**: "Comando não reconhecido: all_tips"
+**✅ Solução**: Adicionados handlers para callbacks do sistema de alertas
+
+**Detalhes técnicos**:
+- Callbacks `all_tips`, `high_value`, `high_conf`, `premium` agora são reconhecidos
+- Bot principal agora delega corretamente para o sistema de alertas
+- Menu de subscrições funciona perfeitamente em grupos
+
 ## 🎉 VANTAGENS DA NOVA VERSÃO
 
 1. **✅ Simples** - Qualquer membro pode ativar
-2. **✅ Rápido** - Sem verificação de permissões
+2. **✅ Rápido** - Comandos funcionam imediatamente
 3. **✅ Democrático** - Todos podem usar os comandos
 4. **✅ Funcional** - Menos erros de permissões
+5. **✅ Callbacks funcionais** - Menus respondem corretamente
 
 ## 🔄 TESTE RÁPIDO
 
@@ -75,6 +95,7 @@
 - **O último a configurar** define o tipo de alerta do grupo
 - **Tips são enviadas** conforme o tipo de subscrição escolhido
 - **Histórico mantido** - número de tips recebidas é preservado
+- **Menus funcionais** - Todos os botões respondem corretamente
 
 ## 📞 COMANDOS DE TESTE
 
@@ -84,8 +105,12 @@
 /deactivate_group  → Desativa alertas (qualquer membro)
 ```
 
+**TESTE DOS MENUS**:
+- Clique em cada opção do menu (🔔 💎 🎯 👑)
+- Todas devem funcionar sem erro de "comando não reconhecido"
+
 ---
 
 **Bot**: @BETLOLGPT_bot (ID: 7584060058)
 **Status**: 🟢 Online e totalmente funcional
-**Atualização**: ✅ Verificação de admin removida - todos podem usar! 
+**Última Atualização**: ✅ Callbacks corrigidos - menus funcionam perfeitamente! 

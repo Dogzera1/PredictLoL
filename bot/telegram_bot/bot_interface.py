@@ -1205,6 +1205,12 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                     reply_markup=self._get_main_keyboard(self._is_admin(query.from_user.id))
                 )
             
+            # NOVOS HANDLERS: Callbacks do alerts_system para subscrições de grupo
+            elif data in ["all_tips", "high_value", "high_conf", "premium"]:
+                # Estes são callbacks gerados pelo alerts_system
+                # Delega para o sistema de alertas que já tem a lógica implementada
+                await self.telegram_alerts._handle_subscription_callback(update, context)
+            
             # Handlers de subscrição (CORRIGIDOS com nomes dos keyboards)
             elif data in ["sub_all_tips", "sub_high_value", "sub_high_conf", "sub_premium"]:
                 # Mapeia para os nomes esperados pelo alerts_system
