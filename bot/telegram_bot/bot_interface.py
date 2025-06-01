@@ -251,8 +251,8 @@ class LoLBotV3UltraAdvanced:
             # 5. Configura handlers de shutdown
             self._setup_signal_handlers(schedule_task)
             
-            # 6. Inicia polling com proteção anti-conflito
-            logger.info("📞 Iniciando polling com proteção anti-conflito...")
+            # 6. Inicia polling com proteção ultra avançada
+            logger.info("📞 Iniciando polling com proteção ultra avançada...")
             await self._start_polling_with_advanced_retry()
             
             self.is_running = True
@@ -270,29 +270,40 @@ class LoLBotV3UltraAdvanced:
             raise
 
     async def _start_polling_with_advanced_retry(self) -> None:
-        """Inicia polling com proteção avançada contra conflitos"""
-        max_retries = 15
-        base_wait_time = 5
+        """Inicia polling com proteção ultra avançada contra conflitos"""
+        max_retries = 25  # Aumentado para 25 tentativas
+        base_wait_time = 3
+        
+        logger.info(f"🛡️ Sistema anti-conflito ativado: {max_retries} tentativas")
         
         for attempt in range(max_retries):
             try:
                 if attempt > 0:
-                    wait_time = min(base_wait_time + (attempt * 3), 60)
-                    logger.info(f"⏳ Tentativa {attempt + 1}/{max_retries} - Aguardando {wait_time}s...")
+                    # Backoff exponencial com jitter
+                    wait_time = min(base_wait_time + (attempt * 2) + (attempt % 3), 120)
+                    logger.info(f"⏳ Tentativa {attempt + 1}/{max_retries} em {wait_time}s...")
                     await asyncio.sleep(wait_time)
                     
-                    # Força limpeza antes de tentar novamente
-                    await self._force_clear_telegram_conflicts()
+                    # Limpeza progressiva baseada no número da tentativa
+                    if attempt <= 5:
+                        await self._gentle_conflict_cleanup()
+                    elif attempt <= 12:
+                        await self._moderate_conflict_cleanup()
+                    elif attempt <= 20:
+                        await self._aggressive_conflict_cleanup()
+                    else:
+                        await self._nuclear_conflict_cleanup()  # Nova fase ultra agressiva
                 
                 # Configurações otimizadas para evitar conflitos
+                logger.debug(f"🚀 Iniciando polling (tentativa {attempt + 1})...")
                 await self.application.updater.start_polling(
-                    drop_pending_updates=True,  # Descarta updates pendentes
-                    bootstrap_retries=1,        # Menos retries bootstrap
-                    read_timeout=45,           # Timeout maior para leitura
-                    connect_timeout=30,        # Timeout conexão
-                    pool_timeout=60,           # Pool timeout maior
-                    write_timeout=30,          # Timeout escrita
-                    allowed_updates=["message", "callback_query"]  # Apenas updates necessários
+                    drop_pending_updates=True,
+                    bootstrap_retries=0,        # Sem retries bootstrap
+                    read_timeout=60,           # Timeout maior
+                    connect_timeout=45,        # Timeout conexão maior
+                    pool_timeout=90,           # Pool timeout muito maior
+                    write_timeout=45,          # Timeout escrita maior
+                    allowed_updates=["message", "callback_query"]
                 )
                 
                 logger.info("✅ Polling iniciado com sucesso!")
@@ -302,27 +313,33 @@ class LoLBotV3UltraAdvanced:
                 error_str = str(e).lower()
                 
                 if "conflict" in error_str or "terminated by other" in error_str:
-                    logger.warning(f"⚠️ Conflito detectado (tentativa {attempt + 1}/{max_retries}): {e}")
+                    logger.warning(f"⚠️ Conflito #{attempt + 1}: {e}")
                     
                     if attempt < max_retries - 1:
-                        # Limpeza progressivamente mais agressiva
-                        if attempt < 3:
-                            await self._gentle_conflict_cleanup()
-                        elif attempt < 8:
-                            await self._moderate_conflict_cleanup()
+                        # Log estratégia de limpeza
+                        if attempt <= 5:
+                            logger.info("🧹 Próxima estratégia: Limpeza suave")
+                        elif attempt <= 12:
+                            logger.info("🧹 Próxima estratégia: Limpeza moderada")
+                        elif attempt <= 20:
+                            logger.info("🧹 Próxima estratégia: Limpeza agressiva")
                         else:
-                            await self._aggressive_conflict_cleanup()
+                            logger.warning("🚨 Próxima estratégia: NUCLEAR")
                         continue
                     else:
-                        logger.error("❌ Máximo de tentativas atingido para resolver conflitos")
-                        raise RuntimeError("Não foi possível resolver conflitos do Telegram após múltiplas tentativas")
+                        logger.error("❌ FALHA CRÍTICA: Conflitos não resolvidos após 25 tentativas!")
+                        logger.error("🔍 Possível causa: Instância remota ativa (Railway, Heroku, etc.)")
+                        raise RuntimeError("Conflitos persistentes - verifique instâncias remotas")
                 
                 elif "network" in error_str or "timeout" in error_str:
-                    logger.warning(f"⚠️ Problema de rede (tentativa {attempt + 1}): {e}")
-                    continue
-                    
+                    logger.warning(f"🌐 Problema de rede #{attempt + 1}: {e}")
+                    if attempt < max_retries - 1:
+                        continue
+                    else:
+                        raise RuntimeError("Problemas de rede persistentes")
+                        
                 else:
-                    logger.error(f"❌ Erro não relacionado a conflito: {e}")
+                    logger.error(f"❌ Erro crítico não relacionado a conflito: {e}")
                     raise
 
     async def _gentle_conflict_cleanup(self) -> None:
@@ -378,6 +395,29 @@ class LoLBotV3UltraAdvanced:
             
         except Exception as e:
             logger.warning(f"⚠️ Erro na limpeza agressiva: {e}")
+
+    async def _nuclear_conflict_cleanup(self) -> None:
+        """Limpeza ultra agressiva de conflitos"""
+        logger.info("🧹 Limpeza ultra agressiva...")
+        try:
+            # Reinicia aplicação completamente
+            if self.application:
+                if self.application.updater and self.application.updater.running:
+                    await self.application.updater.stop()
+                await self.application.stop()
+                await self.application.shutdown()
+                await asyncio.sleep(10)
+                
+                # Recria aplicação
+                self.application = Application.builder().token(self.bot_token).build()
+                self._setup_all_handlers()
+                await self.application.initialize()
+                await self.application.start()
+            
+            await self._force_clear_telegram_conflicts(requests_count=50)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na limpeza ultra agressiva: {e}")
 
     async def _force_clear_telegram_conflicts(self, requests_count: int = 10) -> None:
         """Força limpeza de conflitos via API do Telegram"""
