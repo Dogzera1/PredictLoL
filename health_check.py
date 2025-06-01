@@ -64,25 +64,14 @@ def favicon():
 
 @app.route('/dashboard')
 def dashboard():
-    """Dashboard web interativo"""
+    """Dashboard web interativo com dados reais"""
     increment_request_counter()
     
     current_time = time.time()
     uptime = current_time - bot_status["start_time"]
     
-    # Dados simulados para o dashboard
-    dashboard_data = {
-        "service": "Bot LoL V3 Ultra Avançado",
-        "version": bot_status["version"],
-        "uptime_hours": round(uptime / 3600, 2),
-        "total_predictions": 45,
-        "correct_predictions": 38,
-        "win_rate": 84.4,
-        "roi": 18.7,
-        "profit": 1870.0,
-        "running": bot_status["is_running"],
-        "current_time": datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-    }
+    # Dados reais do sistema
+    dashboard_data = get_real_dashboard_data(uptime)
     
     # Template HTML do dashboard
     dashboard_html = '''
@@ -119,6 +108,10 @@ def dashboard():
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         }
         
+        .metric-card.profit.negative {
+            background: linear-gradient(135deg, #ff5f6d 0%, #ffc371 100%);
+        }
+        
         .metric-card.predictions {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
@@ -127,8 +120,16 @@ def dashboard():
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
         
+        .metric-card.win-rate.high {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
         .metric-card.roi {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .metric-card.roi.negative {
+            background: linear-gradient(135deg, #ff5f6d 0%, #ffc371 100%);
         }
         
         .dashboard-header {
@@ -155,6 +156,12 @@ def dashboard():
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             margin-bottom: 1rem;
         }
+        
+        .data-source {
+            font-size: 0.8em;
+            color: #6c757d;
+            font-style: italic;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -171,6 +178,9 @@ def dashboard():
                         </span>
                         <span class="text-light">Última atualização: {{ current_time }}</span>
                     </div>
+                    <div class="data-source mt-2">
+                        <small>📊 Dados: {{ data_source }}</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -178,31 +188,34 @@ def dashboard():
         <!-- Métricas Principais -->
         <div class="row mb-4">
             <div class="col-md-3">
-                <div class="metric-card win-rate">
+                <div class="metric-card win-rate {% if win_rate >= 70 %}high{% endif %}">
                     <div class="text-center">
                         <i class="fas fa-trophy fa-2x mb-2"></i>
                         <h3>{{ win_rate }}%</h3>
                         <p class="mb-0">Win Rate</p>
+                        <small class="data-source">{{ total_predictions }} predições</small>
                     </div>
                 </div>
             </div>
             
             <div class="col-md-3">
-                <div class="metric-card roi">
+                <div class="metric-card roi {% if roi < 0 %}negative{% endif %}">
                     <div class="text-center">
                         <i class="fas fa-chart-line fa-2x mb-2"></i>
                         <h3>{{ roi }}%</h3>
                         <p class="mb-0">ROI</p>
+                        <small class="data-source">Return on Investment</small>
                     </div>
                 </div>
             </div>
             
             <div class="col-md-3">
-                <div class="metric-card profit">
+                <div class="metric-card profit {% if profit < 0 %}negative{% endif %}">
                     <div class="text-center">
                         <i class="fas fa-dollar-sign fa-2x mb-2"></i>
-                        <h3>R$ {{ profit }}</h3>
-                        <p class="mb-0">Lucro Total</p>
+                        <h3>{{ profit_display }}</h3>
+                        <p class="mb-0">{{ profit_label }}</p>
+                        <small class="data-source">Total acumulado</small>
                     </div>
                 </div>
             </div>
@@ -213,6 +226,7 @@ def dashboard():
                         <i class="fas fa-brain fa-2x mb-2"></i>
                         <h3>{{ total_predictions }}</h3>
                         <p class="mb-0">Predições</p>
+                        <small class="data-source">{{ tips_generated }} tips geradas</small>
                     </div>
                 </div>
             </div>
@@ -243,6 +257,16 @@ def dashboard():
                                 <td><strong>Predições Corretas:</strong></td>
                                 <td>{{ correct_predictions }}/{{ total_predictions }}</td>
                             </tr>
+                            <tr>
+                                <td><strong>Componentes:</strong></td>
+                                <td><span class="{% if components_available %}status-online{% else %}status-offline{% endif %}">
+                                    {% if components_available %}✅ Carregados{% else %}⚠️ Limitados{% endif %}
+                                </span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tips Sistema:</strong></td>
+                                <td>{{ tips_status }}</td>
+                            </tr>
                         </table>
                     </div>
                 </div>
@@ -252,6 +276,91 @@ def dashboard():
                 <div class="chart-container">
                     <h5><i class="fas fa-chart-pie"></i> Performance</h5>
                     <canvas id="performanceChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Métricas Detalhadas -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-cogs"></i> Estatísticas do Sistema</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Requests:</strong></td>
+                                <td>{{ total_requests }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Errors:</strong></td>
+                                <td>{{ errors_count }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Success Rate:</strong></td>
+                                <td>{{ success_rate }}%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Análises Composições:</strong></td>
+                                <td>{{ composition_analyses }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Análises Patches:</strong></td>
+                                <td>{{ patch_analyses }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-memory"></i> Recursos do Sistema</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>CPU:</strong></td>
+                                <td>{{ cpu_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Memória:</strong></td>
+                                <td>{{ memory_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Disco:</strong></td>
+                                <td>{{ disk_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Processos:</strong></td>
+                                <td>{{ process_count }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-clock"></i> Métricas de Tempo</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <tr>
+                                <td><strong>Última Predição:</strong></td>
+                                <td>{{ last_prediction_time }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Última Tip:</strong></td>
+                                <td>{{ last_tip_time }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Requests/hora:</strong></td>
+                                <td>{{ requests_per_hour }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ambiente:</strong></td>
+                                <td>{{ environment }}</td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -321,6 +430,14 @@ def dashboard():
                 plugins: {
                     legend: {
                         position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const percentage = ((context.parsed / {{ total_predictions }}) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
                     }
                 }
             }
@@ -331,35 +448,224 @@ def dashboard():
             location.reload();
         }, 30000);
         
-        console.log('🚀 Dashboard Bot LoL V3 carregado!');
+        console.log('🚀 Dashboard Bot LoL V3 carregado com dados reais!');
     </script>
 </body>
 </html>
     '''
     
-    # Renderiza template com dados
+    # Renderiza template com dados reais
     try:
         from jinja2 import Template
         template = Template(dashboard_html)
         return template.render(**dashboard_data)
     except ImportError:
         # Fallback sem Jinja2 - substitui manualmente
-        for key, value in dashboard_data.items():
-            dashboard_html = dashboard_html.replace('{{ ' + key + ' }}', str(value))
+        return render_dashboard_fallback(dashboard_html, dashboard_data)
+
+def get_real_dashboard_data(uptime):
+    """Coleta dados reais do sistema"""
+    try:
+        # Tenta importar e acessar componentes reais
+        real_data = collect_system_metrics()
+        data_source = "Sistema em Tempo Real"
+        components_available = True
+    except Exception as e:
+        # Fallback para dados básicos se componentes não estão disponíveis
+        real_data = get_fallback_metrics()
+        data_source = "Dados Básicos (Componentes não carregados)"
+        components_available = False
+    
+    # Processa dados para exibição
+    profit = real_data.get('net_profit', 0.0)
+    roi = real_data.get('roi_percentage', 0.0)
+    
+    # Formata valores monetários
+    if profit >= 0:
+        profit_display = f"R$ {profit:.1f}"
+        profit_label = "Lucro Total"
+    else:
+        profit_display = f"R$ {abs(profit):.1f}"
+        profit_label = "Prejuízo Total"
+    
+    # Calcula métricas de sistema
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        process_count = len(psutil.pids())
+    except:
+        cpu_percent = 0
+        memory = type('obj', (object,), {'percent': 0})()
+        disk = type('obj', (object,), {'used': 0, 'total': 1})()
+        process_count = 0
+    
+    return {
+        "service": "Bot LoL V3 Ultra Avançado",
+        "version": bot_status["version"],
+        "uptime_hours": round(uptime / 3600, 2),
+        "total_predictions": real_data.get('total_predictions', 0),
+        "correct_predictions": real_data.get('correct_predictions', 0),
+        "win_rate": real_data.get('win_rate_percentage', 0.0),
+        "roi": roi,
+        "profit": profit,
+        "profit_display": profit_display,
+        "profit_label": profit_label,
+        "tips_generated": real_data.get('tips_generated', 0),
+        "running": bot_status["is_running"],
+        "components_available": components_available,
+        "current_time": datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+        "data_source": data_source,
+        "tips_status": "✅ Ativo" if real_data.get('tips_system_active', False) else "⚠️ Inativo",
+        "total_requests": bot_status["total_requests"],
+        "errors_count": bot_status["errors_count"],
+        "success_rate": round((bot_status["total_requests"] - bot_status["errors_count"]) / max(bot_status["total_requests"], 1) * 100, 2),
+        "composition_analyses": real_data.get('composition_analyses', 0),
+        "patch_analyses": real_data.get('patch_analyses', 0),
+        "cpu_percent": round(cpu_percent, 1),
+        "memory_percent": round(memory.percent, 1),
+        "disk_percent": round((disk.used / disk.total) * 100, 1),
+        "process_count": process_count,
+        "last_prediction_time": real_data.get('last_prediction_time', 'Nunca'),
+        "last_tip_time": real_data.get('last_tip_time', 'Nunca'),
+        "requests_per_hour": round(bot_status["total_requests"] / max(uptime / 3600, 1), 1),
+        "environment": bot_status["environment"]
+    }
+
+def collect_system_metrics():
+    """Coleta métricas reais do sistema quando componentes estão disponíveis"""
+    try:
+        # Importa componentes do sistema
+        from bot.core_logic.prediction_system import DynamicPredictionSystem
+        from bot.systems.tips_system import ProfessionalTipsSystem
+        from bot.monitoring.performance_monitor import PerformanceMonitor
         
-        # Condicionais manuais
-        if dashboard_data['running']:
-            dashboard_html = dashboard_html.replace('{% if running %}success{% else %}danger{% endif %}', 'success')
-            dashboard_html = dashboard_html.replace('{% if running %}Online{% else %}Offline{% endif %}', 'Online')
-            dashboard_html = dashboard_html.replace('{% if running %}status-online{% else %}status-offline{% endif %}', 'status-online')
-            dashboard_html = dashboard_html.replace('{% if running %}🟢 Online{% else %}🔴 Offline{% endif %}', '🟢 Online')
+        metrics = {}
+        
+        # Verifica se existe instância do sistema de predição
+        # (Em produção, isso seria injetado ou acessado via singleton)
+        
+        # Por enquanto, simula busca de arquivos de dados/logs
+        metrics_data = load_metrics_from_files()
+        
+        if metrics_data:
+            return metrics_data
         else:
-            dashboard_html = dashboard_html.replace('{% if running %}success{% else %}danger{% endif %}', 'danger')
-            dashboard_html = dashboard_html.replace('{% if running %}Online{% else %}Offline{% endif %}', 'Offline')
-            dashboard_html = dashboard_html.replace('{% if running %}status-online{% else %}status-offline{% endif %}', 'status-offline')
-            dashboard_html = dashboard_html.replace('{% if running %}🟢 Online{% else %}🔴 Offline{% endif %}', '🔴 Offline')
+            # Se não há dados salvos, retorna métricas iniciais
+            return {
+                'total_predictions': 0,
+                'correct_predictions': 0,
+                'win_rate_percentage': 0.0,
+                'roi_percentage': 0.0,
+                'net_profit': 0.0,
+                'tips_generated': 0,
+                'tips_system_active': True,
+                'composition_analyses': 0,
+                'patch_analyses': 0,
+                'last_prediction_time': 'Sistema iniciando...',
+                'last_tip_time': 'Sistema iniciando...'
+            }
+    
+    except ImportError as e:
+        # Componentes não estão disponíveis
+        raise Exception(f"Componentes não carregados: {e}")
+
+def load_metrics_from_files():
+    """Carrega métricas de arquivos de dados se existirem"""
+    try:
+        metrics_files = [
+            'bot/data/monitoring/performance_metrics.json',
+            'bot/data/monitoring/tips_metrics.json',
+            'bot/data/monitoring/prediction_stats.json'
+        ]
         
-        return dashboard_html
+        combined_metrics = {}
+        
+        for file_path in metrics_files:
+            if os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    combined_metrics.update(data)
+        
+        if combined_metrics:
+            # Calcula métricas derivadas
+            total_preds = combined_metrics.get('total_predictions', 0)
+            correct_preds = combined_metrics.get('correct_predictions', 0)
+            
+            if total_preds > 0:
+                combined_metrics['win_rate_percentage'] = round((correct_preds / total_preds) * 100, 1)
+            else:
+                combined_metrics['win_rate_percentage'] = 0.0
+                
+            return combined_metrics
+            
+        return None
+        
+    except Exception as e:
+        print(f"Erro ao carregar métricas de arquivos: {e}")
+        return None
+
+def get_fallback_metrics():
+    """Métricas básicas quando sistema completo não está disponível"""
+    return {
+        'total_predictions': 0,
+        'correct_predictions': 0,
+        'win_rate_percentage': 0.0,
+        'roi_percentage': 0.0,
+        'net_profit': 0.0,
+        'tips_generated': 0,
+        'tips_system_active': False,
+        'composition_analyses': 0,
+        'patch_analyses': 0,
+        'last_prediction_time': 'Sistema não carregado',
+        'last_tip_time': 'Sistema não carregado'
+    }
+
+def render_dashboard_fallback(dashboard_html, dashboard_data):
+    """Renderiza dashboard sem Jinja2"""
+    # Substitui variáveis simples
+    for key, value in dashboard_data.items():
+        dashboard_html = dashboard_html.replace('{{ ' + key + ' }}', str(value))
+    
+    # Condicionais para status
+    if dashboard_data['running']:
+        dashboard_html = dashboard_html.replace('{% if running %}success{% else %}danger{% endif %}', 'success')
+        dashboard_html = dashboard_html.replace('{% if running %}Online{% else %}Offline{% endif %}', 'Online')
+        dashboard_html = dashboard_html.replace('{% if running %}status-online{% else %}status-offline{% endif %}', 'status-online')
+        dashboard_html = dashboard_html.replace('{% if running %}🟢 Online{% else %}🔴 Offline{% endif %}', '🟢 Online')
+    else:
+        dashboard_html = dashboard_html.replace('{% if running %}success{% else %}danger{% endif %}', 'danger')
+        dashboard_html = dashboard_html.replace('{% if running %}Online{% else %}Offline{% endif %}', 'Offline')
+        dashboard_html = dashboard_html.replace('{% if running %}status-online{% else %}status-offline{% endif %}', 'status-offline')
+        dashboard_html = dashboard_html.replace('{% if running %}🟢 Online{% else %}🔴 Offline{% endif %}', '🔴 Offline')
+    
+    # Condicionais para componentes
+    if dashboard_data['components_available']:
+        dashboard_html = dashboard_html.replace('{% if components_available %}status-online{% else %}status-offline{% endif %}', 'status-online')
+        dashboard_html = dashboard_html.replace('{% if components_available %}✅ Carregados{% else %}⚠️ Limitados{% endif %}', '✅ Carregados')
+    else:
+        dashboard_html = dashboard_html.replace('{% if components_available %}status-online{% else %}status-offline{% endif %}', 'status-offline')
+        dashboard_html = dashboard_html.replace('{% if components_available %}✅ Carregados{% else %}⚠️ Limitados{% endif %}', '⚠️ Limitados')
+    
+    # Condicionais para win rate
+    if dashboard_data['win_rate'] >= 70:
+        dashboard_html = dashboard_html.replace('{% if win_rate >= 70 %}high{% endif %}', 'high')
+    else:
+        dashboard_html = dashboard_html.replace('{% if win_rate >= 70 %}high{% endif %}', '')
+    
+    # Condicionais para ROI
+    if dashboard_data['roi'] < 0:
+        dashboard_html = dashboard_html.replace('{% if roi < 0 %}negative{% endif %}', 'negative')
+    else:
+        dashboard_html = dashboard_html.replace('{% if roi < 0 %}negative{% endif %}', '')
+    
+    # Condicionais para profit
+    if dashboard_data['profit'] < 0:
+        dashboard_html = dashboard_html.replace('{% if profit < 0 %}negative{% endif %}', 'negative')
+    else:
+        dashboard_html = dashboard_html.replace('{% if profit < 0 %}negative{% endif %}', '')
+    
+    return dashboard_html
 
 @app.route('/health', methods=['GET'])
 def health_check():
