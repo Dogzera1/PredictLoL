@@ -705,9 +705,9 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 • `/mystats` - Suas estatísticas
 
 **👥 Comandos para Grupos:**
-• `/activate_group` - Ativar alertas no grupo
+• `/activate_group` - Ativar alertas no grupo (qualquer membro)
 • `/group_status` - Status do grupo
-• `/deactivate_group` - Desativar alertas
+• `/deactivate_group` - Desativar alertas (qualquer membro)
 
 **📊 Tipos de Subscrição:**
 • 🔔 Todas as Tips
@@ -746,18 +746,8 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 
     async def _handle_group_subscription(self, query, chat, user, subscription_type: SubscriptionType) -> None:
         """Manipula subscrição em grupos"""
-        # Verifica se usuário é admin do grupo
-        try:
-            chat_member = await self.bot.get_chat_member(chat.id, user.id)
-            is_admin = chat_member.status in ['administrator', 'creator']
-        except Exception:
-            is_admin = False
-        
-        if not is_admin:
-            await query.edit_message_text(
-                self._escape_markdown_v2("❌ **Apenas administradores podem configurar alertas do grupo.**"),
-            )
-            return
+        # REMOVIDO: Verificação de administrador - agora qualquer membro pode configurar
+        logger.info(f"Subscrição de grupo configurada por {user.first_name} ({user.id}) no grupo {chat.title} ({chat.id})")
         
         # Registra ou atualiza grupo
         self.groups[chat.id] = TelegramGroup(
@@ -912,49 +902,8 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             )
             return
         
-        # Verifica se o usuário é admin do grupo
-        try:
-            member = await self.bot.get_chat_member(chat.id, user.id)
-            if member.status not in ['administrator', 'creator']:
-                await update.message.reply_text(
-                    "❌ Apenas administradores podem ativar alertas no grupo!\n\n"
-                    f"👤 Seu status atual: {member.status}\n"
-                    f"ℹ️ Peça a um admin para tornar você administrador."
-                )
-                return
-        except Forbidden as e:
-            logger.error(f"Bot sem permissão para verificar membros do grupo {chat.id}: {e}")
-            await update.message.reply_text(
-                "❌ O bot não tem permissão para verificar membros do grupo!\n\n"
-                "🔧 SOLUÇÃO:\n"
-                "1. Torne o bot ADMINISTRADOR do grupo\n"
-                "2. Dê ao bot a permissão 'Ver lista de membros'\n"
-                "3. Tente novamente o comando\n\n"
-                "ℹ️ O bot precisa ser admin para verificar quem pode configurar alertas."
-            )
-            return
-        except BadRequest as e:
-            logger.error(f"Erro de requisição ao verificar admin do grupo {chat.id}: {e}")
-            await update.message.reply_text(
-                "❌ Erro ao acessar informações do grupo!\n\n"
-                "🔧 POSSÍVEIS CAUSAS:\n"
-                "• Grupo é muito restritivo\n"
-                "• Bot não tem permissões suficientes\n"
-                "• Problema temporário da API do Telegram\n\n"
-                "💡 Tente tornar o bot administrador do grupo."
-            )
-            return
-        except Exception as e:
-            logger.error(f"Erro inesperado ao verificar admin do grupo {chat.id}: {e}")
-            await update.message.reply_text(
-                f"❌ Erro inesperado ao verificar permissões!\n\n"
-                f"🔍 Detalhes técnicos: {str(e)[:100]}...\n\n"
-                f"🔧 SOLUÇÕES:\n"
-                f"1. Certifique-se de que o bot é administrador\n"
-                f"2. Verifique se o grupo permite bots\n"
-                f"3. Tente remover e adicionar o bot novamente"
-            )
-            return
+        # REMOVIDO: Verificação de administrador - agora qualquer membro pode usar
+        logger.info(f"Comando /activate_group usado por {user.first_name} ({user.id}) no grupo {chat.title} ({chat.id})")
         
         # Verifica se o grupo já está ativo
         if chat.id in self.groups and self.groups[chat.id].is_active:
@@ -974,7 +923,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         await update.message.reply_text(
             f"🔔 Ativar Alertas de Tips no Grupo\n\n"
             f"📋 Grupo: {chat.title}\n"
-            f"👤 Admin: {user.first_name}\n\n"
+            f"👤 Solicitado por: {user.first_name}\n\n"
             f"Escolha o tipo de alerta que o grupo receberá:",
             reply_markup=keyboard
         )
@@ -1037,17 +986,8 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             )
             return
         
-        # Verifica se o usuário é admin do grupo
-        try:
-            member = await self.bot.get_chat_member(chat.id, user.id)
-            if member.status not in ['administrator', 'creator']:
-                await update.message.reply_text(
-                    "❌ Apenas administradores podem desativar alertas!"
-                )
-                return
-        except Exception as e:
-            logger.error(f"Erro ao verificar admin: {e}")
-            return
+        # REMOVIDO: Verificação de administrador - agora qualquer membro pode usar
+        logger.info(f"Comando /deactivate_group usado por {user.first_name} ({user.id}) no grupo {chat.title} ({chat.id})")
         
         # Verifica se o grupo está ativo
         if chat.id not in self.groups or not self.groups[chat.id].is_active:
@@ -1062,6 +1002,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         await update.message.reply_text(
             f"❌ Alertas desativados!\n\n"
             f"O grupo não receberá mais tips automáticas.\n"
+            f"👤 Desativado por: {user.first_name}\n"
             f"Use /activate_group para reativar."
         )
 
