@@ -1214,11 +1214,47 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
                     "sub_high_conf": "high_conf",
                     "sub_premium": "premium"
                 }
-                # Modifica temporariamente o callback_data para o alerts_system
-                original_data = query.data
-                query.data = subscription_mapping[data]
-                await self.telegram_alerts._handle_subscription_callback(update, context)
-                query.data = original_data  # Restaura o original
+                
+                # Em vez de modificar query.data (que é read-only), 
+                # vamos chamar diretamente os métodos do alerts_system
+                mapped_subscription = subscription_mapping[data]
+                user = query.from_user
+                
+                try:
+                    # Importa o enum correto
+                    from ..telegram_bot.alerts_system import SubscriptionType
+                    
+                    # Converte string para enum
+                    subscription_enum = SubscriptionType(mapped_subscription)
+                    
+                    # Chama diretamente o método de subscrição individual 
+                    await self.telegram_alerts._handle_user_subscription(
+                        query=query, 
+                        user=user, 
+                        subscription_type=subscription_enum
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"Erro na subscrição {mapped_subscription}: {e}")
+                    
+                    subscription_names = {
+                        "all_tips": "🔔 Todas as Tips",
+                        "high_value": "💎 Alto Valor (EV > 10%)",
+                        "high_conf": "🎯 Alta Confiança (> 80%)", 
+                        "premium": "👑 Premium (EV > 15% + Conf > 85%)"
+                    }
+                    
+                    # Fallback manual se falhar
+                    success_message = f"✅ **Subscrição ativada!**\n\n"
+                    success_message += f"Tipo: {subscription_names.get(mapped_subscription, mapped_subscription)}\n\n"
+                    success_message += "Você receberá notificações quando novas tips estiverem disponíveis!\n\n"
+                    success_message += "Use `/unsubscribe` para cancelar a qualquer momento."
+                    
+                    await query.edit_message_text(
+                        self._escape_markdown_v2(success_message),
+                        parse_mode=ParseMode.MARKDOWN_V2,
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Menu", callback_data="main_menu")]])
+                    )
             
             # Handlers de cancelamento de subscrição
             elif data == "unsubscribe_all":
