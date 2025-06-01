@@ -51,6 +51,9 @@ class DashboardGenerator:
             HTML completo do dashboard
         """
         try:
+            # Valida e sanitiza dados de entrada
+            dashboard_data = self._validate_dashboard_data(dashboard_data)
+            
             # Extrai métricas principais
             current_metrics = dashboard_data.get("current_metrics", {})
             last_24h = dashboard_data.get("last_24h", {})
@@ -285,10 +288,57 @@ class DashboardGenerator:
     <script>
         {self._generate_chart_scripts(trend, method_performance)}
         
-        // Auto-refresh a cada 30 segundos
-        setTimeout(function() {{
-            location.reload();
-        }}, 30000);
+        // Controle de scroll e auto-refresh melhorado
+        let isScrolling = false;
+        let scrollTimeout = null;
+        let refreshTimer = null;
+        
+        // Detecta quando o usuário está fazendo scroll
+        window.addEventListener('scroll', function() {{
+            isScrolling = true;
+            
+            // Cancela refresh se usuário estiver scrollando
+            if (refreshTimer) {{
+                clearTimeout(refreshTimer);
+            }}
+            
+            // Reseta scroll detector após 3 segundos
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(function() {{
+                isScrolling = false;
+                // Reagenda refresh apenas se não estiver scrollando
+                scheduleRefresh();
+            }}, 3000);
+        }});
+        
+        // Função para agendar refresh inteligente
+        function scheduleRefresh() {{
+            if (refreshTimer) clearTimeout(refreshTimer);
+            
+            refreshTimer = setTimeout(function() {{
+                // Só faz refresh se não estiver scrollando
+                if (!isScrolling) {{
+                    // Salva posição do scroll antes de recarregar
+                    sessionStorage.setItem('dashboardScrollPos', window.scrollY);
+                    location.reload();
+                }} else {{
+                    // Reagenda para mais tarde se estiver scrollando
+                    scheduleRefresh();
+                }}
+            }}, 30000);
+        }}
+        
+        // Restaura posição do scroll após carregamento
+        window.addEventListener('load', function() {{
+            const savedScrollPos = sessionStorage.getItem('dashboardScrollPos');
+            if (savedScrollPos) {{
+                window.scrollTo(0, parseInt(savedScrollPos));
+                sessionStorage.removeItem('dashboardScrollPos');
+            }}
+        }});
+        
+        // Inicia agendamento inicial
+        scheduleRefresh();
     </script>
 </body>
 </html>
@@ -306,6 +356,24 @@ class DashboardGenerator:
         body {
             background-color: #f8f9fa;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden; /* Previne scroll horizontal */
+            scroll-behavior: smooth; /* Scroll suave */
+        }
+        
+        html, body {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        *, *::before, *::after {
+            box-sizing: inherit;
+        }
+        
+        .container-fluid {
+            max-width: 100%;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            margin: 0 auto;
         }
         
         .dashboard-header {
@@ -315,6 +383,8 @@ class DashboardGenerator:
             border-radius: 10px;
             margin-bottom: 2rem;
             text-align: center;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         
         .status-indicator {
@@ -331,6 +401,8 @@ class DashboardGenerator:
             height: 140px;
             display: flex;
             align-items: center;
+            max-width: 100%;
+            overflow: hidden; /* Previne overflow */
         }
         
         .metric-card:hover {
@@ -343,12 +415,21 @@ class DashboardGenerator:
             margin-right: 1rem;
             width: 60px;
             text-align: center;
+            flex-shrink: 0; /* Previne encolhimento */
+        }
+        
+        .metric-content {
+            flex: 1;
+            overflow: hidden; /* Previne overflow de texto */
         }
         
         .metric-content h3 {
             margin: 0;
             font-size: 2.2rem;
             font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .metric-content p {
@@ -375,6 +456,8 @@ class DashboardGenerator:
             border-radius: 15px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin-bottom: 1rem;
+            max-width: 100%;
+            overflow: hidden; /* Previne overflow */
         }
         
         .card-header {
@@ -384,20 +467,40 @@ class DashboardGenerator:
             font-weight: 600;
         }
         
+        .card-body {
+            max-width: 100%;
+            overflow: hidden; /* Previne overflow */
+        }
+        
+        /* Canvas dos gráficos */
+        canvas {
+            max-width: 100% !important;
+            height: auto !important;
+            box-sizing: border-box;
+        }
+        
         .analysis-stats .stat-item {
             display: flex;
             justify-content: space-between;
             padding: 0.5rem 0;
             border-bottom: 1px solid #f0f0f0;
+            max-width: 100%;
+            overflow: hidden;
         }
         
         .stat-label {
             color: #6c757d;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
         }
         
         .stat-value {
             font-weight: bold;
             color: #495057;
+            white-space: nowrap;
+            margin-left: 1rem;
         }
         
         .method-detail {
@@ -406,6 +509,8 @@ class DashboardGenerator:
             background: #f8f9fa;
             border-radius: 10px;
             margin-bottom: 1rem;
+            max-width: 100%;
+            overflow: hidden;
         }
         
         .method-detail h6 {
@@ -422,17 +527,58 @@ class DashboardGenerator:
         .trend-down { color: #dc3545; }
         .trend-neutral { color: #6c757d; }
         
+        /* Responsividade melhorada */
         @media (max-width: 768px) {
             .metric-card {
                 height: auto;
                 flex-direction: column;
                 text-align: center;
+                padding: 1rem;
             }
             
             .metric-icon {
                 margin-right: 0;
                 margin-bottom: 1rem;
             }
+            
+            .container-fluid {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            
+            .dashboard-header {
+                padding: 1.5rem;
+            }
+        }
+        
+        /* Previne problemas com row/col */
+        .row {
+            margin-left: -0.75rem;
+            margin-right: -0.75rem;
+        }
+        
+        .row > * {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+        
+        /* Scroll customizado */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
         """
 
@@ -544,93 +690,164 @@ class DashboardGenerator:
         ]
         
         return f"""
-        // Gráfico de Performance Temporal
-        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
-        new Chart(performanceCtx, {{
-            type: 'line',
-            data: {{
-                labels: {json.dumps([f"T-{i}" for i in range(len(win_rate_trend)-1, -1, -1)])},
-                datasets: [{{
-                    label: 'Win Rate (%)',
-                    data: {json.dumps(win_rate_trend)},
-                    borderColor: '#28a745',
-                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                    tension: 0.4,
-                    yAxisID: 'y'
-                }}, {{
-                    label: 'ROI (%)',
-                    data: {json.dumps(roi_trend)},
-                    borderColor: '#007bff',
-                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                    tension: 0.4,
-                    yAxisID: 'y1'
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                interaction: {{
-                    mode: 'index',
-                    intersect: false,
-                }},
-                scales: {{
-                    y: {{
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: {{
-                            display: true,
-                            text: 'Win Rate (%)'
-                        }}
-                    }},
-                    y1: {{
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {{
-                            display: true,
-                            text: 'ROI (%)'
-                        }},
-                        grid: {{
-                            drawOnChartArea: false,
-                        }},
-                    }}
-                }}
-            }}
-        }});
+        // Configurações globais do Chart.js para evitar problemas
+        Chart.defaults.responsive = true;
+        Chart.defaults.maintainAspectRatio = false;
+        Chart.defaults.plugins.legend.display = true;
+        Chart.defaults.animation.duration = 300; // Animação mais rápida
         
-        // Gráfico de Performance por Método
-        const methodCtx = document.getElementById('methodChart').getContext('2d');
-        new Chart(methodCtx, {{
-            type: 'doughnut',
-            data: {{
-                labels: {json.dumps(methods)},
-                datasets: [{{
-                    label: 'Predições',
-                    data: {json.dumps(method_predictions)},
-                    backgroundColor: [
-                        '#007bff',
-                        '#28a745', 
-                        '#6f42c1'
-                    ],
-                    borderWidth: 2
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                plugins: {{
-                    legend: {{
-                        position: 'bottom',
+        // Aguarda o DOM estar pronto
+        document.addEventListener('DOMContentLoaded', function() {{
+            
+            // Gráfico de Performance Temporal
+            const performanceCanvas = document.getElementById('performanceChart');
+            if (performanceCanvas) {{
+                const performanceCtx = performanceCanvas.getContext('2d');
+                
+                // Define altura fixa para evitar problemas
+                performanceCanvas.style.height = '400px';
+                performanceCanvas.height = 400;
+                
+                new Chart(performanceCtx, {{
+                    type: 'line',
+                    data: {{
+                        labels: {json.dumps([f"T-{i}" for i in range(len(win_rate_trend)-1, -1, -1)])},
+                        datasets: [{{
+                            label: 'Win Rate (%)',
+                            data: {json.dumps(win_rate_trend)},
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y',
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }}, {{
+                            label: 'ROI (%)',
+                            data: {json.dumps(roi_trend)},
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y1',
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }}]
                     }},
-                    tooltip: {{
-                        callbacks: {{
-                            afterLabel: function(context) {{
-                                const winRates = {json.dumps(method_win_rates)};
-                                return 'Win Rate: ' + winRates[context.dataIndex].toFixed(1) + '%';
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {{
+                            padding: {{
+                                left: 10,
+                                right: 10,
+                                top: 10,
+                                bottom: 10
+                            }}
+                        }},
+                        interaction: {{
+                            mode: 'index',
+                            intersect: false,
+                        }},
+                        animation: {{
+                            duration: 300
+                        }},
+                        scales: {{
+                            y: {{
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {{
+                                    display: true,
+                                    text: 'Win Rate (%)'
+                                }},
+                                grid: {{
+                                    display: true,
+                                    drawBorder: true
+                                }}
+                            }},
+                            y1: {{
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {{
+                                    display: true,
+                                    text: 'ROI (%)'
+                                }},
+                                grid: {{
+                                    drawOnChartArea: false,
+                                }},
+                            }}
+                        }},
+                        plugins: {{
+                            legend: {{
+                                display: true,
+                                position: 'top'
                             }}
                         }}
                     }}
-                }}
+                }});
             }}
+            
+            // Gráfico de Performance por Método
+            const methodCanvas = document.getElementById('methodChart');
+            if (methodCanvas) {{
+                const methodCtx = methodCanvas.getContext('2d');
+                
+                // Define altura fixa para evitar problemas
+                methodCanvas.style.height = '300px';
+                methodCanvas.height = 300;
+                
+                new Chart(methodCtx, {{
+                    type: 'doughnut',
+                    data: {{
+                        labels: {json.dumps(methods)},
+                        datasets: [{{
+                            label: 'Predições',
+                            data: {json.dumps(method_predictions)},
+                            backgroundColor: [
+                                '#007bff',
+                                '#28a745', 
+                                '#6f42c1'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
+                        }}]
+                    }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: {{
+                            padding: 20
+                        }},
+                        animation: {{
+                            duration: 300
+                        }},
+                        plugins: {{
+                            legend: {{
+                                position: 'bottom',
+                                labels: {{
+                                    padding: 20,
+                                    usePointStyle: true
+                                }}
+                            }},
+                            tooltip: {{
+                                callbacks: {{
+                                    afterLabel: function(context) {{
+                                        const winRates = {json.dumps(method_win_rates)};
+                                        return 'Win Rate: ' + winRates[context.dataIndex].toFixed(1) + '%';
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }});
+            }}
+        }});
+        
+        // Redimensiona gráficos quando necessário
+        window.addEventListener('resize', function() {{
+            Chart.instances.forEach(function(chart) {{
+                chart.resize();
+            }});
         }});
         """
 
@@ -852,3 +1069,165 @@ class DashboardGenerator:
         except Exception as e:
             logger.error(f"Erro ao gerar relatório HTML: {e}")
             return f"<html><body><h1>Erro: {e}</h1></body></html>" 
+
+    def _validate_dashboard_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Valida e sanitiza dados do dashboard para evitar problemas de renderização
+        
+        Args:
+            data: Dados originais do dashboard
+            
+        Returns:
+            Dados validados e sanitizados
+        """
+        try:
+            # Cria cópia dos dados para não modificar original
+            validated_data = {}
+            
+            # Valida métricas principais
+            current_metrics = data.get("current_metrics", {})
+            validated_data["current_metrics"] = {
+                "win_rate": self._safe_float(current_metrics.get("win_rate", 0), 0, 100),
+                "roi": self._safe_float(current_metrics.get("roi", 0), -100, 1000),
+                "net_profit": self._safe_float(current_metrics.get("net_profit", 0), -10000, 10000),
+                "total_predictions": self._safe_int(current_metrics.get("total_predictions", 0), 0, 100000)
+            }
+            
+            # Valida dados das últimas 24h
+            last_24h = data.get("last_24h", {})
+            validated_data["last_24h"] = {
+                "predictions": self._safe_int(last_24h.get("predictions", 0), 0, 1000),
+                "resolved": self._safe_int(last_24h.get("resolved", 0), 0, 1000),
+                "pending": self._safe_int(last_24h.get("pending", 0), 0, 1000),
+                "profit": self._safe_float(last_24h.get("profit", 0), -1000, 1000)
+            }
+            
+            # Valida performance por método
+            method_performance = data.get("method_performance", {})
+            validated_data["method_performance"] = {}
+            for method in ["ml", "algorithm", "hybrid"]:
+                method_data = method_performance.get(method, {})
+                validated_data["method_performance"][method] = {
+                    "predictions": self._safe_int(method_data.get("predictions", 0), 0, 10000),
+                    "win_rate": self._safe_float(method_data.get("win_rate", 0), 0, 100)
+                }
+            
+            # Valida alertas (limita quantidade)
+            active_alerts = data.get("active_alerts", [])
+            if isinstance(active_alerts, list):
+                validated_data["active_alerts"] = active_alerts[:10]  # Máximo 10 alertas
+            else:
+                validated_data["active_alerts"] = []
+            
+            # Valida dados de análise
+            analysis_usage = data.get("analysis_usage", {})
+            validated_data["analysis_usage"] = {
+                "composition_analyses": self._safe_int(analysis_usage.get("composition_analyses", 0), 0, 10000),
+                "patch_analyses": self._safe_int(analysis_usage.get("patch_analyses", 0), 0, 10000),
+                "avg_processing_time": self._safe_float(analysis_usage.get("avg_processing_time", 0), 0, 10000)
+            }
+            
+            # Valida dados de tendência (limita tamanho)
+            trend = data.get("trend", {})
+            validated_data["trend"] = {
+                "win_rate_trend": self._safe_trend_array(trend.get("win_rate_trend", []), 0, 100),
+                "roi_trend": self._safe_trend_array(trend.get("roi_trend", []), -100, 1000)
+            }
+            
+            # Copia outros dados com validação básica
+            validated_data["uptime_hours"] = self._safe_float(data.get("uptime_hours", 0), 0, 8760)  # Máx 1 ano
+            validated_data["timestamp"] = str(data.get("timestamp", ""))[:50]  # Limita tamanho
+            
+            return validated_data
+            
+        except Exception as e:
+            logger.error(f"Erro na validação de dados do dashboard: {e}")
+            # Retorna dados padrão em caso de erro
+            return self._get_default_dashboard_data()
+    
+    def _safe_float(self, value: Any, min_val: float = None, max_val: float = None) -> float:
+        """Converte valor para float seguro"""
+        try:
+            result = float(value)
+            
+            # Verifica se é número válido
+            if not isinstance(result, (int, float)) or result != result:  # NaN check
+                return 0.0
+            
+            # Aplica limites se especificados
+            if min_val is not None:
+                result = max(result, min_val)
+            if max_val is not None:
+                result = min(result, max_val)
+                
+            return result
+        except (ValueError, TypeError):
+            return 0.0
+    
+    def _safe_int(self, value: Any, min_val: int = None, max_val: int = None) -> int:
+        """Converte valor para int seguro"""
+        try:
+            result = int(float(value))
+            
+            # Aplica limites se especificados
+            if min_val is not None:
+                result = max(result, min_val)
+            if max_val is not None:
+                result = min(result, max_val)
+                
+            return result
+        except (ValueError, TypeError):
+            return 0
+    
+    def _safe_trend_array(self, arr: Any, min_val: float = None, max_val: float = None) -> List[float]:
+        """Valida array de tendência"""
+        try:
+            if not isinstance(arr, list):
+                return []
+            
+            # Limita tamanho do array para evitar problemas
+            limited_arr = arr[-50:] if len(arr) > 50 else arr
+            
+            # Valida cada valor
+            validated_arr = []
+            for item in limited_arr:
+                safe_val = self._safe_float(item, min_val, max_val)
+                validated_arr.append(safe_val)
+            
+            return validated_arr
+        except Exception:
+            return []
+    
+    def _get_default_dashboard_data(self) -> Dict[str, Any]:
+        """Retorna dados padrão do dashboard em caso de erro"""
+        return {
+            "current_metrics": {
+                "win_rate": 0.0,
+                "roi": 0.0,
+                "net_profit": 0.0,
+                "total_predictions": 0
+            },
+            "last_24h": {
+                "predictions": 0,
+                "resolved": 0,
+                "pending": 0,
+                "profit": 0.0
+            },
+            "method_performance": {
+                "ml": {"predictions": 0, "win_rate": 0.0},
+                "algorithm": {"predictions": 0, "win_rate": 0.0},
+                "hybrid": {"predictions": 0, "win_rate": 0.0}
+            },
+            "active_alerts": [],
+            "analysis_usage": {
+                "composition_analyses": 0,
+                "patch_analyses": 0,
+                "avg_processing_time": 0.0
+            },
+            "trend": {
+                "win_rate_trend": [],
+                "roi_trend": []
+            },
+            "uptime_hours": 0.0,
+            "timestamp": ""
+        } 

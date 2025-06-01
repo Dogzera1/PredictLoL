@@ -949,7 +949,7 @@ class DynamicPredictionSystem:
         
         # Recomendação de unidades
         reasoning_parts.append(f"💵 **Unidades Recomendadas:** {tip_recommendation.units:.1f}")
-        reasoning_parts.append(f"🎯 **Nível de Confiança:** {tip_recommendation.confidence_level}")
+        reasoning_parts.append(f"🎯 **Nível de Confiança:** {tip_recommendation.confidence_percentage:.1f}%")
         
         return "\n".join(reasoning_parts)
 
@@ -1195,7 +1195,7 @@ class DynamicPredictionSystem:
 
     def _extract_team_composition(self, match_data: MatchData, team_key: str) -> List[Dict]:
         """
-        Extrai composição do time dos dados da partida
+        Extrai composição de campeões de um time específico
         
         Args:
             match_data: Dados da partida
@@ -1211,35 +1211,54 @@ class DynamicPredictionSystem:
             # Verifica se há dados de picks & bans
             if hasattr(match_data, 'draft_data') and match_data.draft_data:
                 draft = match_data.draft_data
-                team_picks = draft.get(f"{team_key}_picks", [])
                 
-                for i, pick in enumerate(team_picks):
-                    if isinstance(pick, dict):
-                        champion = pick.get("champion", pick.get("champion_name", ""))
-                        position = pick.get("position", pick.get("role", self._guess_position(i)))
-                        
-                        composition.append({
-                            "champion": champion,
-                            "position": position,
-                            "pick_order": i + 1
-                        })
-            
-            # Fallback: tenta extrair dos dados gerais do match
-            elif hasattr(match_data, 'teams') and match_data.teams:
-                team_data = match_data.teams.get(team_key, {})
-                players = team_data.get('players', [])
-                
-                for i, player in enumerate(players):
-                    if isinstance(player, dict):
-                        champion = player.get("champion", player.get("champion_name", ""))
-                        position = player.get("position", player.get("role", self._guess_position(i)))
-                        
-                        if champion:
+                # Verifica se draft_data é um dicionário
+                if isinstance(draft, dict):
+                    team_picks = draft.get(f"{team_key}_picks", [])
+                    
+                    for i, pick in enumerate(team_picks):
+                        if isinstance(pick, dict):
+                            champion = pick.get("champion", pick.get("champion_name", ""))
+                            position = pick.get("position", pick.get("role", self._guess_position(i)))
+                            
                             composition.append({
                                 "champion": champion,
                                 "position": position,
                                 "pick_order": i + 1
                             })
+                else:
+                    # Se draft_data não é um dict, tenta acessar como atributo
+                    team_picks = getattr(draft, f"{team_key}_picks", [])
+                    if team_picks:
+                        for i, pick in enumerate(team_picks):
+                            if hasattr(pick, 'champion'):
+                                champion = pick.champion
+                                position = getattr(pick, 'position', self._guess_position(i))
+                                
+                                composition.append({
+                                    "champion": champion,
+                                    "position": position,
+                                    "pick_order": i + 1
+                                })
+            
+            # Fallback: tenta extrair dos dados gerais do match
+            elif hasattr(match_data, 'teams') and match_data.teams:
+                teams_data = match_data.teams
+                if isinstance(teams_data, dict):
+                    team_data = teams_data.get(team_key, {})
+                    players = team_data.get('players', [])
+                    
+                    for i, player in enumerate(players):
+                        if isinstance(player, dict):
+                            champion = player.get("champion", player.get("champion_name", ""))
+                            position = player.get("position", player.get("role", self._guess_position(i)))
+                            
+                            if champion:
+                                composition.append({
+                                    "champion": champion,
+                                    "position": position,
+                                    "pick_order": i + 1
+                                })
             
             # Se ainda não tem dados, tenta estrutura simples
             else:

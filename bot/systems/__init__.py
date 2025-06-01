@@ -6,7 +6,7 @@ Este módulo contém os sistemas centrais de processamento:
 - Gerenciador de Cronograma: Orquestração e automação
 """
 
-from .tips_system import ProfessionalTipsSystem
+from .tips_system import ProfessionalTipsSystem, TipStatus
 from .schedule_manager import (
     ScheduleManager,
     TaskStatus,
@@ -17,6 +17,7 @@ from .schedule_manager import (
 
 __all__ = [
     'ProfessionalTipsSystem',
+    'TipStatus',
     'ScheduleManager',
     'TaskStatus',
     'TaskType',

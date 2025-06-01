@@ -17,5 +17,43 @@
     "real_time_score": 0.0,
     "is_resolved": true,
     "processing_time_ms": 1000.0
+  },
+  "pred_1748814992045": {
+    "prediction_id": "pred_1748814992045",
+    "match_id": "test_match_123",
+    "timestamp": 1748814992.045013,
+    "predicted_winner": "Team A",
+    "actual_winner": "Team A",
+    "win_probability": 0.65,
+    "confidence_level": "high",
+    "method_used": "hybrid",
+    "odds_used": 1.85,
+    "stake_amount": 10.0,
+    "potential_return": 18.5,
+    "actual_return": 18.5,
+    "composition_score": 0.3,
+    "patch_score": 0.2,
+    "real_time_score": 0.4,
+    "is_resolved": true,
+    "processing_time_ms": 1250.5
+  },
+  "pred_1748815023264": {
+    "prediction_id": "pred_1748815023264",
+    "match_id": "integration_test_456",
+    "timestamp": 1748815023.264261,
+    "predicted_winner": "T1",
+    "actual_winner": "T1",
+    "win_probability": 0.78,
+    "confidence_level": "very_high",
+    "method_used": "hybrid",
+    "odds_used": 1.65,
+    "stake_amount": 15.0,
+    "potential_return": 24.75,
+    "actual_return": 24.75,
+    "composition_score": 0.4,
+    "patch_score": 0.35,
+    "real_time_score": 0.6,
+    "is_resolved": true,
+    "processing_time_ms": 2150.0
   }
 }
