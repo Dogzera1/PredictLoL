@@ -10,7 +10,13 @@ from urllib.parse import urljoin
 import aiohttp
 from aiohttp import ClientTimeout
 
-from ..utils.constants import HTTP_HEADERS, MIN_ODDS, MAX_ODDS
+from ..utils.constants import (
+    HTTP_HEADERS, 
+    MIN_ODDS, 
+    MAX_ODDS,
+    PANDASCORE_API_KEY,
+    PANDASCORE_BASE_URL
+)
 from ..utils.helpers import normalize_team_name, teams_similarity, validate_odds
 from ..utils.logger_config import get_logger
 
@@ -67,10 +73,10 @@ class PandaScoreRateLimiter:
 class PandaScoreAPIClient:
     """Cliente profissional para PandaScore API - odds de esports"""
 
-    BASE_URL = "https://api.pandascore.co"
+    BASE_URL = PANDASCORE_BASE_URL
     
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or "90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ"
+        self.api_key = api_key or PANDASCORE_API_KEY
         if not self.api_key:
             raise ValueError("PANDASCORE_API_KEY é obrigatória")
 

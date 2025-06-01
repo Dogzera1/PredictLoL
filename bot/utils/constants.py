@@ -60,8 +60,8 @@ RIOT_API_ENDPOINTS = {
     "prod_relapi": "https://prod-relapi.ewp.gg/persisted/gw"
 }
 
-# Chave de API padrão da Lolesports (conforme documentação openapi.yaml)
-RIOT_API_KEY = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
+# Chave de API da Riot para desenvolvimento/teste (atualizada)
+RIOT_API_KEY = "RGAPI-7b5ce87e-4bb8-4d9d-b905-8df7d7b4f8c2"
 
 # PandaScore API
 PANDASCORE_API_KEY = "90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ"

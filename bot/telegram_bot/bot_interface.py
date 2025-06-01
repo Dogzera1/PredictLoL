@@ -129,7 +129,7 @@ class LoLBotV3UltraAdvanced:
             
             # 5. Inicia polling de forma robusta
             logger.info("📞 Iniciando polling...")
-            self.application.updater.start_polling(
+            await self.application.updater.start_polling(
                 drop_pending_updates=True,
                 bootstrap_retries=3,
                 read_timeout=30,
@@ -378,7 +378,7 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
 • `/admin` \\\\ Painel administrativo completo
 • `/system` \\\\ Status detalhado do sistema
 • `/force` \\\\ Forçar scan de partidas
-• `/tasks` \\\\ Gerenciar tarefas agendadas
+• `/tasks` \\\\ Gerenciar tarefas
 • `/health` \\\\ Health check completo
 • `/logs` \\\\ Logs recentes do sistema
 • `/restart` \\\\ Reiniciar componentes
