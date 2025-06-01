@@ -70,6 +70,28 @@ class TelegramUser:
 
 
 @dataclass
+class TelegramGroup:
+    """Grupo do Telegram"""
+    group_id: int
+    title: str
+    subscription_type: SubscriptionType
+    is_active: bool = True
+    activated_by: int = 0  # ID do usuário que ativou
+    activated_at: float = 0.0
+    tips_received: int = 0
+    custom_filters: Dict[str, Any] = None
+    admin_ids: List[int] = None
+    
+    def __post_init__(self):
+        if self.activated_at == 0.0:
+            self.activated_at = time.time()
+        if self.custom_filters is None:
+            self.custom_filters = {}
+        if self.admin_ids is None:
+            self.admin_ids = []
+
+
+@dataclass
 class AlertStats:
     """Estatísticas de alertas"""
     total_alerts_sent: int = 0
@@ -123,7 +145,9 @@ class TelegramAlertsSystem:
         
         # Usuários e subscrições
         self.users: Dict[int, TelegramUser] = {}
+        self.groups: Dict[int, TelegramGroup] = {}  # Grupos registrados
         self.blocked_users: Set[int] = set()
+        self.blocked_groups: Set[int] = set()  # Grupos bloqueados
         
         # Estatísticas
         self.stats = AlertStats()
@@ -166,6 +190,11 @@ class TelegramAlertsSystem:
         self.application.add_handler(CommandHandler("status", self._handle_status))
         self.application.add_handler(CommandHandler("mystats", self._handle_my_stats))
         
+        # Comandos para grupos
+        self.application.add_handler(CommandHandler("activate_group", self._handle_activate_group))
+        self.application.add_handler(CommandHandler("group_status", self._handle_group_status))
+        self.application.add_handler(CommandHandler("deactivate_group", self._handle_deactivate_group))
+        
         # Callback handlers para botões inline
         self.application.add_handler(CallbackQueryHandler(self._handle_subscription_callback))
         
@@ -191,63 +220,61 @@ class TelegramAlertsSystem:
 
     async def send_professional_tip(self, tip: ProfessionalTip) -> bool:
         """
-        Envia tip profissional para todos os usuários subscritos
+        Envia tip profissional para todos os usuários e grupos subscritos
         
         Args:
             tip: Tip profissional a enviar
             
         Returns:
-            True se enviada com sucesso para pelo menos um usuário
+            True se enviada com sucesso para pelo menos um destinatário
         """
-        try:
-            # Verifica cache para evitar duplicatas
-            tip_cache_key = f"{tip.match_id}_{tip.tip_on_team}_{tip.odds}"
-            current_time = time.time()
+        if not self.bot:
+            logger.error("Bot não inicializado para envio de tip")
+            return False
+        
+        # Verifica cache para evitar spam
+        tip_id = f"{tip.match_id}_{tip.team_name}_{tip.prediction_type}"
+        if tip_id in self.recent_tips_cache:
+            logger.debug(f"Tip {tip_id} já enviada recentemente (cache)")
+            return False
+        
+        # Adiciona ao cache
+        self.recent_tips_cache[tip_id] = time.time()
+        
+        # Formata mensagem
+        message = self._format_tip_message(tip)
+        
+        # Envia para usuários individuais
+        eligible_users = self._get_eligible_users_for_tip(tip)
+        user_success_count = 0
+        
+        for user_id in eligible_users:
+            if await self._send_message_to_user(user_id, message, NotificationType.TIP_ALERT):
+                user_success_count += 1
+                if user_id in self.users:
+                    self.users[user_id].tips_received += 1
+        
+        # Envia para grupos
+        eligible_groups = self._get_eligible_groups_for_tip(tip)
+        group_success_count = 0
+        
+        for group_id in eligible_groups:
+            if await self._send_message_to_group(group_id, message, NotificationType.TIP_ALERT):
+                group_success_count += 1
+                if group_id in self.groups:
+                    self.groups[group_id].tips_received += 1
+        
+        total_success = user_success_count + group_success_count
+        
+        if total_success > 0:
+            self.stats.tips_sent += 1
+            self.stats.total_alerts_sent += total_success
+            self.stats.last_alert_time = time.time()
             
-            if tip_cache_key in self.recent_tips_cache:
-                last_sent = self.recent_tips_cache[tip_cache_key]
-                if current_time - last_sent < self.cache_duration:
-                    logger.debug(f"Tip já enviada recentemente: {tip_cache_key}")
-                    return False
-            
-            # Formata mensagem
-            formatted_message = self._format_tip_message(tip)
-            
-            # Filtra usuários elegíveis
-            eligible_users = self._get_eligible_users_for_tip(tip)
-            
-            if not eligible_users:
-                logger.warning("Nenhum usuário elegível para receber a tip")
-                return False
-            
-            # Envia para todos os usuários elegíveis
-            successful_sends = 0
-            
-            for user_id in eligible_users:
-                try:
-                    if self._can_send_to_user(user_id):
-                        await self._send_message_to_user(
-                            user_id, 
-                            formatted_message, 
-                            NotificationType.TIP_ALERT
-                        )
-                        successful_sends += 1
-                    
-                except Exception as e:
-                    logger.error(f"Erro ao enviar tip para usuário {user_id}: {e}")
-            
-            # Atualiza cache e estatísticas
-            if successful_sends > 0:
-                self.recent_tips_cache[tip_cache_key] = current_time
-                self.stats.tips_sent += successful_sends
-                logger.info(f"✅ Tip enviada para {successful_sends} usuários")
-                return True
-            else:
-                logger.warning("Falha ao enviar tip para qualquer usuário")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Erro ao enviar tip profissional: {e}")
+            logger.info(f"Tip enviada para {user_success_count} usuários e {group_success_count} grupos")
+            return True
+        else:
+            logger.warning("Tip não foi enviada para nenhum destinatário")
             return False
 
     async def send_match_update(self, analysis: GameAnalysis, match_id: str) -> None:
@@ -448,24 +475,25 @@ class TelegramAlertsSystem:
             return True  # Em caso de erro, permite a tip
 
     def _can_send_to_user(self, user_id: int) -> bool:
-        """Verifica se pode enviar mensagem para usuário (rate limiting)"""
+        """Verifica se pode enviar mensagem para o usuário (rate limiting)"""
         if user_id in self.blocked_users:
             return False
         
         current_time = time.time()
-        one_hour_ago = current_time - 3600
+        user_times = self.user_message_times.get(user_id, [])
         
-        # Limpa mensagens antigas
-        if user_id in self.user_message_times:
-            self.user_message_times[user_id] = [
-                msg_time for msg_time in self.user_message_times[user_id]
-                if msg_time > one_hour_ago
-            ]
-        else:
-            self.user_message_times[user_id] = []
+        # Remove mensagens antigas (últimas hora)
+        user_times = [t for t in user_times if current_time - t < 3600]
         
-        # Verifica limite
-        return len(self.user_message_times[user_id]) < self.max_messages_per_hour
+        # Verifica rate limit
+        if len(user_times) >= self.max_messages_per_hour:
+            logger.debug(f"Rate limit atingido para usuário {user_id}")
+            return False
+        
+        # Atualiza lista de tempos
+        user_times.append(current_time)
+        self.user_message_times[user_id] = user_times
+        return True
 
     async def _send_message_to_user(
         self, 
@@ -615,64 +643,114 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
 
     async def _handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /help"""
-        help_message = """🆘 **AJUDA \\\\ Bot LoL V3 Ultra Avançado**
+        help_text = """🆘 **Ajuda - Bot LoL V3**
 
-**🎯 O que é este bot?**
-Sistema profissional de tips para League of Legends que combina Machine Learning com análise em tempo real para gerar recomendações de apostas de alta qualidade\\.
+**👤 Comandos Pessoais:**
+• `/start` - Iniciar bot
+• `/subscribe` - Configurar alertas
+• `/unsubscribe` - Cancelar alertas
+• `/status` - Status do sistema
+• `/mystats` - Suas estatísticas
 
-**📋 Comandos:**
-• `/start` \\\\ Iniciar e registrar\\-se
-• `/subscribe` \\\\ Configurar notificações
-• `/unsubscribe` \\\\ Cancelar subscrição
-• `/status` \\\\ Status do sistema
-• `/mystats` \\\\ Suas estatísticas
-• `/help` \\\\ Esta ajuda
+**👥 Comandos para Grupos:**
+• `/activate_group` - Ativar alertas no grupo
+• `/group_status` - Status do grupo
+• `/deactivate_group` - Desativar alertas
 
-**🔔 Tipos de Subscrição:**
-• **Todas as Tips** \\\\ Recebe todas as tips geradas
-• **Alto Valor** \\\\ Apenas tips com EV \\> 10%
-• **Alta Confiança** \\\\ Apenas tips com confiança \\> 80%
-• **Premium** \\\\ Tips exclusivas \\(EV \\> 15% e confiança \\> 85%\\)
+**📊 Tipos de Subscrição:**
+• 🔔 Todas as Tips
+• 💎 Alto Valor (EV > 10%)
+• 🎯 Alta Confiança (> 80%)
+• 👑 Premium (EV > 15% + Conf > 85%)
 
-**💡 Como funciona:**
-1\\. Sistema monitora partidas ao vivo a cada 3 minutos
-2\\. Analisa dados usando ML \\+ algoritmos heurísticos
-3\\. Gera predições com confiança e Expected Value
-4\\. Valida critérios profissionais rigorosos
-5\\. Envia apenas tips de alta qualidade
-
-**📊 Métricas de Qualidade:**
-• Confiança mínima: 65%
-• EV mínimo: 3%
-• Odds entre 1\\.30 e 3\\.50
-• Máximo 5 tips por hora \\(anti\\-spam\\)
-
-🔥 **Desenvolvido com tecnologia de ponta para apostas profissionais\\!**"""
+🤖 **Bot LoL V3 Ultra Avançado**
+⚡ Sistema profissional de tips eSports"""
         
-        await update.message.reply_text(help_message, parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(
+            help_text,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_subscription_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler de callbacks dos botões de subscrição"""
+        """Handler para callbacks de subscrição"""
         query = update.callback_query
         await query.answer()
         
-        user_id = query.from_user.id
-        subscription_type = SubscriptionType(query.data)
+        chat = query.message.chat
+        user = query.from_user
         
-        # Atualiza subscrição
-        if user_id in self.users:
-            self.users[user_id].subscription_type = subscription_type
-            self.users[user_id].is_active = True
+        try:
+            subscription_type = SubscriptionType(query.data)
+        except ValueError:
+            await query.edit_message_text("❌ **Tipo de subscrição inválido\\.**", parse_mode=ParseMode.MARKDOWN_V2)
+            return
+        
+        # Verifica se é um grupo ou usuário individual
+        if chat.type in ['group', 'supergroup']:
+            # Lógica para grupos
+            await self._handle_group_subscription(query, chat, user, subscription_type)
         else:
-            self.users[user_id] = TelegramUser(
-                user_id=user_id,
-                username=query.from_user.username or "",
-                first_name=query.from_user.first_name,
+            # Lógica para usuários individuais
+            await self._handle_user_subscription(query, user, subscription_type)
+
+    async def _handle_group_subscription(self, query, chat, user, subscription_type: SubscriptionType) -> None:
+        """Lida com subscrição de grupos"""
+        try:
+            # Verifica se o usuário é admin
+            member = await self.bot.get_chat_member(chat.id, user.id)
+            if member.status not in ['administrator', 'creator']:
+                await query.edit_message_text(
+                    "❌ **Apenas administradores podem configurar alertas\\!**",
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                return
+        except Exception as e:
+            logger.error(f"Erro ao verificar admin no callback: {e}")
+            return
+        
+        # Registra ou atualiza o grupo
+        if chat.id in self.groups:
+            self.groups[chat.id].subscription_type = subscription_type
+            self.groups[chat.id].is_active = True
+        else:
+            self.groups[chat.id] = TelegramGroup(
+                group_id=chat.id,
+                title=chat.title,
+                subscription_type=subscription_type,
+                activated_by=user.id
+            )
+        
+        await query.edit_message_text(
+            f"✅ **Alertas ativados no grupo\\!**\n\n"
+            f"📋 **Grupo:** {chat.title}\n"
+            f"📊 **Tipo:** {subscription_type.value}\n"
+            f"👤 **Configurado por:** {user.first_name}\n\n"
+            f"O grupo receberá tips automáticas conforme o tipo selecionado\\.\n"
+            f"Use `/group_status` para ver detalhes\\.",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        
+        logger.info(f"Grupo {chat.title} ({chat.id}) ativado por {user.first_name} ({user.id})")
+
+    async def _handle_user_subscription(self, query, user, subscription_type: SubscriptionType) -> None:
+        """Lida com subscrição de usuários individuais"""
+        # Registra ou atualiza usuário
+        if user.id in self.users:
+            self.users[user.id].subscription_type = subscription_type
+            self.users[user.id].is_active = True
+            self.users[user.id].last_active = time.time()
+        else:
+            self.users[user.id] = TelegramUser(
+                user_id=user.id,
+                username=user.username or "",
+                first_name=user.first_name,
                 subscription_type=subscription_type
             )
         
         await query.edit_message_text(
-            f"✅ **Subscrição configurada!**\n\nTipo: {subscription_type.value}\n\nVocê receberá notificações conforme sua subscrição.",
+            f"✅ **Subscrição configurada\\!**\n\n"
+            f"📊 **Tipo:** {subscription_type.value}\n"
+            f"Você receberá tips conforme sua subscrição\\.",
             parse_mode=ParseMode.MARKDOWN_V2
         )
 
@@ -704,35 +782,50 @@ Sistema profissional de tips para League of Legends que combina Machine Learning
             return f"{int(diff/86400)}d atrás"
 
     def get_system_stats(self) -> Dict[str, Any]:
-        """Retorna estatísticas completas do sistema"""
-        active_users = sum(1 for u in self.users.values() if u.is_active)
+        """Retorna estatísticas do sistema de alertas"""
+        active_users = sum(1 for user in self.users.values() if user.is_active)
+        blocked_users = len(self.blocked_users)
+        
+        active_groups = sum(1 for group in self.groups.values() if group.is_active)
+        blocked_groups = len(self.blocked_groups)
         
         subscriptions_by_type = {}
-        for sub_type in SubscriptionType:
-            subscriptions_by_type[sub_type.value] = sum(
-                1 for u in self.users.values() 
-                if u.is_active and u.subscription_type == sub_type
-            )
+        for subscription_type in SubscriptionType:
+            user_count = sum(1 for user in self.users.values() 
+                           if user.subscription_type == subscription_type and user.is_active)
+            group_count = sum(1 for group in self.groups.values() 
+                            if group.subscription_type == subscription_type and group.is_active)
+            subscriptions_by_type[subscription_type.value] = {
+                "users": user_count,
+                "groups": group_count,
+                "total": user_count + group_count
+            }
         
         return {
             "users": {
                 "total": len(self.users),
                 "active": active_users,
-                "blocked": len(self.blocked_users),
-                "subscriptions_by_type": subscriptions_by_type
+                "blocked": blocked_users,
+                "subscriptions_by_type": {k: v["users"] for k, v in subscriptions_by_type.items()}
             },
+            "groups": {
+                "total": len(self.groups),
+                "active": active_groups,
+                "blocked": blocked_groups,
+                "subscriptions_by_type": {k: v["groups"] for k, v in subscriptions_by_type.items()}
+            },
+            "combined_subscriptions": subscriptions_by_type,
             "alerts": {
                 "total_sent": self.stats.total_alerts_sent,
                 "tips_sent": self.stats.tips_sent,
                 "match_updates_sent": self.stats.match_updates_sent,
                 "system_alerts_sent": self.stats.system_alerts_sent,
                 "failed_deliveries": self.stats.failed_deliveries,
-                "success_rate": self.stats.success_rate,
-                "last_alert_time": self.stats.last_alert_time
+                "success_rate": self.stats.success_rate
             },
             "rate_limiting": {
                 "max_messages_per_hour": self.max_messages_per_hour,
-                "cache_duration_minutes": self.cache_duration / 60,
+                "cache_duration_minutes": self.cache_duration // 60,
                 "recent_tips_cached": len(self.recent_tips_cache)
             }
         }
@@ -751,4 +844,220 @@ Sistema profissional de tips para League of Legends que combina Machine Learning
             del self.recent_tips_cache[tip_id]
         
         if old_tips:
-            logger.debug(f"Cache limpo: {len(old_tips)} tips antigas removidas") 
+            logger.debug(f"Cache limpo: {len(old_tips)} tips antigas removidas")
+
+    # ===== HANDLERS PARA GRUPOS =====
+
+    async def _handle_activate_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler para ativar alertas em um grupo"""
+        chat = update.effective_chat
+        user = update.effective_user
+        
+        # Verifica se é um grupo
+        if chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text(
+                "❌ **Este comando só funciona em grupos\\!**\n\n"
+                "Use `/subscribe` para alertas pessoais\\.",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Verifica se o usuário é admin do grupo
+        try:
+            member = await self.bot.get_chat_member(chat.id, user.id)
+            if member.status not in ['administrator', 'creator']:
+                await update.message.reply_text(
+                    "❌ **Apenas administradores podem ativar alertas no grupo\\!**",
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                return
+        except Exception as e:
+            logger.error(f"Erro ao verificar admin: {e}")
+            await update.message.reply_text(
+                "❌ **Erro ao verificar permissões\\.**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Verifica se o grupo já está ativo
+        if chat.id in self.groups and self.groups[chat.id].is_active:
+            group = self.groups[chat.id]
+            await update.message.reply_text(
+                f"✅ **Grupo já está ativo\\!**\n\n"
+                f"📊 **Tipo:** {group.subscription_type.value}\n"
+                f"🎯 **Tips recebidas:** {group.tips_received}\n"
+                f"👤 **Ativado por:** {group.activated_by}\n\n"
+                f"Use `/group_status` para mais detalhes\\.",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Mostra opções de subscrição para o grupo
+        keyboard = self._get_group_subscription_keyboard()
+        
+        await update.message.reply_text(
+            f"🔔 **Ativar Alertas de Tips no Grupo**\n\n"
+            f"📋 **Grupo:** {chat.title}\n"
+            f"👤 **Admin:** {user.first_name}\n\n"
+            f"Escolha o tipo de alerta que o grupo receberá:",
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=keyboard
+        )
+
+    async def _handle_group_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler para status do grupo"""
+        chat = update.effective_chat
+        
+        # Verifica se é um grupo
+        if chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text(
+                "❌ **Este comando só funciona em grupos\\!**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Verifica se o grupo está registrado
+        if chat.id not in self.groups:
+            await update.message.reply_text(
+                "ℹ️ **Grupo não está registrado\\.**\n\n"
+                "Use `/activate_group` para ativar alertas\\.",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        group = self.groups[chat.id]
+        
+        # Calcula uptime
+        uptime_hours = (time.time() - group.activated_at) / 3600
+        
+        status_text = f"""📊 **STATUS DO GRUPO**
+
+📋 **Informações:**
+• Nome: {chat.title}
+• ID: `{chat.id}`
+• Status: {'✅ Ativo' if group.is_active else '❌ Inativo'}
+
+🔔 **Alertas:**
+• Tipo: {group.subscription_type.value}
+• Tips recebidas: {group.tips_received}
+• Ativo há: {uptime_hours:.1f}h
+
+👤 **Configuração:**
+• Ativado por: {group.activated_by}
+• Data: {time.strftime('%d/%m/%Y %H:%M', time.localtime(group.activated_at))}
+
+⚙️ **Comandos:**
+• `/activate_group` \\- Reconfigurar alertas
+• `/deactivate_group` \\- Desativar alertas"""
+        
+        await update.message.reply_text(
+            status_text,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    async def _handle_deactivate_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler para desativar alertas do grupo"""
+        chat = update.effective_chat
+        user = update.effective_user
+        
+        # Verifica se é um grupo
+        if chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text(
+                "❌ **Este comando só funciona em grupos\\!**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Verifica se o usuário é admin do grupo
+        try:
+            member = await self.bot.get_chat_member(chat.id, user.id)
+            if member.status not in ['administrator', 'creator']:
+                await update.message.reply_text(
+                    "❌ **Apenas administradores podem desativar alertas\\!**",
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                return
+        except Exception as e:
+            logger.error(f"Erro ao verificar admin: {e}")
+            return
+        
+        # Verifica se o grupo está ativo
+        if chat.id not in self.groups or not self.groups[chat.id].is_active:
+            await update.message.reply_text(
+                "ℹ️ **Alertas já estão desativados neste grupo\\.**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Desativa o grupo
+        self.groups[chat.id].is_active = False
+        
+        await update.message.reply_text(
+            f"❌ **Alertas desativados\\!**\n\n"
+            f"O grupo não receberá mais tips automáticas\\.\n"
+            f"Use `/activate_group` para reativar\\.",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    def _get_group_subscription_keyboard(self) -> InlineKeyboardMarkup:
+        """Cria teclado inline para subscrições de grupo"""
+        keyboard = [
+            [InlineKeyboardButton("🔔 Todas as Tips", callback_data=SubscriptionType.ALL_TIPS.value)],
+            [InlineKeyboardButton("💎 Alto Valor (EV > 10%)", callback_data=SubscriptionType.HIGH_VALUE.value)],
+            [InlineKeyboardButton("🎯 Alta Confiança (> 80%)", callback_data=SubscriptionType.HIGH_CONFIDENCE.value)],
+            [InlineKeyboardButton("👑 Premium (EV > 15% + Conf > 85%)", callback_data=SubscriptionType.PREMIUM.value)],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def _get_eligible_groups_for_tip(self, tip: ProfessionalTip) -> List[int]:
+        """Filtra grupos elegíveis para receber a tip"""
+        eligible_groups = []
+        
+        for group_id, group in self.groups.items():
+            if not group.is_active or group_id in self.blocked_groups:
+                continue
+            
+            # Filtra por tipo de subscrição
+            if group.subscription_type == SubscriptionType.ALL_TIPS:
+                eligible_groups.append(group_id)
+            elif group.subscription_type == SubscriptionType.HIGH_VALUE and tip.expected_value > 0.10:
+                eligible_groups.append(group_id)
+            elif group.subscription_type == SubscriptionType.HIGH_CONFIDENCE and tip.confidence > 0.80:
+                eligible_groups.append(group_id)
+            elif group.subscription_type == SubscriptionType.PREMIUM and tip.expected_value > 0.15 and tip.confidence > 0.85:
+                eligible_groups.append(group_id)
+            elif group.subscription_type == SubscriptionType.CUSTOM and self._meets_custom_filters(tip, group.custom_filters):
+                eligible_groups.append(group_id)
+        
+        return eligible_groups
+
+    async def _send_message_to_group(self, group_id: int, message: str, notification_type: NotificationType) -> bool:
+        """Envia mensagem para um grupo específico"""
+        try:
+            if group_id in self.blocked_groups:
+                return False
+            
+            await self.bot.send_message(
+                chat_id=group_id,
+                text=message,
+                parse_mode=ParseMode.MARKDOWN_V2,
+                disable_web_page_preview=True
+            )
+            
+            return True
+            
+        except Forbidden:
+            logger.warning(f"Bot foi removido do grupo {group_id}")
+            self.blocked_groups.add(group_id)
+            if group_id in self.groups:
+                self.groups[group_id].is_active = False
+            return False
+            
+        except BadRequest as e:
+            logger.error(f"Erro de requisição para grupo {group_id}: {e}")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Erro ao enviar mensagem para grupo {group_id}: {e}")
+            self.stats.failed_deliveries += 1
+            return False 

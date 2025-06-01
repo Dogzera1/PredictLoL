@@ -7,6 +7,14 @@ from typing import Dict, List, Optional, Any, TYPE_CHECKING
 from dataclasses import dataclass
 import signal
 import sys
+import tempfile
+
+# Import condicional para fcntl (não disponível no Windows)
+try:
+    import fcntl  # Para lock de arquivo no Unix/Linux
+    FCNTL_AVAILABLE = True
+except ImportError:
+    FCNTL_AVAILABLE = False
 
 try:
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -45,6 +53,105 @@ class BotStats:
     @property
     def uptime_hours(self) -> float:
         return (time.time() - self.start_time) / 3600
+
+
+class InstanceManager:
+    """Gerenciador de instância única do bot"""
+    
+    def __init__(self, lock_file: str = None):
+        if lock_file is None:
+            lock_file = os.path.join(tempfile.gettempdir(), "lol_bot_v3.lock")
+        
+        self.lock_file = lock_file
+        self.lock_fd = None
+        
+    def acquire_lock(self) -> bool:
+        """Tenta adquirir lock exclusivo"""
+        try:
+            self.lock_fd = open(self.lock_file, 'w')
+            
+            if sys.platform == "win32":
+                # Windows - usa locking exclusivo via msvcrt
+                try:
+                    import msvcrt
+                    msvcrt.locking(self.lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+                except ImportError:
+                    # Se msvcrt não está disponível, usa fallback simples
+                    logger.warning("msvcrt não disponível, usando lock básico")
+            else:
+                # Unix/Linux - usa fcntl se disponível
+                if FCNTL_AVAILABLE:
+                    fcntl.lockf(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                else:
+                    logger.warning("fcntl não disponível, usando lock básico")
+            
+            # Escreve PID no arquivo
+            self.lock_fd.write(str(os.getpid()))
+            self.lock_fd.flush()
+            
+            logger.info(f"🔒 Lock adquirido: {self.lock_file}")
+            return True
+            
+        except (IOError, OSError) as e:
+            logger.warning(f"⚠️ Não foi possível adquirir lock: {e}")
+            if self.lock_fd:
+                self.lock_fd.close()
+                self.lock_fd = None
+            return False
+    
+    def release_lock(self) -> None:
+        """Libera o lock"""
+        if self.lock_fd:
+            try:
+                if sys.platform == "win32":
+                    try:
+                        import msvcrt
+                        msvcrt.locking(self.lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
+                    except ImportError:
+                        pass  # Lock básico não precisa unlock
+                else:
+                    if FCNTL_AVAILABLE:
+                        fcntl.lockf(self.lock_fd, fcntl.LOCK_UN)
+                
+                self.lock_fd.close()
+                logger.info("🔓 Lock liberado")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao liberar lock: {e}")
+            finally:
+                self.lock_fd = None
+                
+                # Remove arquivo de lock
+                try:
+                    if os.path.exists(self.lock_file):
+                        os.remove(self.lock_file)
+                except:
+                    pass
+    
+    def is_another_instance_running(self) -> bool:
+        """Verifica se há outra instância rodando"""
+        if not os.path.exists(self.lock_file):
+            return False
+        
+        try:
+            with open(self.lock_file, 'r') as f:
+                pid = int(f.read().strip())
+            
+            # Verifica se processo ainda existe
+            if sys.platform == "win32":
+                import subprocess
+                result = subprocess.run(['tasklist', '/FI', f'PID eq {pid}'], 
+                                      capture_output=True, text=True)
+                return str(pid) in result.stdout
+            else:
+                # Unix/Linux
+                try:
+                    os.kill(pid, 0)  # Não mata, apenas verifica se existe
+                    return True
+                except OSError:
+                    return False
+                    
+        except (ValueError, IOError):
+            return False
 
 
 class LoLBotV3UltraAdvanced:
@@ -89,6 +196,9 @@ class LoLBotV3UltraAdvanced:
         self.schedule_manager = schedule_manager
         self.admin_user_ids = admin_user_ids or []
         
+        # Gerenciador de instância única
+        self.instance_manager = InstanceManager()
+        
         # Referências diretas aos sistemas via ScheduleManager
         self.tips_system = schedule_manager.tips_system
         self.telegram_alerts = schedule_manager.telegram_alerts
@@ -107,6 +217,17 @@ class LoLBotV3UltraAdvanced:
         if self.is_running:
             logger.warning("Bot já está executando")
             return
+        
+        # Verifica se já há outra instância rodando
+        if self.instance_manager.is_another_instance_running():
+            logger.error("❌ Outra instância do bot já está rodando!")
+            logger.info("💡 Use 'python stop_all_bots.py' para parar todas as instâncias")
+            raise RuntimeError("Outra instância do bot já está rodando")
+        
+        # Tenta adquirir lock exclusivo
+        if not self.instance_manager.acquire_lock():
+            logger.error("❌ Não foi possível adquirir lock exclusivo!")
+            raise RuntimeError("Não foi possível garantir instância única")
         
         logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado - Sistema Completo!")
         
@@ -127,20 +248,17 @@ class LoLBotV3UltraAdvanced:
             await self.application.initialize()
             await self.application.start()
             
-            # 5. Inicia polling de forma robusta
-            logger.info("📞 Iniciando polling...")
-            await self.application.updater.start_polling(
-                drop_pending_updates=True,
-                bootstrap_retries=3,
-                read_timeout=30,
-                connect_timeout=30,
-                pool_timeout=30
-            )
+            # 5. Configura handlers de shutdown
+            self._setup_signal_handlers(schedule_task)
+            
+            # 6. Inicia polling com proteção anti-conflito
+            logger.info("📞 Iniciando polling com proteção anti-conflito...")
+            await self._start_polling_with_advanced_retry()
             
             self.is_running = True
             logger.info("✅ Bot LoL V3 Ultra Avançado totalmente operacional!")
             
-            # 6. Mantém executando
+            # 7. Mantém executando
             try:
                 await schedule_task
             except asyncio.CancelledError:
@@ -151,63 +269,150 @@ class LoLBotV3UltraAdvanced:
             await self.stop_bot()
             raise
 
-    async def _start_polling_with_retry(self) -> None:
-        """Inicia polling com retry em caso de conflitos"""
-        max_retries = 8
+    async def _start_polling_with_advanced_retry(self) -> None:
+        """Inicia polling com proteção avançada contra conflitos"""
+        max_retries = 15
+        base_wait_time = 5
+        
         for attempt in range(max_retries):
             try:
-                # Aguarda mais tempo entre tentativas para conflitos
                 if attempt > 0:
-                    wait_time = min(10 + (attempt * 5), 30)  # 10, 15, 20, 25, 30, 30, 30...
-                    logger.info(f"⏳ Aguardando {wait_time}s antes da tentativa {attempt + 1}")
+                    wait_time = min(base_wait_time + (attempt * 3), 60)
+                    logger.info(f"⏳ Tentativa {attempt + 1}/{max_retries} - Aguardando {wait_time}s...")
                     await asyncio.sleep(wait_time)
+                    
+                    # Força limpeza antes de tentar novamente
+                    await self._force_clear_telegram_conflicts()
                 
+                # Configurações otimizadas para evitar conflitos
                 await self.application.updater.start_polling(
-                    timeout=60,      # Aumentado de 30 para 60
-                    pool_timeout=60, # Aumentado de 30 para 60
-                    connect_timeout=30,
-                    read_timeout=30,
-                    write_timeout=30,
-                    allowed_updates=["message", "callback_query", "inline_query"]  # Apenas updates necessários
+                    drop_pending_updates=True,  # Descarta updates pendentes
+                    bootstrap_retries=1,        # Menos retries bootstrap
+                    read_timeout=45,           # Timeout maior para leitura
+                    connect_timeout=30,        # Timeout conexão
+                    pool_timeout=60,           # Pool timeout maior
+                    write_timeout=30,          # Timeout escrita
+                    allowed_updates=["message", "callback_query"]  # Apenas updates necessários
                 )
-                logger.info("✅ Polling iniciado com sucesso")
+                
+                logger.info("✅ Polling iniciado com sucesso!")
                 break
+                
             except Exception as e:
-                if "terminated by other getUpdates request" in str(e) or "Conflict" in str(e):
-                    logger.warning(f"⚠️ Conflito no polling (tentativa {attempt + 1}/{max_retries}): {e}")
+                error_str = str(e).lower()
+                
+                if "conflict" in error_str or "terminated by other" in error_str:
+                    logger.warning(f"⚠️ Conflito detectado (tentativa {attempt + 1}/{max_retries}): {e}")
+                    
                     if attempt < max_retries - 1:
-                        # Tenta limpar conflito via API
-                        await self._force_clear_conflicts()
+                        # Limpeza progressivamente mais agressiva
+                        if attempt < 3:
+                            await self._gentle_conflict_cleanup()
+                        elif attempt < 8:
+                            await self._moderate_conflict_cleanup()
+                        else:
+                            await self._aggressive_conflict_cleanup()
                         continue
                     else:
-                        logger.error("❌ Máximo de tentativas atingido para polling")
-                        raise
+                        logger.error("❌ Máximo de tentativas atingido para resolver conflitos")
+                        raise RuntimeError("Não foi possível resolver conflitos do Telegram após múltiplas tentativas")
+                
+                elif "network" in error_str or "timeout" in error_str:
+                    logger.warning(f"⚠️ Problema de rede (tentativa {attempt + 1}): {e}")
+                    continue
+                    
                 else:
                     logger.error(f"❌ Erro não relacionado a conflito: {e}")
                     raise
 
-    async def _force_clear_conflicts(self) -> None:
-        """Força limpeza de conflitos via API do Telegram"""
+    async def _gentle_conflict_cleanup(self) -> None:
+        """Limpeza suave de conflitos"""
+        logger.info("🧹 Limpeza suave...")
         try:
-            import aiohttp
+            # Para o updater atual se estiver rodando
+            if self.application and self.application.updater and self.application.updater.running:
+                await self.application.updater.stop()
+                await asyncio.sleep(2)
             
-            logger.info("🧹 Forçando limpeza de conflitos...")
+            await self._force_clear_telegram_conflicts(requests_count=5)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na limpeza suave: {e}")
+
+    async def _moderate_conflict_cleanup(self) -> None:
+        """Limpeza moderada de conflitos"""
+        logger.info("🧹 Limpeza moderada...")
+        try:
+            # Para aplicação completamente
+            if self.application:
+                if self.application.updater and self.application.updater.running:
+                    await self.application.updater.stop()
+                await self.application.stop()
+                await asyncio.sleep(3)
+                await self.application.start()
+            
+            await self._force_clear_telegram_conflicts(requests_count=10)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na limpeza moderada: {e}")
+
+    async def _aggressive_conflict_cleanup(self) -> None:
+        """Limpeza agressiva de conflitos"""
+        logger.info("🧹 Limpeza agressiva...")
+        try:
+            # Reinicia aplicação completamente
+            if self.application:
+                if self.application.updater and self.application.updater.running:
+                    await self.application.updater.stop()
+                await self.application.stop()
+                await self.application.shutdown()
+                await asyncio.sleep(5)
+                
+                # Recria aplicação
+                self.application = Application.builder().token(self.bot_token).build()
+                self._setup_all_handlers()
+                await self.application.initialize()
+                await self.application.start()
+            
+            await self._force_clear_telegram_conflicts(requests_count=20)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na limpeza agressiva: {e}")
+
+    async def _force_clear_telegram_conflicts(self, requests_count: int = 10) -> None:
+        """Força limpeza de conflitos via API do Telegram"""
+        import aiohttp
+        
+        try:
+            logger.debug(f"📡 Limpando conflitos com {requests_count} requisições...")
             base_url = f"https://api.telegram.org/bot{self.bot_token}"
             
             async with aiohttp.ClientSession() as session:
                 # Múltiplas tentativas de getUpdates para "roubar" controle
-                for i in range(3):
+                for i in range(requests_count):
                     try:
-                        async with session.post(f"{base_url}/getUpdates", json={"timeout": 1}) as resp:
+                        async with session.post(f"{base_url}/getUpdates", 
+                                              json={"timeout": 1, "limit": 100}) as resp:
                             if resp.status == 200:
-                                logger.debug(f"✅ Conflito limpo (tentativa {i + 1})")
-                                break
+                                data = await resp.json()
+                                updates_count = len(data.get('result', []))
+                                if updates_count > 0:
+                                    logger.debug(f"  📥 {updates_count} updates limpos")
                     except:
                         pass
-                    await asyncio.sleep(1)
+                    
+                    await asyncio.sleep(0.5)
+                
+                # Remove webhook se existir
+                try:
+                    async with session.post(f"{base_url}/deleteWebhook") as resp:
+                        if resp.status == 200:
+                            logger.debug("🔗 Webhook removido")
+                except:
+                    pass
                 
                 # Aguarda estabilização
-                await asyncio.sleep(3)
+                await asyncio.sleep(2)
                 
         except Exception as e:
             logger.warning(f"⚠️ Erro na limpeza forçada: {e}")
@@ -243,11 +448,17 @@ class LoLBotV3UltraAdvanced:
                 await self.application.stop()
                 await self.application.shutdown()
             
+            # 3. Libera lock de instância única
+            self.instance_manager.release_lock()
+            
             self.is_running = False
             logger.info("✅ Bot parado com sucesso")
             
         except Exception as e:
             logger.error(f"Erro ao parar bot: {e}")
+        finally:
+            # Garante que lock seja liberado
+            self.instance_manager.release_lock()
 
     def _setup_all_handlers(self) -> None:
         """Configura todos os handlers do bot"""
@@ -260,6 +471,11 @@ class LoLBotV3UltraAdvanced:
         self.application.add_handler(CommandHandler("subscribe", self._handle_subscribe))
         self.application.add_handler(CommandHandler("unsubscribe", self._handle_unsubscribe))
         self.application.add_handler(CommandHandler("mystats", self._handle_my_stats))
+        
+        # Comandos para grupos
+        self.application.add_handler(CommandHandler("activate_group", self._handle_activate_group))
+        self.application.add_handler(CommandHandler("group_status", self._handle_group_status))
+        self.application.add_handler(CommandHandler("deactivate_group", self._handle_deactivate_group))
         
         # Comandos administrativos (apenas admins)
         self.application.add_handler(CommandHandler("admin", self._handle_admin))
@@ -338,19 +554,24 @@ Olá, {user.first_name}\\!
         is_admin = user.id in self.admin_user_ids
         self.stats.commands_processed += 1
         
-        help_message = """🆘 **AJUDA \\- Bot LoL V3 Ultra Avançado**
+        help_message = f"""🆘 **AJUDA \\- Bot LoL V3 Ultra Avançado**
 
 **🎯 Sobre o Sistema:**
 Bot profissional para tips de League of Legends com automação total\\. Combina Machine Learning, análise em tempo real e gestão de risco profissional\\.
 
 **📋 Comandos Básicos:**
 • `/start` \\- Iniciar e ver menu principal
-• `/help` \\\\ Esta ajuda
-• `/status` \\\\ Status do sistema e estatísticas
-• `/stats` \\\\ Suas estatísticas pessoais
-• `/subscribe` \\\\ Configurar tipos de alerta
-• `/unsubscribe` \\\\ Cancelar alertas
-• `/mystats` \\\\ Histórico detalhado
+• `/help` \\- Esta ajuda
+• `/status` \\- Status do sistema e estatísticas
+• `/stats` \\- Suas estatísticas pessoais
+• `/subscribe` \\- Configurar tipos de alerta
+• `/unsubscribe` \\- Cancelar alertas
+• `/mystats` \\- Histórico detalhado
+
+**👥 Comandos para Grupos:**
+• `/activate_group` \\- Ativar alertas no grupo \\(apenas admins\\)
+• `/group_status` \\- Ver status e estatísticas do grupo
+• `/deactivate_group` \\- Desativar alertas \\(apenas admins\\)
 
 **🔔 Tipos de Subscrição:**
 • **Todas as Tips** \\- Recebe todas as tips geradas
@@ -538,6 +759,23 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=self._get_mystats_keyboard()
         )
+
+    # ===== COMANDOS PARA GRUPOS =====
+
+    async def _handle_activate_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler para ativar alertas em um grupo"""
+        # Delega para o sistema de alertas que já tem a lógica completa
+        await self.telegram_alerts._handle_activate_group(update, context)
+
+    async def _handle_group_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler para status do grupo"""
+        # Delega para o sistema de alertas que já tem a lógica completa
+        await self.telegram_alerts._handle_group_status(update, context)
+
+    async def _handle_deactivate_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler para desativar alertas do grupo"""
+        # Delega para o sistema de alertas que já tem a lógica completa
+        await self.telegram_alerts._handle_deactivate_group(update, context)
 
     # ===== COMANDOS ADMINISTRATIVOS =====
 
