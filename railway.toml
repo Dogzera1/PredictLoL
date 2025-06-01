@@ -12,6 +12,7 @@ restartPolicyMaxRetries = 3
 PYTHONPATH = "/app"
 PYTHONUNBUFFERED = "1"
 TZ = "America/Sao_Paulo"
+NIXPACKS_PYTHON_VERSION = "3.11.7"
 
 [environments.production.deploy]
 numReplicas = 1

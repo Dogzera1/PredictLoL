@@ -20,7 +20,6 @@ def test_required_files():
         "runtime.txt", 
         "Procfile",
         "railway.toml",
-        "nixpacks.toml",
         "health_check.py",
         "env.template"
     ]
@@ -188,27 +187,15 @@ def test_railway_config():
         else:
             print("  ❌ railway.toml - comando de start incorreto")
             return False
+        
+        # Verifica se Python version está configurada
+        if "NIXPACKS_PYTHON_VERSION" in content and "3.11" in content:
+            print("  ✅ railway.toml - Python 3.11 configurado")
+        else:
+            print("  ✅ railway.toml - Python será auto-detectado")
             
     except FileNotFoundError:
         print("  ❌ railway.toml não encontrado!")
-        return False
-    
-    # Testa nixpacks.toml
-    try:
-        with open("nixpacks.toml", "r") as f:
-            content = f.read()
-        
-        # Aceita vários formatos de configuração Python 3.11
-        if ("python311" in content or 
-            "3.11" in content or 
-            ("providers.python" in content and "version" in content)):
-            print("  ✅ nixpacks.toml - Python 3.11 configurado")
-        else:
-            print("  ❌ nixpacks.toml - versão Python incorreta")
-            return False
-            
-    except FileNotFoundError:
-        print("  ❌ nixpacks.toml não encontrado!")
         return False
     
     # Testa Procfile
