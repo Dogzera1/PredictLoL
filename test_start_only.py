@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Teste completo do Bot LoL V3 - Todos os comandos funcionais
+Bot LoL V3 - Versão Protegida Contra Conflitos
 """
 import asyncio
 import logging
 import time
+import aiohttp
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from telegram.error import Conflict
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,6 +25,43 @@ SYSTEM_STATS = {
     "system_uptime": 0,
     "commands_processed": 0
 }
+
+class ConflictResolver:
+    """Classe para resolver conflitos automaticamente"""
+    
+    @staticmethod
+    async def clear_conflicts():
+        """Limpa conflitos via API direta"""
+        logger.info("🧹 Limpando conflitos automaticamente...")
+        
+        base_url = f"https://api.telegram.org/bot{BOT_TOKEN}"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Múltiplas tentativas de getUpdates
+                for i in range(5):
+                    try:
+                        async with session.post(
+                            f"{base_url}/getUpdates", 
+                            json={"timeout": 1, "offset": -1}
+                        ) as resp:
+                            if resp.status == 200:
+                                logger.debug(f"Limpeza {i+1}/5 OK")
+                            await asyncio.sleep(1)
+                    except:
+                        pass
+                
+                # Remove webhook
+                try:
+                    await session.post(f"{base_url}/deleteWebhook")
+                except:
+                    pass
+                
+                logger.info("✅ Conflitos limpos!")
+                await asyncio.sleep(3)
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na limpeza: {e}")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler completo para /start"""
@@ -307,6 +346,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         if data == "main_menu":
+            # Simula comando start via callback
             await start_command(update, context)
         
         elif data == "show_help":
@@ -358,7 +398,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"""🔧 **STATUS DETALHADO**
 
 **🖥️ Sistema Principal:**
-• Runtime: Python 3\\.11
+• Runtime: Python 3\\.13
 • Framework: python\\-telegram\\-bot 20\\.0
 • Database: SQLite \\(in\\-memory\\)
 • Cache: Redis \\(simulado\\)
@@ -457,42 +497,86 @@ def get_main_keyboard(is_admin=False):
     
     return InlineKeyboardMarkup(keyboard)
 
+async def start_bot_with_protection():
+    """Inicia bot com proteção contra conflitos"""
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"🚀 Tentativa {attempt + 1}/{max_retries} de inicialização...")
+            
+            # Limpa conflitos antes de iniciar
+            if attempt > 0:
+                await ConflictResolver.clear_conflicts()
+            
+            # Cria aplicação
+            app = Application.builder().token(BOT_TOKEN).build()
+            
+            # Adiciona handlers
+            app.add_handler(CommandHandler("start", start_command))
+            app.add_handler(CommandHandler("help", help_command))
+            app.add_handler(CommandHandler("status", status_command))
+            app.add_handler(CommandHandler("stats", stats_command))
+            app.add_handler(CommandHandler("subscribe", subscribe_command))
+            app.add_handler(CommandHandler("ping", ping_command))
+            app.add_handler(CommandHandler("admin", admin_command))
+            app.add_handler(CallbackQueryHandler(handle_callback))
+            
+            await app.initialize()
+            await app.start()
+            
+            logger.info("🤖 Bot LoL V3 Ultra Avançado iniciado com proteção!")
+            logger.info(f"👥 Bot: @{app.bot.username}")
+            logger.info("📱 Comandos: /start, /help, /status, /stats, /subscribe, /ping, /admin")
+            logger.info("🔘 Interface com botões interativos ativa!")
+            logger.info("🛡️ Proteção anti-conflito ativa!")
+            logger.info("⏹️ Ctrl+C para parar")
+            
+            # Inicia polling com configurações otimizadas
+            await app.updater.start_polling(
+                drop_pending_updates=True,
+                timeout=30,
+                bootstrap_retries=0,  # Sem retry interno
+                read_timeout=20,
+                connect_timeout=20,
+                pool_timeout=20
+            )
+            
+            try:
+                await asyncio.Event().wait()
+            except KeyboardInterrupt:
+                logger.info("🛑 Parando bot...")
+            finally:
+                await app.updater.stop()
+                await app.stop()
+                await app.shutdown()
+                logger.info("✅ Bot parado com sucesso")
+            
+            break  # Se chegou aqui, funcionou
+            
+        except Conflict as e:
+            logger.warning(f"⚠️ Conflito detectado na tentativa {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                logger.info(f"🔄 Tentando novamente em 15s...")
+                await asyncio.sleep(15)
+            else:
+                logger.error("❌ Máximo de tentativas atingido!")
+                raise
+        except Exception as e:
+            logger.error(f"❌ Erro na tentativa {attempt + 1}: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(10)
+            else:
+                raise
+
 async def main():
-    """Main completo"""
-    app = Application.builder().token(BOT_TOKEN).build()
-    
-    # Comandos
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("status", status_command))
-    app.add_handler(CommandHandler("stats", stats_command))
-    app.add_handler(CommandHandler("subscribe", subscribe_command))
-    app.add_handler(CommandHandler("ping", ping_command))
-    app.add_handler(CommandHandler("admin", admin_command))
-    
-    # Callbacks
-    app.add_handler(CallbackQueryHandler(handle_callback))
-    
-    await app.initialize()
-    await app.start()
-    
-    logger.info("🤖 Bot LoL V3 Ultra Avançado iniciado!")
-    logger.info(f"👥 Bot: @{app.bot.username}")
-    logger.info("📱 Comandos disponíveis: /start, /help, /status, /stats, /subscribe, /ping, /admin")
-    logger.info("🔘 Interface com botões interativos ativa!")
-    logger.info("⏹️ Ctrl+C para parar")
-    
-    await app.updater.start_polling()
-    
+    """Main com proteção avançada"""
     try:
-        await asyncio.Event().wait()
+        await start_bot_with_protection()
     except KeyboardInterrupt:
-        logger.info("🛑 Parando bot...")
-    finally:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
-        logger.info("✅ Bot parado com sucesso")
+        logger.info("🛑 Interrompido pelo usuário")
+    except Exception as e:
+        logger.error(f"❌ Erro fatal: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main()) 
