@@ -60,7 +60,15 @@ class InstanceManager:
     
     def __init__(self, lock_file: str = None):
         if lock_file is None:
-            lock_file = os.path.join(tempfile.gettempdir(), "lol_bot_v3.lock")
+            # Windows-friendly path
+            if sys.platform == "win32":
+                lock_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Temp")
+            else:
+                lock_dir = tempfile.gettempdir()
+            
+            # Cria diretório se não existir
+            os.makedirs(lock_dir, exist_ok=True)
+            lock_file = os.path.join(lock_dir, "lol_bot_v3.lock")
         
         self.lock_file = lock_file
         self.lock_fd = None
@@ -68,6 +76,7 @@ class InstanceManager:
     def acquire_lock(self) -> bool:
         """Tenta adquirir lock exclusivo"""
         try:
+            # Tenta criar arquivo de lock
             self.lock_fd = open(self.lock_file, 'w')
             
             if sys.platform == "win32":
@@ -78,6 +87,9 @@ class InstanceManager:
                 except ImportError:
                     # Se msvcrt não está disponível, usa fallback simples
                     logger.warning("msvcrt não disponível, usando lock básico")
+                except OSError as e:
+                    logger.warning(f"Lock msvcrt falhou: {e}, usando fallback")
+                    # Não falha, apenas continua sem lock exclusivo
             else:
                 # Unix/Linux - usa fcntl se disponível
                 if FCNTL_AVAILABLE:
@@ -93,10 +105,66 @@ class InstanceManager:
             return True
             
         except (IOError, OSError) as e:
-            logger.warning(f"⚠️ Não foi possível adquirir lock: {e}")
-            if self.lock_fd:
-                self.lock_fd.close()
-                self.lock_fd = None
+            if "permission denied" in str(e).lower():
+                logger.warning(f"⚠️ Permission denied para lock, tentando fallback...")
+                # Tenta fallback com lock básico
+                return self._fallback_lock()
+            else:
+                logger.warning(f"⚠️ Não foi possível adquirir lock: {e}")
+                if self.lock_fd:
+                    self.lock_fd.close()
+                    self.lock_fd = None
+                return False
+    
+    def _fallback_lock(self) -> bool:
+        """Fallback quando não consegue criar lock exclusivo"""
+        try:
+            # Usa apenas verificação de PID básica
+            if os.path.exists(self.lock_file):
+                try:
+                    with open(self.lock_file, 'r') as f:
+                        pid = int(f.read().strip())
+                    
+                    # Verifica se processo ainda existe
+                    if self._is_process_running(pid):
+                        logger.warning(f"⚠️ Processo {pid} ainda rodando")
+                        return False
+                except (ValueError, IOError):
+                    # Arquivo corrompido, remove
+                    try:
+                        os.remove(self.lock_file)
+                    except:
+                        pass
+            
+            # Cria arquivo simples com PID
+            with open(self.lock_file, 'w') as f:
+                f.write(str(os.getpid()))
+            
+            logger.info(f"🔒 Lock básico adquirido: {self.lock_file}")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Fallback lock falhou: {e}")
+            # Em último caso, permite execução sem lock
+            logger.warning("⚠️ Executando sem lock de instância - CUIDADO!")
+            return True
+    
+    def _is_process_running(self, pid: int) -> bool:
+        """Verifica se processo está rodando"""
+        try:
+            if sys.platform == "win32":
+                import subprocess
+                result = subprocess.run(['tasklist', '/FI', f'PID eq {pid}'], 
+                                      capture_output=True, text=True)
+                return str(pid) in result.stdout
+            else:
+                # Unix/Linux
+                try:
+                    os.kill(pid, 0)  # Não mata, apenas verifica se existe
+                    return True
+                except OSError:
+                    return False
+        except:
             return False
     
     def release_lock(self) -> None:
@@ -107,7 +175,7 @@ class InstanceManager:
                     try:
                         import msvcrt
                         msvcrt.locking(self.lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
-                    except ImportError:
+                    except (ImportError, OSError):
                         pass  # Lock básico não precisa unlock
                 else:
                     if FCNTL_AVAILABLE:
@@ -137,18 +205,7 @@ class InstanceManager:
                 pid = int(f.read().strip())
             
             # Verifica se processo ainda existe
-            if sys.platform == "win32":
-                import subprocess
-                result = subprocess.run(['tasklist', '/FI', f'PID eq {pid}'], 
-                                      capture_output=True, text=True)
-                return str(pid) in result.stdout
-            else:
-                # Unix/Linux
-                try:
-                    os.kill(pid, 0)  # Não mata, apenas verifica se existe
-                    return True
-                except OSError:
-                    return False
+            return self._is_process_running(pid)
                     
         except (ValueError, IOError):
             return False
@@ -276,6 +333,9 @@ class LoLBotV3UltraAdvanced:
         
         logger.info(f"🛡️ Sistema anti-conflito ativado: {max_retries} tentativas")
         
+        # FASE PRÉ-POLLING: Limpeza preventiva
+        await self._pre_polling_cleanup()
+        
         for attempt in range(max_retries):
             try:
                 if attempt > 0:
@@ -341,6 +401,51 @@ class LoLBotV3UltraAdvanced:
                 else:
                     logger.error(f"❌ Erro crítico não relacionado a conflito: {e}")
                     raise
+
+    async def _pre_polling_cleanup(self) -> None:
+        """Limpeza preventiva antes de iniciar polling"""
+        logger.info("🧹 Limpeza preventiva pré-polling...")
+        
+        try:
+            import aiohttp
+            base_url = f"https://api.telegram.org/bot{self.bot_token}"
+            
+            async with aiohttp.ClientSession() as session:
+                # 1. Verifica e remove webhook se existir
+                async with session.post(f"{base_url}/getWebhookInfo") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        webhook_info = data.get('result', {})
+                        webhook_url = webhook_info.get('url', '')
+                        
+                        if webhook_url:
+                            logger.warning(f"⚠️ Webhook detectado: {webhook_url}")
+                            logger.info("🔧 Removendo webhook automaticamente...")
+                            
+                            async with session.post(f"{base_url}/deleteWebhook") as resp:
+                                if resp.status == 200:
+                                    logger.info("✅ Webhook removido com sucesso")
+                                else:
+                                    logger.warning(f"⚠️ Falha ao remover webhook: {resp.status}")
+                
+                # 2. Limpeza inicial de getUpdates
+                for i in range(5):
+                    try:
+                        async with session.post(f"{base_url}/getUpdates", 
+                                              json={"timeout": 0, "limit": 100, "offset": -1}) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                updates_count = len(data.get('result', []))
+                                if updates_count > 0:
+                                    logger.debug(f"  📥 Limpou {updates_count} updates pendentes")
+                    except:
+                        pass
+                    await asyncio.sleep(0.5)
+                
+                logger.info("✅ Limpeza preventiva concluída")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na limpeza preventiva: {e}")
 
     async def _gentle_conflict_cleanup(self) -> None:
         """Limpeza suave de conflitos"""
@@ -428,7 +533,15 @@ class LoLBotV3UltraAdvanced:
             base_url = f"https://api.telegram.org/bot{self.bot_token}"
             
             async with aiohttp.ClientSession() as session:
-                # Múltiplas tentativas de getUpdates para "roubar" controle
+                # 1. Força remoção de webhook primeiro
+                try:
+                    async with session.post(f"{base_url}/deleteWebhook") as resp:
+                        if resp.status == 200:
+                            logger.debug("🔗 Webhook removido forçadamente")
+                except:
+                    pass
+                
+                # 2. Múltiplas tentativas de getUpdates para "roubar" controle
                 for i in range(requests_count):
                     try:
                         async with session.post(f"{base_url}/getUpdates", 
@@ -443,15 +556,7 @@ class LoLBotV3UltraAdvanced:
                     
                     await asyncio.sleep(0.5)
                 
-                # Remove webhook se existir
-                try:
-                    async with session.post(f"{base_url}/deleteWebhook") as resp:
-                        if resp.status == 200:
-                            logger.debug("🔗 Webhook removido")
-                except:
-                    pass
-                
-                # Aguarda estabilização
+                # 3. Aguarda estabilização
                 await asyncio.sleep(2)
                 
         except Exception as e:
