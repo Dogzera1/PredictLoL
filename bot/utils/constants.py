@@ -11,8 +11,8 @@ MIN_UNITS = 0.5
 MAX_UNITS = 5.0
 
 # Odds
-MIN_ODDS = 1.30
-MAX_ODDS = 3.50
+MIN_ODDS = 1.50
+MAX_ODDS = 8.00
 
 # Timing
 SCAN_INTERVAL_MINUTES = 3
@@ -324,6 +324,10 @@ SUPPORTED_LEAGUES = {
     "LFL", "Prime League", "Superliga", "GLL", "LVP", "PG Nationals",
     "NLC", "Ultraliga", "TCL Academy", "LCL Academy",
     
+    # EMEA Masters e variações - ADICIONADO EXPLICITAMENTE
+    "EMEA Masters", "EM", "European Masters", "EU Masters", 
+    "EMEA Championship", "European Championship", "EMEA",
+    
     # Ligas regionais específicas - ÁSIA
     "LJL Academy", "LCO Academy", "VCS Academy", "PCS Academy",
     
@@ -342,18 +346,22 @@ SUPPORTED_LEAGUES = {
     "Series", "Circuit", "Challenge", "Masters", "Premier"
 }
 
-# Thresholds para sistema de predição - AJUSTADOS para desenvolvimento
+# Thresholds para sistema de predição - OTIMIZADOS para odds altas e valor
 PREDICTION_THRESHOLDS = {
-    "min_confidence": 0.45,          # Reduzido ainda mais para permitir mais tips  
-    "min_ev": 0.5,                   # Reduzido drasticamente para aceitar EV menor
-    "min_odds": 1.15,                # Reduzido para aceitar odds ainda menores
-    "max_odds": 6.00,                # Aumentado para aceitar odds maiores
+    "min_confidence": 0.45,          # Reduzido para permitir mais tips  
+    "min_ev": 0.5,                   # EV mínimo para aceitar apostas
+    "min_odds": 1.50,                # Odds mínima 1.5x conforme solicitado
+    "max_odds": 8.00,                # Aumentado para incluir odds altas valiosas
     "min_game_time": 0,              # Permitir desde o draft/início
-    "min_data_quality": 0.05,        # Reduzido drasticamente para aceitar dados básicos
+    "min_data_quality": 0.05,        # Aceitar dados básicos
     "cache_time_minutes": 10,        # Cache de predições
-    "ml_confidence_threshold": 0.45,  # Reduzido para desenvolvimento
+    "ml_confidence_threshold": 0.45,  # Threshold ML
     "hybrid_weight_ml": 0.6,         # Peso do ML no método híbrido
-    "hybrid_weight_algo": 0.4        # Peso dos algoritmos no híbrido
+    "hybrid_weight_algo": 0.4,       # Peso dos algoritmos no híbrido
+    # Configurações específicas para odds altas
+    "high_odds_threshold": 4.0,      # Odds consideradas "altas"
+    "high_odds_min_ev": 3.0,         # EV mínimo para odds altas (3%)
+    "high_odds_confidence_penalty": 0.1  # Redução de confiança para odds altas
 }
 
 # Pesos para modelo ML simulado

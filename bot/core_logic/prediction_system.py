@@ -860,26 +860,63 @@ class DynamicPredictionSystem:
         game_time: int,
         data_quality: float
     ) -> Dict[str, Any]:
-        """Valida se tip atende aos critérios mínimos"""
+        """Valida se tip atende aos critérios mínimos - APRIMORADO para odds altas"""
         
         # Importa thresholds das constantes
         from ..utils.constants import PREDICTION_THRESHOLDS
         
-        # Critérios baseados nas constantes
+        # Detecta se são odds altas
+        is_high_odds = odds >= PREDICTION_THRESHOLDS.get("high_odds_threshold", 4.0)
+        
+        # Critérios padrão
         meets_confidence = confidence >= PREDICTION_THRESHOLDS["min_confidence"]
         meets_ev = ev_percentage >= PREDICTION_THRESHOLDS["min_ev"]
         meets_odds = PREDICTION_THRESHOLDS["min_odds"] <= odds <= PREDICTION_THRESHOLDS["max_odds"]
         meets_timing = game_time >= PREDICTION_THRESHOLDS["min_game_time"]
         meets_quality = data_quality >= PREDICTION_THRESHOLDS["min_data_quality"]
         
+        # LÓGICA ESPECIAL PARA ODDS ALTAS
+        if is_high_odds:
+            logger.info(f"🎯 ODDS ALTAS DETECTADAS: {odds:.2f} - Aplicando critérios especiais")
+            
+            # Para odds altas, relaxamos a confiança mas exigimos EV maior
+            high_odds_min_ev = PREDICTION_THRESHOLDS.get("high_odds_min_ev", 3.0)
+            confidence_penalty = PREDICTION_THRESHOLDS.get("high_odds_confidence_penalty", 0.1)
+            
+            # Ajusta critérios para odds altas
+            adjusted_confidence_threshold = max(
+                PREDICTION_THRESHOLDS["min_confidence"] - confidence_penalty,
+                0.35  # Nunca menos que 35% de confiança
+            )
+            
+            meets_confidence_high_odds = confidence >= adjusted_confidence_threshold
+            meets_ev_high_odds = ev_percentage >= high_odds_min_ev
+            
+            # Para odds altas, usamos critérios ajustados
+            meets_confidence = meets_confidence_high_odds
+            meets_ev = meets_ev_high_odds
+            
+            logger.info(f"📊 CRITÉRIOS ODDS ALTAS:")
+            logger.info(f"   Confiança: {confidence:.1%} >= {adjusted_confidence_threshold:.1%} = {meets_confidence}")
+            logger.info(f"   EV: {ev_percentage:.1f}% >= {high_odds_min_ev:.1f}% = {meets_ev}")
+            logger.info(f"   Razão: Odds altas ({odds:.2f}) podem ter valor elevado mesmo com menor confiança")
+        
         is_valid = all([meets_confidence, meets_ev, meets_odds, meets_timing, meets_quality])
         
         # Determina motivo de rejeição
         reason = None
         if not meets_confidence:
-            reason = f"Confiança muito baixa: {confidence:.1%} (min: {PREDICTION_THRESHOLDS['min_confidence']:.1%})"
+            threshold = (PREDICTION_THRESHOLDS["min_confidence"] - 
+                        (PREDICTION_THRESHOLDS.get("high_odds_confidence_penalty", 0.1) if is_high_odds else 0))
+            reason = f"Confiança muito baixa: {confidence:.1%} (min: {threshold:.1%})"
+            if is_high_odds:
+                reason += " [Critério reduzido para odds altas]"
         elif not meets_ev:
-            reason = f"EV insuficiente: {ev_percentage:.1f}% (min: {PREDICTION_THRESHOLDS['min_ev']:.1f}%)"
+            threshold = (PREDICTION_THRESHOLDS.get("high_odds_min_ev", 3.0) if is_high_odds 
+                        else PREDICTION_THRESHOLDS["min_ev"])
+            reason = f"EV insuficiente: {ev_percentage:.1f}% (min: {threshold:.1f}%)"
+            if is_high_odds:
+                reason += " [EV mínimo aumentado para odds altas]"
         elif not meets_odds:
             reason = f"Odds fora do range: {odds} (range: {PREDICTION_THRESHOLDS['min_odds']}-{PREDICTION_THRESHOLDS['max_odds']})"
         elif not meets_timing:
@@ -894,7 +931,9 @@ class DynamicPredictionSystem:
             "meets_ev": meets_ev,
             "meets_odds": meets_odds,
             "meets_timing": meets_timing,
-            "meets_quality": meets_quality
+            "meets_quality": meets_quality,
+            "is_high_odds": is_high_odds,
+            "special_criteria_applied": is_high_odds
         }
 
     def _generate_analysis_reasoning(
