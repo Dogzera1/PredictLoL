@@ -282,12 +282,14 @@ class DynamicPredictionSystem:
             # Extrai odds das casas
             team1_odds, team2_odds = self._extract_odds_from_data(odds_data)
             
-            # Determina qual team apostar baseado na predição
-            if prediction_result.predicted_winner == match_data.team1_name:
+            # Determina qual team apostar baseado na predição - SEMPRE O FAVORITO
+            if prediction_result.win_probability > 0.5:
+                # Team1 é favorito
                 bet_on_team = match_data.team1_name
                 predicted_odds = team1_odds
                 predicted_probability = prediction_result.win_probability
             else:
+                # Team2 é favorito
                 bet_on_team = match_data.team2_name
                 predicted_odds = team2_odds
                 predicted_probability = 1.0 - prediction_result.win_probability
@@ -297,7 +299,7 @@ class DynamicPredictionSystem:
             
             # Validação inicial de critérios
             validation_result = self._validate_tip_criteria(
-                confidence=prediction_result.win_probability,
+                confidence=predicted_probability,
                 ev_percentage=ev_percentage,
                 odds=predicted_odds,
                 game_time=match_data.game_time_seconds,
@@ -846,7 +848,9 @@ class DynamicPredictionSystem:
     def _calculate_expected_value(self, true_probability: float, bookmaker_odds: float) -> float:
         """Calcula Expected Value da aposta"""
         implied_probability = 1 / bookmaker_odds
-        return ((true_probability * bookmaker_odds) - 1) * 100
+        ev = ((true_probability * bookmaker_odds) - 1) * 100
+        logger.debug(f"EV Calculation: prob={true_probability:.3f}, odds={bookmaker_odds:.2f}, ev={ev:.2f}%")
+        return ev
 
     def _validate_tip_criteria(
         self, 

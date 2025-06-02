@@ -144,7 +144,7 @@ class ProfessionalTipsSystem:
             "min_game_time_minutes": 0,  # Permitir partidas desde o início (draft)
             "max_game_time_minutes": 60,  # Aumentado para permitir partidas longas
             "supported_leagues": SUPPORTED_LEAGUES,
-            "min_data_quality": 0.30,  # Reduzido para aceitar dados básicos da Riot
+            "min_data_quality": 0.05,  # Reduzido drasticamente para aceitar dados básicos
             "required_events": 0  # Reduzido para aceitar partidas no início
         }
         

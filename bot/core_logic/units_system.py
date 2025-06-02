@@ -271,6 +271,8 @@ class ProfessionalUnitsSystem:
 
     def _get_units_category(self, confidence: float, ev_decimal: float) -> Optional[Dict[str, Any]]:
         """Determina categoria de unidades baseada em confiança e EV"""
+        logger.debug(f"Buscando categoria: conf={confidence:.3f}, ev_decimal={ev_decimal:.4f}")
+        
         # Ordena categorias por prioridade (mais restritivas primeiro)
         sorted_categories = sorted(
             UNITS_CONFIG.items(),
@@ -279,11 +281,13 @@ class ProfessionalUnitsSystem:
         )
         
         for category_name, category in sorted_categories:
+            logger.debug(f"Testando {category_name}: min_conf={category['min_confidence']:.3f}, min_ev={category['min_ev']:.4f}")
             if (confidence >= category["min_confidence"] and 
                 ev_decimal >= category["min_ev"]):
                 logger.debug(f"Categoria selecionada: {category_name}")
                 return category
         
+        logger.debug("Nenhuma categoria encontrada!")
         return None
 
     def _apply_modifiers(

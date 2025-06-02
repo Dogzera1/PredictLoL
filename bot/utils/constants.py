@@ -5,8 +5,8 @@ Constantes globais do sistema Bot LoL V3 Ultra Avançado
 from __future__ import annotations
 
 # Sistema de Unidades Profissionais
-MIN_CONFIDENCE_FOR_TIP = 0.70
-MIN_EV_FOR_TIP = 0.05
+MIN_CONFIDENCE_FOR_TIP = 0.50
+MIN_EV_FOR_TIP = 0.01
 MIN_UNITS = 0.5
 MAX_UNITS = 5.0
 
@@ -74,13 +74,21 @@ SUPPORTED_LOCALES = [
     "ru-RU", "tr-TR", "ja-JP", "ko-KR"
 ]
 
-# Status válidos para partidas ao vivo
+# Status válidos para partidas ao vivo - EXPANDIDO
 VALID_LIVE_STATUSES = {
     "inprogress",
     "live", 
     "ongoing",
     "in_progress",
-    "started"
+    "started",
+    "running",        # Adicionado para PandaScore
+    "active",         # Status genérico
+    "playing",        # Partida em andamento
+    "draft",          # Fase de draft/pick & ban
+    "loading",        # Carregando jogo
+    "paused",         # Partida pausada (ainda válida)
+    "ready",          # Pronta para iniciar
+    "configured"      # Configurada e pronta
 }
 
 # Rate limits
@@ -298,21 +306,52 @@ EV_EMOJIS = {
     "low": "📉"      # EV <= 5%
 }
 
-# Ligas suportadas para análise
+# Ligas suportadas para análise - EXPANDIDA PARA INCLUIR TODAS AS REGIONAIS
 SUPPORTED_LEAGUES = {
-    "LCS", "LEC", "LPL", "LCK", "CBLOL", "LLA", "WORLDS", "MSI"
+    # Tier 1 - Principais ligas internacionais
+    "LCS", "LEC", "LPL", "LCK", "CBLOL", "LLA", "WORLDS", "MSI",
+    
+    # Tier 2 - Ligas regionais importantes
+    "LJL", "LCO", "VCS", "PCS", "TCL", "LCL",
+    
+    # Tier 3 - Ligas menores e qualificatórias  
+    "LCKC", "LDL", "ERL", "ACADEMY", "PRIME",
+    
+    # Ligas regionais específicas - BRASIL
+    "LRS", "Circuito Desafiante", "CBLOL Academy", "Liga Brasileira",
+    
+    # Ligas regionais específicas - EUROPA
+    "LFL", "Prime League", "Superliga", "GLL", "LVP", "PG Nationals",
+    "NLC", "Ultraliga", "TCL Academy", "LCL Academy",
+    
+    # Ligas regionais específicas - ÁSIA
+    "LJL Academy", "LCO Academy", "VCS Academy", "PCS Academy",
+    
+    # Ligas regionais específicas - AMERICAS
+    "LCS Academy", "LLA Academy", "Copa América",
+    
+    # Torneios e eventos especiais
+    "Demacia Cup", "Rift Rivals", "All-Star", "Clash",
+    "University Championship", "Student Championship",
+    
+    # Ligas semi-profissionais
+    "Challengers", "Amateur", "Regional", "Open", "Qualifier",
+    
+    # Wildcards genéricos para capturar outras ligas
+    "Academy", "Championship", "League", "Tournament", "Cup",
+    "Series", "Circuit", "Challenge", "Masters", "Premier"
 }
 
 # Thresholds para sistema de predição - AJUSTADOS para desenvolvimento
 PREDICTION_THRESHOLDS = {
-    "min_confidence": 0.50,          # Reduzido para permitir tips em desenvolvimento  
-    "min_ev": 1.0,                   # Reduzido para aceitar EV menor
-    "min_odds": 1.20,                # Reduzido para aceitar odds menores
-    "max_odds": 5.00,                # Aumentado para aceitar odds maiores
-    "min_game_time": 0,              # Permitir desde o início da partida
-    "min_data_quality": 0.10,        # Reduzido para aceitar dados básicos da Riot
+    "min_confidence": 0.45,          # Reduzido ainda mais para permitir mais tips  
+    "min_ev": 0.5,                   # Reduzido drasticamente para aceitar EV menor
+    "min_odds": 1.15,                # Reduzido para aceitar odds ainda menores
+    "max_odds": 6.00,                # Aumentado para aceitar odds maiores
+    "min_game_time": 0,              # Permitir desde o draft/início
+    "min_data_quality": 0.05,        # Reduzido drasticamente para aceitar dados básicos
     "cache_time_minutes": 10,        # Cache de predições
-    "ml_confidence_threshold": 0.50,  # Reduzido para desenvolvimento
+    "ml_confidence_threshold": 0.45,  # Reduzido para desenvolvimento
     "hybrid_weight_ml": 0.6,         # Peso do ML no método híbrido
     "hybrid_weight_algo": 0.4        # Peso dos algoritmos no híbrido
 }

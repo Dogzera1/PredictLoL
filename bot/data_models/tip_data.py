@@ -311,24 +311,30 @@ class ProfessionalTip:
         ]
         
         for field in required_fields:
-            if not getattr(self, field):
-                return False, f"Campo obrigatório ausente: {field}"
+            value = getattr(self, field)
+            # Para campos numéricos, verifica se não é None; para strings, verifica se não está vazio
+            if field in ["odds", "units", "confidence_percentage", "ev_percentage"]:
+                if value is None:
+                    return False, f"Campo obrigatório ausente: {field}"
+            else:
+                if not value:
+                    return False, f"Campo obrigatório ausente: {field}"
         
         # Verifica valores mínimos
-        if self.confidence_percentage < 60:
+        if self.confidence_percentage < 45:  # Reduzido para permitir mais tips
             return False, f"Confiança muito baixa: {self.confidence_percentage}%"
         
-        if self.ev_percentage < 3:
+        if self.ev_percentage < 0.5:  # Reduzido para permitir mais tips
             return False, f"EV muito baixo: {self.ev_percentage}%"
         
-        if self.odds < 1.20 or self.odds > 4.0:
+        if self.odds < 1.15 or self.odds > 6.0:  # Range expandido
             return False, f"Odds fora do range aceitável: {self.odds}"
         
         if self.units < 0.5 or self.units > 5.0:
             return False, f"Unidades fora do range: {self.units}"
         
         # Verifica se análise tem conteúdo suficiente
-        if len(self.analysis_reasoning) < 50:
+        if len(self.analysis_reasoning) < 20:  # Reduzido para permitir análises mais curtas
             return False, "Análise muito curta"
         
         return True, "Tip válida" 
