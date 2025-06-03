@@ -18,12 +18,31 @@ from pathlib import Path
 app = Flask(__name__)
 
 # Status global do bot
+def detect_environment():
+    """Detecta automaticamente o ambiente"""
+    # Verifica se está no Railway
+    railway_vars = [
+        "RAILWAY_PROJECT_ID",
+        "RAILWAY_SERVICE_ID", 
+        "RAILWAY_ENVIRONMENT_ID",
+        "RAILWAY_DEPLOYMENT_ID"
+    ]
+    if any(os.getenv(var) for var in railway_vars):
+        return "production"
+    
+    # Verifica outras plataformas de produção
+    if os.getenv("VERCEL") or os.getenv("HEROKU_APP_NAME") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return "production"
+    
+    # Default para desenvolvimento
+    return os.getenv("ENVIRONMENT", "development")
+
 bot_status = {
     "is_running": False,
     "start_time": time.time(),
     "last_heartbeat": time.time(),
     "version": "3.0.0",
-    "environment": os.getenv("ENVIRONMENT", "development"),
+    "environment": detect_environment(),
     "total_requests": 0,
     "errors_count": 0
 }

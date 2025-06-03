@@ -323,6 +323,7 @@ class LoLBotV3UltraAdvanced:
             self.application = Application.builder().token(self.bot_token).build()
             
             # 2. Configura handlers
+            logger.info("🎮 Configurando handlers do bot...")
             self._setup_all_handlers()
             
             # 3. Inicia ScheduleManager primeiro
@@ -337,26 +338,48 @@ class LoLBotV3UltraAdvanced:
             logger.info(f"🔌 Porta: {port}")
             
             # 5. Inicia aplicação com webhook
+            logger.info("⚡ Inicializando aplicação Telegram...")
             await self.application.initialize()
             await self.application.start()
             
-            # 6. Configura webhook
-            await self.application.bot.set_webhook(
+            # 6. Configura webhook no Telegram
+            logger.info("🔗 Configurando webhook no Telegram...")
+            webhook_info = await self.application.bot.set_webhook(
                 url=webhook_url,
                 drop_pending_updates=True,
                 allowed_updates=["message", "callback_query"]
             )
             
-            # 7. Inicia servidor webhook
-            await self.application.run_webhook(
-                listen="0.0.0.0",
-                port=port,
-                webhook_url=webhook_url,
-                url_path="/webhook"
-            )
+            if webhook_info:
+                logger.info("✅ Webhook configurado com sucesso!")
+            else:
+                logger.warning("⚠️ Webhook pode não ter sido configurado corretamente")
             
-            self.is_running = True
-            logger.info("✅ Bot LoL V3 Ultra Avançado totalmente operacional (WEBHOOK)!")
+            # 7. Inicia servidor webhook
+            logger.info("🚀 Iniciando servidor webhook...")
+            
+            try:
+                # Tenta iniciar o servidor webhook
+                await self.application.run_webhook(
+                    listen="0.0.0.0",
+                    port=port,
+                    webhook_url=webhook_url,
+                    url_path="/webhook"
+                )
+                
+                self.is_running = True
+                logger.info("✅ Bot LoL V3 Ultra Avançado totalmente operacional (WEBHOOK)!")
+                
+            except Exception as webhook_error:
+                logger.error(f"💥 Erro específico no servidor webhook: {webhook_error}")
+                
+                # Verifica se é problema de porta
+                if "port" in str(webhook_error).lower() or "address" in str(webhook_error).lower():
+                    logger.error(f"🔌 ERRO DE PORTA: Porta {port} não disponível no Railway")
+                    logger.error("💡 Sugestão: Verificar variável PORT no Railway")
+                
+                # Re-levanta o erro
+                raise webhook_error
             
             # 8. Mantém executando
             try:
@@ -365,8 +388,27 @@ class LoLBotV3UltraAdvanced:
                 logger.info("📋 ScheduleManager cancelado")
             
         except Exception as e:
-            logger.error(f"Erro crítico ao iniciar bot (webhook): {e}")
-            await self.stop_bot()
+            error_str = str(e).lower()
+            logger.error(f"❌ Erro crítico ao iniciar bot (webhook): {e}")
+            
+            # Log detalhado baseado no tipo de erro
+            if "port" in error_str or "address already in use" in error_str:
+                logger.error(f"🔌 Erro de porta: Porta {port} pode estar ocupada")
+            elif "network" in error_str or "connection" in error_str:
+                logger.error("🌐 Erro de rede: Problemas de conectividade")
+            elif "token" in error_str or "unauthorized" in error_str:
+                logger.error("🔑 Erro de autenticação: Token pode estar inválido")
+            elif "webhook" in error_str:
+                logger.error("🔗 Erro de webhook: Problemas na configuração")
+            else:
+                logger.error(f"❓ Erro desconhecido: {e}")
+            
+            # Sempre tenta fazer cleanup
+            try:
+                await self.stop_bot()
+            except Exception as cleanup_error:
+                logger.error(f"Erro no cleanup: {cleanup_error}")
+            
             raise
 
     async def _start_local_tips_only(self) -> None:
@@ -395,10 +437,8 @@ class LoLBotV3UltraAdvanced:
         if railway_url:
             return f"https://{railway_url}/webhook"
         
-        # Fallback para Railway
-        service_name = os.getenv("RAILWAY_SERVICE_NAME", "predictlol")
-        project_name = os.getenv("RAILWAY_PROJECT_NAME", "predictlol")
-        return f"https://{service_name}-{project_name}.up.railway.app/webhook"
+        # Fallback específico para o projeto
+        return "https://predictlol-production.up.railway.app/webhook"
 
     async def _start_polling_with_advanced_retry(self) -> None:
         """Inicia polling com proteção ultra avançada contra conflitos"""
@@ -431,8 +471,7 @@ class LoLBotV3UltraAdvanced:
                 # Configurações otimizadas para evitar conflitos
                 logger.debug(f"🚀 Iniciando polling (tentativa {attempt + 1})...")
                 await self.application.updater.start_polling(
-                    drop_pending_updates=True,
-                    bootstrap_retries=0,        # Sem retries bootstrap
+                    drop_pending_updates=True,        # Sem retries bootstrap
                     read_timeout=60,           # Timeout maior
                     connect_timeout=45,        # Timeout conexão maior
                     pool_timeout=90,           # Pool timeout muito maior
