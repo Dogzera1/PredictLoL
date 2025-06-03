@@ -247,7 +247,7 @@ class BotApplication:
                 else:
                     logger.info("🏥 Iniciando health check server local...")
                 start_health_server()
-                set_bot_running(True)  # Marca bot como rodando
+                set_bot_running(True)  # Marca bot como rodando - SEMPRE que health check está disponível
                 
                 # Conecta métricas reais ao health check
                 try:
@@ -291,6 +291,15 @@ class BotApplication:
                 logger.info("📊 Sistema de análise funcionando")
                 logger.info("⚡ ScheduleManager executando")
                 logger.info("📱 Telegram: Desabilitado (sem conflitos)")
+                
+                # Cria task para heartbeat também no modo local
+                if HEALTH_CHECK_AVAILABLE:
+                    async def heartbeat_loop():
+                        while True:
+                            update_heartbeat()
+                            await asyncio.sleep(30)  # Heartbeat a cada 30s
+                    
+                    heartbeat_task = asyncio.create_task(heartbeat_loop())
                 
                 # Inicia apenas ScheduleManager
                 await self.schedule_manager.start_scheduled_tasks()
