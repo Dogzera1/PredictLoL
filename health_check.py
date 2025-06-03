@@ -9,6 +9,7 @@ import os
 import time
 import json
 import psutil
+import logging
 from flask import Flask, jsonify, render_template_string, send_from_directory, request
 import threading
 import asyncio
@@ -17,9 +18,13 @@ from pathlib import Path
 
 app = Flask(__name__)
 
+# Setup de logging básico
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Status global do bot
 def detect_environment():
-    """Detecta automaticamente o ambiente"""
+    """Detecta automaticamente o ambiente usando variáveis do Railway"""
     # Verifica se está no Railway
     railway_vars = [
         "RAILWAY_PROJECT_ID",
@@ -28,6 +33,10 @@ def detect_environment():
         "RAILWAY_DEPLOYMENT_ID"
     ]
     if any(os.getenv(var) for var in railway_vars):
+        return "production"
+    
+    # Verifica FORCE_RAILWAY_MODE
+    if os.getenv("FORCE_RAILWAY_MODE", "").lower() == "true":
         return "production"
     
     # Verifica outras plataformas de produção
@@ -44,7 +53,12 @@ bot_status = {
     "version": "3.0.0",
     "environment": detect_environment(),
     "total_requests": 0,
-    "errors_count": 0
+    "errors_count": 0,
+    "railway_vars": {
+        "environment_id": os.getenv("RAILWAY_ENVIRONMENT_ID"),
+        "force_mode": os.getenv("FORCE_RAILWAY_MODE"),
+        "port": os.getenv("PORT", "8080")
+    }
 }
 
 def update_heartbeat():
@@ -285,6 +299,22 @@ def dashboard():
                             <tr>
                                 <td><strong>Tips Sistema:</strong></td>
                                 <td>{{ tips_status }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ambiente:</strong></td>
+                                <td>{{ environment }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Railway Env ID:</strong></td>
+                                <td>{{ railway_environment_id }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Force Railway Mode:</strong></td>
+                                <td>{{ force_railway_mode }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Port:</strong></td>
+                                <td>{{ port_configured }}</td>
                             </tr>
                         </table>
                     </div>
@@ -548,7 +578,10 @@ def get_real_dashboard_data(uptime):
         "last_prediction_time": real_data.get('last_prediction_time', 'Nunca'),
         "last_tip_time": real_data.get('last_tip_time', 'Nunca'),
         "requests_per_hour": round(bot_status["total_requests"] / max(uptime / 3600, 1), 1),
-        "environment": bot_status["environment"]
+        "environment": bot_status["environment"],
+        "railway_environment_id": bot_status["railway_vars"]["environment_id"],
+        "force_railway_mode": bot_status["railway_vars"]["force_mode"],
+        "port_configured": bot_status["railway_vars"]["port"]
     }
 
 def collect_system_metrics():
@@ -771,13 +804,48 @@ def system_metrics():
     increment_request_counter()
     
     try:
-        # Métricas do sistema
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
+        # Métricas do sistema com fallbacks
+        try:
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+        except Exception as e:
+            logger.error(f"Erro ao obter CPU: {e}")
+            cpu_percent = 0.0
+            
+        try:
+            memory = psutil.virtual_memory()
+        except Exception as e:
+            logger.error(f"Erro ao obter memória: {e}")
+            memory = type('obj', (object,), {
+                'total': 0, 'available': 0, 'used': 0, 'percent': 0.0
+            })()
+            
+        try:
+            disk = psutil.disk_usage('/')
+        except Exception as e:
+            logger.error(f"Erro ao obter disco: {e}")
+            disk = type('obj', (object,), {
+                'total': 0, 'free': 0, 'used': 0
+            })()
         
         current_time = time.time()
         uptime = current_time - bot_status["start_time"]
+        
+        # Platform info com fallback
+        try:
+            import platform
+            platform_name = platform.system()
+            python_version = f"{psutil.sys.version_info.major}.{psutil.sys.version_info.minor}.{psutil.sys.version_info.micro}"
+        except Exception as e:
+            logger.error(f"Erro ao obter platform info: {e}")
+            platform_name = "unknown"
+            python_version = "3.x"
+            
+        # Process count com fallback
+        try:
+            process_count = len(psutil.pids())
+        except Exception as e:
+            logger.error(f"Erro ao obter process count: {e}")
+            process_count = 0
         
         response = {
             "service": "Bot LoL V3 Ultra Avançado",
@@ -799,7 +867,7 @@ def system_metrics():
                     "total_gb": round(disk.total / 1024 / 1024 / 1024, 2),
                     "free_gb": round(disk.free / 1024 / 1024 / 1024, 2),
                     "used_gb": round(disk.used / 1024 / 1024 / 1024, 2),
-                    "percent": round((disk.used / disk.total) * 100, 2)
+                    "percent": round((disk.used / max(disk.total, 1)) * 100, 2)
                 }
             },
             "bot": {
@@ -810,9 +878,10 @@ def system_metrics():
                 "requests_per_hour": round(bot_status["total_requests"] / max(uptime / 3600, 1), 2)
             },
             "environment": {
-                "python_version": f"{psutil.sys.version_info.major}.{psutil.sys.version_info.minor}.{psutil.sys.version_info.micro}",
-                "platform": psutil.platform.system(),
-                "process_count": len(psutil.pids())
+                "python_version": python_version,
+                "platform": platform_name,
+                "process_count": process_count,
+                "railway_environment": bot_status["environment"]
             }
         }
         
@@ -820,10 +889,18 @@ def system_metrics():
         
     except Exception as e:
         increment_error_counter()
+        logger.error(f"Erro crítico no endpoint metrics: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Response de fallback mínima
         return jsonify({
             "error": "Failed to collect metrics",
             "message": str(e),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "service": "Bot LoL V3 Ultra Avançado",
+            "uptime_seconds": round(time.time() - bot_status["start_time"], 2),
+            "bot_running": bot_status["is_running"]
         }), 500
 
 @app.route('/', methods=['GET'])
@@ -1072,8 +1149,9 @@ def _send_stats_response(chat_id):
 
 def _send_admin_response(chat_id, user_id):
     """Envia resposta para o comando /admin"""
-    # Verifica se é admin (ID do usuário principal)
-    admin_ids = [8012415611]  # Seu ID
+    # Verifica se é admin (usa variável do Railway)
+    admin_ids_str = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611")
+    admin_ids = [int(id.strip()) for id in admin_ids_str.split(",") if id.strip().isdigit()]
     
     if user_id not in admin_ids:
         message = """🔒 *ACESSO RESTRITO*
@@ -1104,6 +1182,7 @@ Este comando é apenas para administradores\\!
 
 *🔧 INFORMAÇÕES TÉCNICAS:*
 • Ambiente: Railway \\(Produção\\)
+• Railway Environment ID: {os.getenv('RAILWAY_ENVIRONMENT_ID', 'N/A')}
 • Webhook: ✅ Funcionando
 • Health Check: ✅ Ativo
 • User ID: {user_id}
@@ -1494,8 +1573,8 @@ def _send_telegram_message(chat_id, text, parse_mode=None, reply_markup=None):
     try:
         import requests
         
-        # Token do bot (deve estar nas variáveis de ambiente)
-        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        # Token do bot (usa a variável correta do Railway)
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAHiZkgr-TFlbt8Ym1GNFMdvjfVa6oED918")
         if not bot_token:
             print("❌ TELEGRAM_BOT_TOKEN não encontrado")
             return jsonify({"error": "Bot token not configured"}), 500
@@ -1551,16 +1630,21 @@ def _send_telegram_message(chat_id, text, parse_mode=None, reply_markup=None):
 
 def run_health_server():
     """Executa servidor de health check em thread separada"""
-    port = int(os.getenv("PORT", 8080))
+    port = int(os.getenv("PORT", 5000))  # Usa PORT=5000 das variáveis do Railway
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 def start_health_server():
     """Inicia servidor de health check"""
     health_thread = threading.Thread(target=run_health_server, daemon=True)
     health_thread.start()
-    print(f"🏥 Health check server iniciado na porta {os.getenv('PORT', 8080)}")
+    port = os.getenv("PORT", 5000)
+    environment_id = os.getenv("RAILWAY_ENVIRONMENT_ID", "N/A")
+    print(f"🏥 Health check server iniciado na porta {port}")
+    print(f"🚀 Railway Environment ID: {environment_id}")
+    print(f"🔧 FORCE_RAILWAY_MODE: {os.getenv('FORCE_RAILWAY_MODE', 'false')}")
 
 if __name__ == "__main__":
     # Executa apenas o servidor de health check
     print("🏥 Iniciando Health Check Server para Railway...")
+    print(f"🔧 Usando variáveis: PORT={os.getenv('PORT', 5000)}, ENV_ID={os.getenv('RAILWAY_ENVIRONMENT_ID', 'N/A')}")
     run_health_server() 

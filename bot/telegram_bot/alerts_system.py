@@ -10,6 +10,7 @@ import re
 import logging
 import json
 from datetime import datetime, timedelta
+import aiohttp
 
 try:
     from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -135,14 +136,22 @@ class TelegramAlertsSystem:
     - Tratamento de usuários bloqueados
     """
 
-    def __init__(self, bot_token: str):
-        """
-        Inicializa o sistema de alertas
+    def __init__(self, bot_token: Optional[str] = None):
+        # Usa token das variáveis do Railway ou o fornecido
+        self.bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAHiZkgr-TFlbt8Ym1GNFMdvjfVa6oED918")
         
-        Args:
-            bot_token: Token do bot do Telegram
-        """
-        self.bot_token = bot_token
+        # Admin IDs das variáveis do Railway
+        admin_ids_str = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611")
+        self.admin_ids = [int(id.strip()) for id in admin_ids_str.split(",") if id.strip().isdigit()]
+        
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self.session: Optional[aiohttp.ClientSession] = None
+        
+        logger.info(f"TelegramAlertsSystem inicializado - Admin IDs: {self.admin_ids}")
+        
+        if not self.bot_token:
+            logger.warning("⚠️ Bot token não fornecido - Sistema de alertas desabilitado")
+        
         self.bot: Optional[Bot] = None
         self.application: Optional[Application] = None
         
@@ -1080,4 +1089,21 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         for char in escape_chars:
             text = text.replace(char, f'\\{char}')
         
-        return text 
+        return text
+
+    async def start_session(self) -> None:
+        """Inicia sessão HTTP"""
+        if not self.session or self.session.closed:
+            self.session = aiohttp.ClientSession()
+    
+    async def close_session(self) -> None:
+        """Fecha sessão HTTP"""
+        if self.session and not self.session.closed:
+            await self.session.close()
+    
+    async def __aenter__(self):
+        await self.start_session()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close_session() 

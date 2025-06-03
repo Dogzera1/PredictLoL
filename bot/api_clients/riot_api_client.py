@@ -125,6 +125,9 @@ class RiotAPIClient:
         self.session: Optional[aiohttp.ClientSession] = None
         self.rate_limiter = RateLimiter()
         self.cache = APICache()
+        
+        # Auto-close flag para sessões que não usam context manager
+        self._auto_close: bool = True
 
         # Headers padrão conforme documentação
         self.headers = {
@@ -134,14 +137,24 @@ class RiotAPIClient:
 
         logger.info("RiotAPIClient (Lolesports) inicializado com sucesso")
 
+    def enable_auto_close(self) -> None:
+        """Habilita auto-close de sessões"""
+        self._auto_close = True
+
+    def disable_auto_close(self) -> None:
+        """Desabilita auto-close (para context managers)"""
+        self._auto_close = False
+
     async def __aenter__(self) -> RiotAPIClient:
         """Context manager entry"""
+        self.disable_auto_close()  # Desabilita auto-close no context manager
         await self.start_session()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit"""
         await self.close_session()
+        self.enable_auto_close()  # Reabilita auto-close após sair do context manager
 
     async def start_session(self) -> None:
         """Inicia sessão HTTP"""
@@ -230,68 +243,80 @@ class RiotAPIClient:
 
     async def get_live_matches(self, locale: str = "pt-BR") -> List[Dict[str, Any]]:
         """
-        Busca partidas ao vivo usando endpoint /getLive
+        Busca todas as partidas ao vivo
         
         Args:
-            locale: Locale para dados (padrão pt-BR)
+            locale: Locale para localização (pt-BR, en-US, etc.)
             
         Returns:
-            Lista de partidas ao vivo (apenas dados reais)
+            Lista de partidas ao vivo com todos os detalhes
         """
         try:
+            # Garante que a sessão está ativa
+            await self.start_session()
+            
+            # Endpoint conforme openapi.yaml
             endpoint = "/getLive"
             params = {"hl": locale}
             
-            data = await self._make_request(
+            response_data = await self._make_request(
                 self.ESPORTS_API_BASE,
                 endpoint,
                 params,
-                cache_ttl=180  # Cache 3 minutos
+                cache_ttl=30  # Cache de 30 segundos para dados ao vivo
             )
             
-            # Extrai eventos da resposta
-            events = data.get("data", {}).get("schedule", {}).get("events", [])
-            logger.info(f"Encontrados {len(events)} eventos ao vivo")
-            return events
+            # Extrai eventos dos dados
+            events = response_data.get("data", {}).get("schedule", {}).get("events", [])
             
-        except RiotAPIError as e:
-            if e.status_code == 403:
-                logger.warning("Riot API: Autenticação falhou - sem dados disponíveis")
-                return []  # Retorna lista vazia ao invés de dados mock
-            logger.error(f"Erro ao buscar partidas ao vivo: {e}")
-            return []
+            # Filtra apenas partidas realmente ao vivo
+            live_events = await self.filter_live_matches_only(events)
+            
+            logger.info(f"Riot API: {len(live_events)} partidas ao vivo encontradas")
+            return live_events
+            
         except Exception as e:
             logger.error(f"Erro ao buscar partidas ao vivo: {e}")
             return []
+        finally:
+            # Auto-fecha sessão se não estiver em context manager
+            if self._auto_close:
+                await self.close_session()
 
     async def get_leagues(self, locale: str = "pt-BR") -> List[Dict[str, Any]]:
         """
-        Busca todas as ligas disponíveis usando endpoint /getLeagues
+        Busca informações de todas as ligas disponíveis
         
         Args:
-            locale: Locale para dados
+            locale: Locale para localização
             
         Returns:
-            Lista de ligas
+            Lista de ligas disponíveis
         """
         try:
+            # Garante que a sessão está ativa
+            await self.start_session()
+            
             endpoint = "/getLeagues"
             params = {"hl": locale}
             
-            data = await self._make_request(
+            response_data = await self._make_request(
                 self.ESPORTS_API_BASE,
                 endpoint,
                 params,
-                cache_ttl=3600  # Cache 1 hora
+                cache_ttl=3600  # Cache de 1 hora para ligas (dados estáticos)
             )
             
-            leagues = data.get("data", {}).get("leagues", [])
-            logger.info(f"Encontradas {len(leagues)} ligas disponíveis")
+            leagues = response_data.get("data", {}).get("leagues", [])
+            logger.info(f"Riot API: {len(leagues)} ligas carregadas")
             return leagues
             
         except Exception as e:
             logger.error(f"Erro ao buscar ligas: {e}")
             return []
+        finally:
+            if self._auto_close:
+                await self.close_session()
 
     async def get_schedule(
         self, 
