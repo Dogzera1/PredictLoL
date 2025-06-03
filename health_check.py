@@ -1109,18 +1109,26 @@ def _send_health_response(chat_id):
     status_emoji = "🟢" if is_healthy else "🔴"
     status_text = "Saudável" if is_healthy else "Problemático"
     
+    # Escapa valores dinâmicos
+    version_escaped = bot_status['version'].replace('.', '\\.')
+    uptime_hours = uptime / 3600
+    
+    # Componentes do status
+    bot_status_text = "✅ Sim" if bot_status['is_running'] else "❌ Não"
+    heartbeat_status = "✅ Normal" if last_heartbeat_ago < 60 else "⚠️ Atrasado"
+    
     message = f"""🏥 *VERIFICAÇÃO DE SAÚDE*
 
 *{status_emoji} STATUS:* {status_text}
 
 *💓 HEARTBEAT:*
 • Último: {last_heartbeat_ago:.1f}s atrás
-• Status: {'✅ Normal' if last_heartbeat_ago < 60 else '⚠️ Atrasado'}
+• Status: {heartbeat_status}
 
 *⚡ SISTEMA:*
-• Bot Running: {'✅ Sim' if bot_status['is_running'] else '❌ Não'}
-• Uptime: {uptime / 3600:.1f}h
-• Versão: {bot_status['version'].replace('.', '\\.')}
+• Bot Running: {bot_status_text}
+• Uptime: {uptime_hours:.1f}h
+• Versão: {version_escaped}
 
 *🔧 COMPONENTES:*
 • Health Server: ✅ Ativo
