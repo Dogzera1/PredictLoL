@@ -356,18 +356,65 @@ class BotApplication:
                         logger.warning("⚠️ Webhook pode não ter sido configurado corretamente")
                     
                     # Inicia ScheduleManager em background
+                    schedule_task = None
                     if hasattr(self, 'schedule_manager') and self.schedule_manager:
                         logger.info("🔄 Iniciando ScheduleManager...")
-                        schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
+                        try:
+                            # Tenta iniciar ScheduleManager
+                            schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
+                            logger.info("✅ ScheduleManager iniciado em background")
+                            
+                            # Aguarda um pouco para verificar se não falhou imediatamente
+                            await asyncio.sleep(2)
+                            
+                            if schedule_task.done():
+                                # Se já terminou, algo deu errado
+                                try:
+                                    await schedule_task
+                                except Exception as e:
+                                    logger.error(f"❌ ScheduleManager falhou: {e}")
+                                    # Reinicia como fallback
+                                    schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
+                            else:
+                                logger.info("✅ ScheduleManager executando corretamente")
+                                
+                        except Exception as e:
+                            logger.error(f"❌ Erro ao iniciar ScheduleManager: {e}")
+                            schedule_task = None
+                    else:
+                        logger.warning("⚠️ ScheduleManager não disponível")
                     
                     logger.info("✅ Railway configurado - sistema operacional!")
                     logger.info("🏥 Health check server com rota /webhook ativa")
                     
-                    # Mantém sistema vivo
+                    # Mantém sistema vivo e monitora ScheduleManager
                     logger.info("♾️ Sistema em operação contínua...")
+                    
+                    loop_count = 0
                     while True:
                         await asyncio.sleep(60)
-                        logger.debug("💓 Sistema ativo no Railway...")
+                        loop_count += 1
+                        
+                        # Log de vida a cada 10 minutos
+                        if loop_count % 10 == 0:
+                            logger.info(f"💓 Sistema ativo no Railway... ({loop_count * 60}s uptime)")
+                            
+                            # Verifica se ScheduleManager ainda está executando
+                            if schedule_task and schedule_task.done():
+                                try:
+                                    await schedule_task
+                                    logger.warning("⚠️ ScheduleManager terminou, reiniciando...")
+                                except Exception as e:
+                                    logger.error(f"❌ ScheduleManager falhou: {e}, reiniciando...")
+                                
+                                # Reinicia ScheduleManager
+                                try:
+                                    schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
+                                    logger.info("🔄 ScheduleManager reiniciado")
+                                except Exception as e:
+                                    logger.error(f"❌ Falha ao reiniciar ScheduleManager: {e}")
+                        else:
+                            logger.debug("💓 Sistema ativo no Railway...")
                     
                 except Exception as e:
                     logger.error(f"❌ ETAPA 6: Erro crítico no webhook: {e}")
@@ -387,7 +434,14 @@ class BotApplication:
                     # Mantém sistema vivo com schedule manager apenas
                     if hasattr(self, 'schedule_manager') and self.schedule_manager:
                         logger.info("🔄 Iniciando ScheduleManager como fallback...")
-                        await self.schedule_manager.start_scheduled_tasks()
+                        try:
+                            await self.schedule_manager.start_scheduled_tasks()
+                        except Exception as e:
+                            logger.error(f"❌ Falha no ScheduleManager fallback: {e}")
+                            # Mantém sistema vivo mesmo sem ScheduleManager
+                            while True:
+                                await asyncio.sleep(60)
+                                logger.debug("💓 Sistema vivo (sem ScheduleManager)...")
                     else:
                         logger.info("♾️ Mantendo sistema vivo (loop infinito)...")
                         while True:
