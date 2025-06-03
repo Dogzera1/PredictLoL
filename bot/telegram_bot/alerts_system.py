@@ -138,7 +138,7 @@ class TelegramAlertsSystem:
 
     def __init__(self, bot_token: Optional[str] = None):
         # Usa token das variáveis do Railway ou o fornecido
-        self.bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAHiZkgr-TFlbt8Ym1GNFMdvjfVa6oED918")
+        self.bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
         
         # Admin IDs das variáveis do Railway
         admin_ids_str = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611")

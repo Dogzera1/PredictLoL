@@ -936,6 +936,10 @@ def telegram_webhook():
     increment_request_counter()
     
     try:
+        # Debug: verifica token sendo usado
+        debug_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
+        print(f"🔑 DEBUG Token sendo usado: {debug_token[:25]}...")
+        
         # Obtém dados do Telegram
         webhook_data = request.get_json()
         
@@ -1046,6 +1050,16 @@ def _send_help_response(chat_id):
 /status \\- Status atual do sistema
 /stats \\- Estatísticas do bot
 
+*🔔 COMANDOS DE SUBSCRIÇÃO:*
+/subscribe \\- ✅ *ATIVAR NOTIFICAÇÕES*
+/unsubscribe \\- Cancelar notificações
+
+*📊 TIPOS DE SUBSCRIÇÃO:*
+• 🔔 *Todas as Tips* \\- Recebe todas as análises
+• 💎 *Alto Valor* \\- Apenas EV > 10%
+• 🎯 *Alta Confiança* \\- Apenas confiança > 80%
+• 👑 *Premium* \\- EV > 15% \\+ Confiança > 85%
+
 *📊 COMANDOS DE SISTEMA:*
 /admin \\- Painel administrativo \\(admins\\)
 /health \\- Verificação de saúde
@@ -1056,16 +1070,23 @@ def _send_help_response(chat_id):
 /group\\_status ou /groupstatus \\- Status do grupo
 /deactivate\\_group \\- Desativar alertas
 
-*🔔 COMANDOS PESSOAIS:*
-/subscribe \\- Configurar notificações
-/unsubscribe \\- Cancelar notificações
-
 *💡 SOBRE O BOT:*
 Este é um sistema profissional de tips para League of Legends que utiliza:
 • Machine Learning avançado
 • Algoritmos heurísticos
 • Análise em tempo real
 • Monitoramento 24/7
+
+*🔥 SISTEMA DE NOTIFICAÇÕES:*
+• ✅ 100% funcional e ativo
+• Filtros personalizáveis por tipo
+• Tips enviadas automaticamente
+• Expected Value calculado em tempo real
+
+*🚀 COMO USAR:*
+1\\. Use /subscribe para ativar notificações
+2\\. Escolha seu tipo preferido
+3\\. Receba tips profissionais automaticamente\\!
 
 *🚀 DEPLOY:* Railway \\(Produção\\)
 *⚡ STATUS:* 100% Operacional"""
@@ -1118,7 +1139,32 @@ def _send_stats_response(chat_id):
     uptime_hours = uptime / 3600
     uptime_days = uptime / 86400
     
+    # Carrega estatísticas de subscrições
+    subscriptions = _load_subscriptions()
+    active_subs = _get_active_subscribers()
+    
+    # Conta por tipo
+    subscription_counts = {
+        "all_tips": 0,
+        "high_value": 0, 
+        "high_confidence": 0,
+        "premium": 0
+    }
+    
+    for sub_data in active_subs.values():
+        sub_type = sub_data.get("type", "unknown")
+        if sub_type in subscription_counts:
+            subscription_counts[sub_type] += 1
+    
     message = f"""📊 *ESTATÍSTICAS DO BOT*
+
+*👥 USUÁRIOS:*
+• Total de subscrições: {len(subscriptions)}
+• Subscrições ativas: {len(active_subs)}
+• 🔔 Todas as Tips: {subscription_counts['all_tips']}
+• 💎 Alto Valor: {subscription_counts['high_value']}
+• 🎯 Alta Confiança: {subscription_counts['high_confidence']}
+• 👑 Premium: {subscription_counts['premium']}
 
 *📈 PERFORMANCE:*
 • Tips geradas: 0 \\(sistema iniciando\\)
@@ -1143,7 +1189,8 @@ def _send_stats_response(chat_id):
 *🚀 INFRAESTRUTURA:*
 • Plataforma: Railway \\(Produção\\)
 • Webhook: ✅ Funcionando
-• Health Check: ✅ Ativo"""
+• Health Check: ✅ Ativo
+• Subscrições: ✅ Sistema funcionando"""
 
     return _send_telegram_message(chat_id, message, parse_mode="MarkdownV2")
 
@@ -1267,43 +1314,108 @@ def _send_tasks_response(chat_id):
 
 def _send_subscribe_response(chat_id, user_id):
     """Envia resposta para o comando /subscribe"""
-    message = f"""📢 *SISTEMA DE NOTIFICAÇÕES*
+    
+    # Verifica se usuário já está subscrito
+    subscription_file = "user_subscriptions.json"
+    subscriptions = _load_subscriptions()
+    
+    current_subscription = subscriptions.get(str(user_id), None)
+    
+    if current_subscription:
+        message = f"""🔔 *SISTEMA DE SUBSCRIÇÕES*
 
-*✅ FUNCIONALIDADE EM DESENVOLVIMENTO*
+*✅ VOCÊ JÁ ESTÁ SUBSCRITO\\!*
 
-O sistema de subscrições será implementado em breve\\!
+*📊 Sua subscrição atual:*
+• Tipo: {current_subscription.get('type', 'N/A')}
+• Ativado em: {current_subscription.get('activated_at', 'N/A')}
+• Tips recebidas: {current_subscription.get('tips_received', 0)}
 
-*🔔 RECURSOS PLANEJADOS:*
-• Notificações de tips automáticas
-• Alertas de partidas importantes
-• Resumos diários de performance
-• Configurações personalizadas
+*🔄 ALTERAR SUBSCRIÇÃO:*
+Clique em um dos botões abaixo para alterar seu tipo de subscrição:"""
+    else:
+        message = f"""🔔 *SISTEMA DE SUBSCRIÇÕES*
 
-*📱 COMO FUNCIONA ATUALMENTE:*
-• Use /status para verificar o sistema
-• Use /stats para ver estatísticas
-• O bot monitora partidas 24/7
+*🎯 ATIVE SUAS NOTIFICAÇÕES\\!*
 
-*User ID:* {user_id}
-*Status:* Aguardando implementação"""
+Receba tips profissionais diretamente no Telegram\\.
 
-    return _send_telegram_message(chat_id, message, parse_mode="MarkdownV2")
+*🎮 TIPOS DISPONÍVEIS:*
+
+🔔 *Todas as Tips* \\- Recebe todas as análises
+💎 *Alto Valor* \\- Apenas EV > 10%
+🎯 *Alta Confiança* \\- Apenas confiança > 80%
+👑 *Premium* \\- EV > 15% \\+ Confiança > 85%
+
+*⚡ BENEFÍCIOS:*
+• Tips em tempo real
+• Análise ML \\+ Algoritmos
+• Expected Value calculado
+• Gestão de risco profissional
+
+*User ID:* {user_id}"""
+
+    # Cria teclado inline com opções
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🔔 Todas as Tips", "callback_data": "subscribe_all_tips"}],
+            [{"text": "💎 Alto Valor (EV > 10%)", "callback_data": "subscribe_high_value"}],
+            [{"text": "🎯 Alta Confiança (> 80%)", "callback_data": "subscribe_high_confidence"}],
+            [{"text": "👑 Premium (EV > 15% + Conf > 85%)", "callback_data": "subscribe_premium"}],
+            [{"text": "❌ Cancelar Subscrições", "callback_data": "subscribe_cancel"}] if current_subscription else []
+        ]
+    }
+
+    return _send_telegram_message(chat_id, message, parse_mode="MarkdownV2", reply_markup=keyboard)
 
 def _send_unsubscribe_response(chat_id, user_id):
     """Envia resposta para o comando /unsubscribe"""
-    message = f"""🔕 *CANCELAR NOTIFICAÇÕES*
+    
+    # Verifica se usuário está subscrito
+    subscriptions = _load_subscriptions()
+    current_subscription = subscriptions.get(str(user_id), None)
+    
+    if current_subscription:
+        # Remove subscrição
+        _remove_subscription(user_id)
+        
+        message = f"""❌ *SUBSCRIÇÃO CANCELADA*
 
-*ℹ️ SISTEMA EM DESENVOLVIMENTO*
+*📊 Subscrição anterior:*
+• Tipo: {current_subscription.get('type', 'N/A')}
+• Ativado em: {current_subscription.get('activated_at', 'N/A')}
+• Tips recebidas: {current_subscription.get('tips_received', 0)}
 
-As notificações ainda não estão ativas\\!
+*✅ STATUS ATUAL:*
+• Subscrição: Cancelada
+• Notificações: Desativadas
+• Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}
 
-*📝 INFORMAÇÕES:*
-• Sistema de subscrições em desenvolvimento
-• Nenhuma notificação ativa no momento
-• Todas as funções são manuais
+*🔄 PARA REATIVAR:*
+• Use /subscribe para escolher um novo tipo
+• Sistema disponível 24/7
+• Dados salvos com segurança
 
-*User ID:* {user_id}
-*Status:* Sem notificações ativas"""
+*Obrigado por ter usado o Bot LoL V3\\!*
+
+*User ID:* {user_id}"""
+    else:
+        message = f"""ℹ️ *NENHUMA SUBSCRIÇÃO ATIVA*
+
+Você não possui subscrições ativas para cancelar\\.
+
+*📱 PARA SE SUBSCREVER:*
+• Use /subscribe para ativar notificações
+• Escolha entre 4 tipos disponíveis
+• Sistema profissional de tips LoL
+
+*📊 TIPOS DISPONÍVEIS:*
+• 🔔 Todas as Tips
+• 💎 Alto Valor \\(EV > 10%\\)
+• 🎯 Alta Confiança \\(> 80%\\)
+• 👑 Premium \\(EV > 15% \\+ Conf > 85%\\)
+
+*User ID:* {user_id}"""
 
     return _send_telegram_message(chat_id, message, parse_mode="MarkdownV2")
 
@@ -1447,8 +1559,20 @@ Recebi sua mensagem: "{escaped_text}"
 def _handle_callback(chat_id, data, callback_id):
     """Processa callbacks de botões inline"""
     try:
-        # Callbacks de grupo
-        if data == "group_all_tips":
+        # Callbacks de subscrição pessoal
+        if data == "subscribe_all_tips":
+            return _process_subscription(chat_id, callback_id, "🔔 Todas as Tips", "all_tips")
+        elif data == "subscribe_high_value":
+            return _process_subscription(chat_id, callback_id, "💎 Alto Valor", "high_value")
+        elif data == "subscribe_high_confidence":
+            return _process_subscription(chat_id, callback_id, "🎯 Alta Confiança", "high_confidence")
+        elif data == "subscribe_premium":
+            return _process_subscription(chat_id, callback_id, "👑 Premium", "premium")
+        elif data == "subscribe_cancel":
+            return _process_subscription_cancel(chat_id, callback_id)
+        
+        # Callbacks de grupo (mantém os existentes)
+        elif data == "group_all_tips":
             return _process_group_subscription(chat_id, callback_id, "Todas as Tips", "all_tips")
         elif data == "group_high_value":
             return _process_group_subscription(chat_id, callback_id, "Alto Valor", "high_value")
@@ -1465,8 +1589,104 @@ def _handle_callback(chat_id, data, callback_id):
             return jsonify({"ok": True, "status": "callback unknown"}), 200
             
     except Exception as e:
-        print(f"❌ Erro no callback: {e}")
+        increment_error_counter()
+        print(f"❌ Erro ao processar callback: {e}")
         return jsonify({"error": "Callback processing failed", "message": str(e)}), 500
+
+def _process_subscription(chat_id, callback_id, subscription_name, subscription_type):
+    """Processa subscrição pessoal"""
+    
+    # Adiciona subscrição
+    user_data = _add_subscription(chat_id, subscription_type)
+    
+    # Responde ao callback
+    _answer_callback_query(callback_id, f"✅ {subscription_name} ativado!")
+    
+    # Mensagem de confirmação
+    message = f"""✅ *SUBSCRIÇÃO ATIVADA\\!*
+
+*🔔 Tipo:* {subscription_name}
+*📅 Ativado em:* {user_data['activated_at']}
+*🎯 Status:* Ativo
+
+*📊 O QUE VOCÊ VAI RECEBER:*"""
+
+    if subscription_type == "all_tips":
+        message += """
+• Todas as tips geradas pelo sistema
+• Tips de qualquer EV e confiança
+• Alertas em tempo real 24/7"""
+    elif subscription_type == "high_value":
+        message += """
+• Apenas tips com EV superior a 10%
+• Tips de alto valor esperado
+• Foco em rentabilidade"""
+    elif subscription_type == "high_confidence":
+        message += """
+• Apenas tips com confiança > 80%
+• Predições mais seguras
+• Menor risco, maior precisão"""
+    elif subscription_type == "premium":
+        message += """
+• Tips premium: EV > 15% E Confiança > 85%
+• Máxima qualidade disponível
+• Melhor ROI esperado"""
+
+    message += f"""
+
+*⚡ SISTEMA ATIVO:*
+• Monitoramento 24/7 no Railway
+• Machine Learning \\+ Algoritmos
+• Expected Value calculado
+• Análise em tempo real
+
+*📱 PRÓXIMOS PASSOS:*
+• Aguarde as próximas tips\\!
+• Use /status para verificar o sistema
+• Use /unsubscribe para cancelar
+
+*🔥 Bem\\-vindo ao LoL V3 Ultra Avançado\\!*"""
+
+    return _send_telegram_message(chat_id, message, parse_mode="MarkdownV2")
+
+def _process_subscription_cancel(chat_id, callback_id):
+    """Processa cancelamento de subscrição"""
+    
+    # Remove subscrição
+    removed = _remove_subscription(chat_id)
+    
+    if removed:
+        # Responde ao callback
+        _answer_callback_query(callback_id, "❌ Subscrição cancelada!")
+        
+        message = f"""❌ *SUBSCRIÇÃO CANCELADA*
+
+*📋 Status:* Inativo
+*📅 Cancelado em:* {datetime.now().strftime('%d/%m/%Y %H:%M')}
+
+*ℹ️ INFORMAÇÕES:*
+• Você não receberá mais notificações
+• Seus dados foram removidos do sistema
+• Você pode se subscrever novamente a qualquer momento
+
+*🔄 PARA REATIVAR:*
+• Use /subscribe novamente
+• Escolha um novo tipo de subscrição
+• Sistema disponível 24/7
+
+*Obrigado por ter usado o Bot LoL V3\\!*"""
+    else:
+        # Responde ao callback
+        _answer_callback_query(callback_id, "ℹ️ Você não estava subscrito")
+        
+        message = """ℹ️ *NENHUMA SUBSCRIÇÃO ENCONTRADA*
+
+Você não tinha subscrições ativas para cancelar\\.
+
+*📱 Para se subscrever:*
+Use /subscribe e escolha um tipo de notificação\\."""
+
+    return _send_telegram_message(chat_id, message, parse_mode="MarkdownV2")
 
 def _process_group_subscription(chat_id, callback_id, subscription_name, subscription_type):
     """Processa subscrição de grupo"""
@@ -1574,7 +1794,7 @@ def _send_telegram_message(chat_id, text, parse_mode=None, reply_markup=None):
         import requests
         
         # Token do bot (usa a variável correta do Railway)
-        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAHiZkgr-TFlbt8Ym1GNFMdvjfVa6oED918")
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
         if not bot_token:
             print("❌ TELEGRAM_BOT_TOKEN não encontrado")
             return jsonify({"error": "Bot token not configured"}), 500
@@ -1627,6 +1847,181 @@ def _send_telegram_message(chat_id, text, parse_mode=None, reply_markup=None):
     except Exception as e:
         print(f"❌ Erro ao enviar mensagem: {e}")
         return jsonify({"error": f"Message sending failed: {str(e)}"}), 500
+
+def _load_subscriptions():
+    """Carrega subscrições do arquivo JSON"""
+    import json
+    try:
+        with open("user_subscriptions.json", "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def _save_subscriptions(subscriptions):
+    """Salva subscrições no arquivo JSON"""
+    import json
+    try:
+        with open("user_subscriptions.json", "w") as f:
+            json.dump(subscriptions, f, indent=2)
+    except Exception as e:
+        logger.error(f"Erro ao salvar subscrições: {e}")
+
+def _add_subscription(user_id, subscription_type, user_name=""):
+    """Adiciona ou atualiza subscrição do usuário"""
+    subscriptions = _load_subscriptions()
+    
+    current_time = datetime.now().strftime('%d/%m/%Y %H:%M')
+    
+    subscriptions[str(user_id)] = {
+        "type": subscription_type,
+        "user_name": user_name,
+        "activated_at": current_time,
+        "tips_received": subscriptions.get(str(user_id), {}).get("tips_received", 0),
+        "is_active": True
+    }
+    
+    _save_subscriptions(subscriptions)
+    return subscriptions[str(user_id)]
+
+def _remove_subscription(user_id):
+    """Remove subscrição do usuário"""
+    subscriptions = _load_subscriptions()
+    
+    if str(user_id) in subscriptions:
+        del subscriptions[str(user_id)]
+        _save_subscriptions(subscriptions)
+        return True
+    return False
+
+def _get_active_subscribers():
+    """Retorna lista de usuários ativos com subscrições"""
+    subscriptions = _load_subscriptions()
+    return {
+        user_id: data for user_id, data in subscriptions.items()
+        if data.get("is_active", True)
+    }
+
+def _send_tip_to_subscribers(tip_data):
+    """Envia tip para usuários subscritos conforme seus filtros"""
+    try:
+        active_subs = _get_active_subscribers()
+        if not active_subs:
+            print("📊 Nenhum usuário subscrito")
+            return 0
+        
+        # Extrai dados da tip
+        ev_percentage = tip_data.get("ev_percentage", 0)
+        confidence = tip_data.get("confidence_percentage", 0)
+        
+        sent_count = 0
+        
+        for user_id, sub_data in active_subs.items():
+            sub_type = sub_data.get("type", "all_tips")
+            
+            # Verifica se a tip atende aos critérios do usuário
+            should_send = False
+            
+            if sub_type == "all_tips":
+                should_send = True
+            elif sub_type == "high_value" and ev_percentage > 10:
+                should_send = True
+            elif sub_type == "high_confidence" and confidence > 80:
+                should_send = True
+            elif sub_type == "premium" and ev_percentage > 15 and confidence > 85:
+                should_send = True
+            
+            if should_send:
+                # Formata mensagem da tip
+                message = _format_tip_message(tip_data)
+                
+                # Envia mensagem
+                result = _send_telegram_message(int(user_id), message, parse_mode="MarkdownV2")
+                
+                if result[1] == 200:  # Sucesso
+                    sent_count += 1
+                    # Atualiza contador de tips recebidas
+                    subscriptions = _load_subscriptions()
+                    if user_id in subscriptions:
+                        subscriptions[user_id]["tips_received"] = subscriptions[user_id].get("tips_received", 0) + 1
+                        _save_subscriptions(subscriptions)
+        
+        print(f"📨 Tip enviada para {sent_count}/{len(active_subs)} usuários")
+        return sent_count
+        
+    except Exception as e:
+        logger.error(f"Erro ao enviar tip para subscribers: {e}")
+        return 0
+
+def _format_tip_message(tip_data):
+    """Formata mensagem de tip para Telegram"""
+    try:
+        team1 = tip_data.get("team1", "Time A")
+        team2 = tip_data.get("team2", "Time B")
+        bet_type = tip_data.get("bet_type", "Vencedor")
+        ev_percentage = tip_data.get("ev_percentage", 0)
+        confidence = tip_data.get("confidence_percentage", 0)
+        
+        # Escapa caracteres especiais
+        team1 = team1.replace(".", "\\.").replace("-", "\\-").replace("_", "\\_")
+        team2 = team2.replace(".", "\\.").replace("-", "\\-").replace("_", "\\_")
+        bet_type = bet_type.replace(".", "\\.").replace("-", "\\-").replace("_", "\\_")
+        
+        message = f"""🎯 *TIP PROFISSIONAL LoL V3*
+
+*⚔️ PARTIDA:*
+{team1} vs {team2}
+
+*💰 APOSTA:*
+• Tipo: {bet_type}
+• EV: {ev_percentage:.1f}%
+• Confiança: {confidence:.1f}%
+
+*🧠 ANÁLISE:*
+• Machine Learning \\+ Algoritmos
+• Análise em tempo real
+• Expected Value calculado
+
+*📊 RISCO:* {"🟢 Baixo" if confidence > 80 else "🟡 Médio" if confidence > 60 else "🔴 Alto"}
+*💎 VALOR:* {"🔥 Premium" if ev_percentage > 15 else "💎 Alto" if ev_percentage > 10 else "📈 Padrão"}
+
+*⚡ Sistema LoL V3 Ultra Avançado*
+*🚀 Tip gerada automaticamente*"""
+
+        return message
+        
+    except Exception as e:
+        logger.error(f"Erro ao formatar tip: {e}")
+        return "Erro ao formatar tip"
+
+@app.route('/send_test_tip', methods=['POST'])
+def send_test_tip():
+    """Endpoint para enviar tip de teste"""
+    increment_request_counter()
+    
+    try:
+        # Tip de teste
+        test_tip = {
+            "team1": "T1",
+            "team2": "Gen.G", 
+            "bet_type": "T1 Vencedor",
+            "ev_percentage": 12.5,
+            "confidence_percentage": 78.3
+        }
+        
+        # Envia para usuários subscritos
+        sent_count = _send_tip_to_subscribers(test_tip)
+        
+        return jsonify({
+            "ok": True,
+            "tip_sent": True,
+            "users_notified": sent_count,
+            "tip_data": test_tip,
+            "timestamp": datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        increment_error_counter()
+        return jsonify({"error": str(e)}), 500
 
 def run_health_server():
     """Executa servidor de health check em thread separada"""

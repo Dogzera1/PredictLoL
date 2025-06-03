@@ -114,7 +114,7 @@ def verificar_telegram():
     print("=" * 60)
     
     # Usa o token correto das variáveis do Railway
-    token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAHiZkgr-TFlbt8Ym1GNFMdvjfVa6oED918")
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
     admin_ids = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611")
     
     print(f"   🔑 Usando token: {token[:20]}...")
