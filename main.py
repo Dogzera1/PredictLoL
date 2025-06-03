@@ -264,84 +264,162 @@ class BotApplication:
         else:
             logger.info("🚀 Iniciando Sistema de Tips LoL V3 (LOCAL - SEM TELEGRAM)...")
         
+        # Marca como rodando IMEDIATAMENTE para Railway
+        if HEALTH_CHECK_AVAILABLE:
+            logger.info("🏥 Iniciando health check server...")
+            start_health_server()
+            set_bot_running(True)  # SEMPRE marca como rodando primeiro
+            logger.info("✅ Bot marcado como RUNNING no health check")
+        
         try:
-            # RAILWAY: Inicia health check server
-            if HEALTH_CHECK_AVAILABLE:
+            # ETAPA 1: Configuração de métricas (falha não é crítica)
+            try:
+                await self._setup_metrics_integration()
+                logger.info("✅ ETAPA 1: Métricas configuradas")
+            except Exception as e:
+                logger.warning(f"⚠️ ETAPA 1: Erro nas métricas (não crítico): {e}")
+            
+            # ETAPA 2: Limpeza de instâncias (falha não é crítica)
+            try:
+                await self._cleanup_previous_instances()
+                logger.info("✅ ETAPA 2: Cleanup concluído")
+            except Exception as e:
+                logger.warning(f"⚠️ ETAPA 2: Erro no cleanup (não crítico): {e}")
+            
+            # ETAPA 3: Inicialização de componentes (crítica, mas mantém bot rodando)
+            try:
+                logger.info("🔧 ETAPA 3: Inicializando componentes...")
+                await self.initialize_components()
+                logger.info("✅ ETAPA 3: Componentes inicializados")
+            except Exception as e:
+                logger.error(f"❌ ETAPA 3: Erro na inicialização: {e}")
+                # Não para o bot - tenta continuar
                 if self.is_railway:
-                    logger.info("🏥 Iniciando health check server para Railway...")
+                    logger.warning("⚠️ Continuando com configuração mínima para Railway")
                 else:
-                    logger.info("🏥 Iniciando health check server local...")
-                start_health_server()
-                set_bot_running(True)  # Marca bot como rodando - SEMPRE que health check está disponível
-                
-                # Conecta métricas reais ao health check
+                    logger.warning("⚠️ Continuando em modo degragado")
+            
+            # ETAPA 4: Exibe resumo
+            try:
+                self._display_system_summary()
+                logger.info("✅ ETAPA 4: Resumo exibido")
+            except Exception as e:
+                logger.warning(f"⚠️ ETAPA 4: Erro no resumo: {e}")
+            
+            # ETAPA 5: Configuração de heartbeat (crítica para Railway)
+            heartbeat_task = None
+            if HEALTH_CHECK_AVAILABLE:
                 try:
-                    await self._setup_metrics_integration()
-                except Exception as e:
-                    logger.warning(f"⚠️ Erro ao configurar métricas: {e}")
-            
-            # NOVO: Limpa instâncias anteriores automaticamente
-            await self._cleanup_previous_instances()
-            
-            # Inicializa componentes
-            await self.initialize_components()
-            
-            # Exibe resumo do sistema
-            self._display_system_summary()
-            
-            if self.is_railway and self.bot_interface:
-                # RAILWAY: Inicia com webhook
-                logger.info("🎉 SISTEMA TOTALMENTE OPERACIONAL (RAILWAY)!")
-                logger.info("🔄 Monitoramento automático ativo")
-                logger.info("📱 Interface Telegram disponível (webhook)")
-                logger.info("⚡ ScheduleManager executando")
-                
-                # Loop principal com heartbeat para Railway
-                if HEALTH_CHECK_AVAILABLE:
-                    # Cria task para heartbeat
                     async def heartbeat_loop():
                         while True:
-                            update_heartbeat()
+                            try:
+                                update_heartbeat()
+                            except Exception as e:
+                                logger.debug(f"Erro no heartbeat: {e}")
                             await asyncio.sleep(30)  # Heartbeat a cada 30s
                     
                     heartbeat_task = asyncio.create_task(heartbeat_loop())
-                
-                # A interface principal gerencia tudo automaticamente
-                await self.bot_interface.start_bot()
-                
+                    logger.info("✅ ETAPA 5: Heartbeat configurado")
+                except Exception as e:
+                    logger.error(f"❌ ETAPA 5: Erro no heartbeat: {e}")
+            
+            # ETAPA 6: Inicialização específica por ambiente
+            if self.is_railway and self.bot_interface:
+                logger.info("🚀 ETAPA 6: Iniciando modo RAILWAY (webhook)...")
+                try:
+                    logger.info("🎉 SISTEMA RAILWAY OPERACIONAL!")
+                    logger.info("🔄 Monitoramento automático ativo")
+                    logger.info("📱 Interface Telegram disponível (webhook)")
+                    logger.info("⚡ ScheduleManager executando")
+                    
+                    # CRITICAL: Start bot interface
+                    logger.info("🤖 Iniciando interface do bot...")
+                    await self.bot_interface.start_bot()
+                    
+                except Exception as e:
+                    logger.error(f"❌ ETAPA 6: Erro crítico no webhook: {e}")
+                    logger.error(f"📊 Detalhes do erro: {type(e).__name__}: {str(e)}")
+                    
+                    # Log mais específico para webhook
+                    if "webhook" in str(e).lower():
+                        logger.error("🔗 Erro específico de webhook - verificar configuração")
+                    elif "port" in str(e).lower():
+                        logger.error("🔌 Erro de porta - verificar PORT no Railway")
+                    elif "token" in str(e).lower():
+                        logger.error("🔑 Erro de token - verificar TELEGRAM_BOT_TOKEN")
+                    
+                    # Continua executando como webhook degradado
+                    logger.warning("⚠️ Continuando em modo webhook degradado...")
+                    
+                    # Mantém sistema vivo com schedule manager apenas
+                    if hasattr(self, 'schedule_manager') and self.schedule_manager:
+                        logger.info("🔄 Iniciando ScheduleManager como fallback...")
+                        await self.schedule_manager.start_scheduled_tasks()
+                    else:
+                        logger.info("♾️ Mantendo sistema vivo (loop infinito)...")
+                        while True:
+                            await asyncio.sleep(60)
+            
+            elif self.is_railway:
+                logger.warning("⚠️ Railway detectado mas bot_interface não disponível")
+                logger.info("♾️ Mantendo sistema vivo...")
+                while True:
+                    await asyncio.sleep(60)
+                    
             else:
                 # LOCAL: Apenas sistema de tips
-                logger.info("🎉 SISTEMA DE TIPS OPERACIONAL (LOCAL)!")
-                logger.info("🔄 Monitoramento automático ativo")
-                logger.info("📊 Sistema de análise funcionando")
-                logger.info("⚡ ScheduleManager executando")
-                logger.info("📱 Telegram: Desabilitado (sem conflitos)")
-                
-                # Cria task para heartbeat também no modo local
-                if HEALTH_CHECK_AVAILABLE:
-                    async def heartbeat_loop():
-                        while True:
-                            update_heartbeat()
-                            await asyncio.sleep(30)  # Heartbeat a cada 30s
+                logger.info("🚀 ETAPA 6: Iniciando modo LOCAL (sem Telegram)...")
+                try:
+                    logger.info("🎉 SISTEMA DE TIPS OPERACIONAL (LOCAL)!")
+                    logger.info("🔄 Monitoramento automático ativo")
+                    logger.info("📊 Sistema de análise funcionando")
+                    logger.info("⚡ ScheduleManager executando")
+                    logger.info("📱 Telegram: Desabilitado (sem conflitos)")
                     
-                    heartbeat_task = asyncio.create_task(heartbeat_loop())
-                
-                # Inicia apenas ScheduleManager
-                await self.schedule_manager.start_scheduled_tasks()
+                    # Inicia ScheduleManager
+                    if hasattr(self, 'schedule_manager') and self.schedule_manager:
+                        await self.schedule_manager.start_scheduled_tasks()
+                    else:
+                        logger.warning("⚠️ ScheduleManager não disponível")
+                        while True:
+                            await asyncio.sleep(60)
+                            
+                except Exception as e:
+                    logger.error(f"❌ ETAPA 6: Erro no modo local: {e}")
+                    # Mantém sistema vivo
+                    while True:
+                        await asyncio.sleep(60)
             
         except KeyboardInterrupt:
             logger.info("🛑 Shutdown solicitado pelo usuário")
         except Exception as e:
-            logger.error(f"❌ Erro crítico: {e}")
-            # RAILWAY: Marca bot como não rodando em caso de erro
-            if HEALTH_CHECK_AVAILABLE:
-                set_bot_running(False)
-            raise
+            logger.error(f"❌ Erro crítico geral: {e}")
+            logger.error(f"📊 Tipo do erro: {type(e).__name__}")
+            
+            # Log stack trace para debug
+            import traceback
+            logger.error(f"📋 Stack trace: {traceback.format_exc()}")
+            
+            # NO RAILWAY: NÃO MARCA COMO NOT RUNNING - mantém vivo
+            if self.is_railway:
+                logger.warning("⚠️ Railway: Mantendo bot_running=True para health check")
+                logger.info("♾️ Entrando em loop de manutenção...")
+                try:
+                    while True:
+                        await asyncio.sleep(60)
+                        logger.debug("💓 Sistema ainda vivo...")
+                except:
+                    pass
+            else:
+                # Local pode falhar
+                if HEALTH_CHECK_AVAILABLE:
+                    set_bot_running(False)
+                raise
         finally:
-            # RAILWAY: Marca bot como não rodando no shutdown
-            if HEALTH_CHECK_AVAILABLE:
+            # APENAS para local ou shutdown explícito
+            if not self.is_railway and HEALTH_CHECK_AVAILABLE:
+                logger.info("🏁 Finalizando health check (modo local)")
                 set_bot_running(False)
-            await self.shutdown()
 
     async def _cleanup_previous_instances(self) -> None:
         """Limpa instâncias anteriores do bot"""
