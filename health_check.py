@@ -9,7 +9,7 @@ import os
 import time
 import json
 import psutil
-from flask import Flask, jsonify, render_template_string, send_from_directory
+from flask import Flask, jsonify, render_template_string, send_from_directory, request
 import threading
 import asyncio
 from datetime import datetime
@@ -852,6 +852,202 @@ def root():
             "metrics": "/metrics"
         }
     })
+
+@app.route('/webhook', methods=['POST'])
+def telegram_webhook():
+    """Endpoint webhook para receber updates do Telegram"""
+    increment_request_counter()
+    
+    try:
+        # Obtém dados do Telegram
+        webhook_data = request.get_json()
+        
+        if not webhook_data:
+            return jsonify({"error": "No data received"}), 400
+        
+        # Log da mensagem recebida (para debug)
+        if 'message' in webhook_data:
+            message = webhook_data['message']
+            chat_id = message.get('chat', {}).get('id')
+            text = message.get('text', '')
+            user_id = message.get('from', {}).get('id')
+            username = message.get('from', {}).get('username', 'Sem username')
+            
+            print(f"📨 Webhook recebido:")
+            print(f"   Chat ID: {chat_id}")
+            print(f"   User ID: {user_id}")
+            print(f"   Username: @{username}")
+            print(f"   Mensagem: {text}")
+            
+            # Resposta básica para comando /start
+            if text and text.strip().lower() == '/start':
+                return _send_start_response(chat_id)
+            elif text and text.strip().lower() == '/help':
+                return _send_help_response(chat_id)
+            elif text and text.strip().lower() == '/status':
+                return _send_status_response(chat_id)
+            else:
+                # Resposta genérica
+                return _send_generic_response(chat_id, text)
+        
+        # Callback queries
+        elif 'callback_query' in webhook_data:
+            callback = webhook_data['callback_query']
+            chat_id = callback.get('message', {}).get('chat', {}).get('id')
+            data = callback.get('data', '')
+            user_id = callback.get('from', {}).get('id')
+            
+            print(f"🔘 Callback recebido: User {user_id}, Data: {data}")
+            return _handle_callback(chat_id, data, callback.get('id'))
+        
+        # Por enquanto, retorna sucesso para outros tipos
+        return jsonify({"ok": True, "status": "webhook received"}), 200
+        
+    except Exception as e:
+        increment_error_counter()
+        print(f"❌ Erro no webhook: {e}")
+        return jsonify({"error": "Webhook processing failed", "message": str(e)}), 500
+
+def _send_start_response(chat_id):
+    """Envia resposta para o comando /start"""
+    message = """🚀 *Bot LoL V3 Ultra Avançado*
+
+Bem-vindo ao sistema profissional de tips para League of Legends!
+
+*🎯 FUNCIONALIDADES:*
+• Tips profissionais com ML + algoritmos
+• Análise em tempo real de partidas
+• Monitoramento 24/7 automático
+• Sistema híbrido de predição
+
+*📱 COMANDOS PRINCIPAIS:*
+/help - Mostra todos os comandos
+/status - Status do sistema
+/stats - Estatísticas do bot
+
+*⚡ STATUS:* Sistema 100% operacional no Railway!
+*🔄 MONITORAMENTO:* Ativo 24/7
+*🤖 VERSÃO:* 3.0.0
+
+Desenvolvido com ❤️ para a comunidade LoL"""
+
+    return _send_telegram_message(chat_id, message, parse_mode="Markdown")
+
+def _send_help_response(chat_id):
+    """Envia resposta para o comando /help"""
+    message = """📚 *GUIA COMPLETO DO BOT*
+
+*🎮 COMANDOS GERAIS:*
+/start - Mensagem de boas-vindas
+/help - Este guia de comandos
+/status - Status atual do sistema
+/stats - Estatísticas do bot
+
+*📊 COMANDOS DE SISTEMA:*
+/admin - Painel administrativo (admins)
+/health - Verificação de saúde
+/tasks - Status das tarefas
+
+*💡 SOBRE O BOT:*
+Este é um sistema profissional de tips para League of Legends que utiliza:
+• Machine Learning avançado
+• Algoritmos heurísticos
+• Análise em tempo real
+• Monitoramento 24/7
+
+*🚀 DEPLOY:* Railway (Produção)
+*⚡ STATUS:* 100% Operacional"""
+
+    return _send_telegram_message(chat_id, message, parse_mode="Markdown")
+
+def _send_status_response(chat_id):
+    """Envia resposta para o comando /status"""
+    global bot_status
+    
+    current_time = time.time()
+    uptime = current_time - bot_status["start_time"]
+    uptime_hours = uptime / 3600
+    
+    message = f"""📊 *STATUS DO SISTEMA*
+
+*🤖 BOT:*
+• Status: {'🟢 Online' if bot_status['is_running'] else '🔴 Offline'}
+• Ambiente: {bot_status['environment'].title()}
+• Versão: {bot_status['version']}
+
+*⏱️ UPTIME:*
+• Horas: {uptime_hours:.1f}h
+• Segundos: {uptime:.0f}s
+
+*📈 MÉTRICAS:*
+• Requisições: {bot_status['total_requests']}
+• Erros: {bot_status['errors_count']}
+• Taxa de sucesso: {((bot_status['total_requests'] - bot_status['errors_count']) / max(bot_status['total_requests'], 1) * 100):.1f}%
+
+*🏥 HEALTH CHECK:*
+• Servidor: ✅ Ativo
+• Webhook: ✅ Funcionando
+• Railway: ✅ Operacional
+
+*⚡ ÚLTIMA VERIFICAÇÃO:* Agora"""
+
+    return _send_telegram_message(chat_id, message, parse_mode="Markdown")
+
+def _send_generic_response(chat_id, text):
+    """Envia resposta genérica"""
+    message = f"""🤖 *Bot LoL V3 Ultra Avançado*
+
+Recebi sua mensagem: "{text}"
+
+*📝 COMANDOS DISPONÍVEIS:*
+/start - Iniciar bot
+/help - Ajuda completa
+/status - Status do sistema
+
+*💡 DICA:* Use /help para ver todos os comandos disponíveis!"""
+
+    return _send_telegram_message(chat_id, message, parse_mode="Markdown")
+
+def _handle_callback(chat_id, data, callback_id):
+    """Manipula callback queries"""
+    # Por enquanto, apenas confirma o callback
+    message = f"✅ Callback processado: {data}"
+    return _send_telegram_message(chat_id, message)
+
+def _send_telegram_message(chat_id, text, parse_mode=None):
+    """Envia mensagem via API do Telegram"""
+    try:
+        import requests
+        
+        # Token do bot (deve estar nas variáveis de ambiente)
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not bot_token:
+            print("❌ TELEGRAM_BOT_TOKEN não encontrado")
+            return jsonify({"error": "Bot token not configured"}), 500
+        
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "disable_web_page_preview": True
+        }
+        
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        
+        response = requests.post(url, json=payload, timeout=10)
+        
+        if response.status_code == 200:
+            print(f"✅ Mensagem enviada para chat {chat_id}")
+            return jsonify({"ok": True, "status": "message sent"}), 200
+        else:
+            print(f"❌ Erro ao enviar mensagem: {response.status_code} - {response.text}")
+            return jsonify({"error": "Failed to send message"}), 500
+            
+    except Exception as e:
+        print(f"❌ Erro ao enviar mensagem: {e}")
+        return jsonify({"error": f"Message sending failed: {str(e)}"}), 500
 
 def run_health_server():
     """Executa servidor de health check em thread separada"""

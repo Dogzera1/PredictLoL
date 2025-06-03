@@ -332,9 +332,42 @@ class BotApplication:
                     logger.info("📱 Interface Telegram disponível (webhook)")
                     logger.info("⚡ ScheduleManager executando")
                     
-                    # CRITICAL: Start bot interface
-                    logger.info("🤖 Iniciando interface do bot...")
-                    await self.bot_interface.start_bot()
+                    # NO RAILWAY: Apenas configura webhook, não inicia servidor
+                    # (o health check server já tem a rota /webhook)
+                    logger.info("🔗 Configurando webhook no Telegram...")
+                    
+                    webhook_url = "https://predictlol-production.up.railway.app/webhook"
+                    
+                    # Inicializa aplicação Telegram
+                    await self.bot_interface.application.initialize()
+                    await self.bot_interface.application.start()
+                    
+                    # Configura webhook no Telegram
+                    webhook_info = await self.bot_interface.application.bot.set_webhook(
+                        url=webhook_url,
+                        drop_pending_updates=True,
+                        allowed_updates=["message", "callback_query"]
+                    )
+                    
+                    if webhook_info:
+                        logger.info("✅ Webhook configurado com sucesso!")
+                        logger.info(f"🔗 URL: {webhook_url}")
+                    else:
+                        logger.warning("⚠️ Webhook pode não ter sido configurado corretamente")
+                    
+                    # Inicia ScheduleManager em background
+                    if hasattr(self, 'schedule_manager') and self.schedule_manager:
+                        logger.info("🔄 Iniciando ScheduleManager...")
+                        schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
+                    
+                    logger.info("✅ Railway configurado - sistema operacional!")
+                    logger.info("🏥 Health check server com rota /webhook ativa")
+                    
+                    # Mantém sistema vivo
+                    logger.info("♾️ Sistema em operação contínua...")
+                    while True:
+                        await asyncio.sleep(60)
+                        logger.debug("💓 Sistema ativo no Railway...")
                     
                 except Exception as e:
                     logger.error(f"❌ ETAPA 6: Erro crítico no webhook: {e}")
