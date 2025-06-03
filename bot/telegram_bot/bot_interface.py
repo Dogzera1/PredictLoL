@@ -292,22 +292,34 @@ class LoLBotV3UltraAdvanced:
             logger.warning("Bot já está executando")
             return
         
-        # Verifica se já há outra instância rodando
-        if self.instance_manager.is_another_instance_running():
-            logger.error("❌ Outra instância do bot já está rodando!")
-            logger.info("💡 Use 'python stop_all_bots.py' para parar todas as instâncias")
-            raise RuntimeError("Outra instância do bot já está rodando")
+        # Detecta se está no Railway
+        is_railway = self._is_running_on_railway()
         
-        # Tenta adquirir lock exclusivo
-        if not self.instance_manager.acquire_lock():
-            logger.error("❌ Não foi possível adquirir lock exclusivo!")
-            raise RuntimeError("Não foi possível garantir instância única")
-        
-        logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado - Sistema Completo!")
+        if is_railway:
+            logger.info("🌐 RAILWAY detectado - usando WEBHOOK")
+            await self._start_with_webhook()
+        else:
+            logger.info("💻 AMBIENTE LOCAL detectado - SISTEMA DE TIPS APENAS")
+            await self._start_local_tips_only()
+
+    def _is_running_on_railway(self) -> bool:
+        """Detecta se está executando no Railway"""
+        railway_vars = [
+            "RAILWAY_PROJECT_ID",
+            "RAILWAY_SERVICE_ID", 
+            "RAILWAY_ENVIRONMENT_ID",
+            "RAILWAY_DEPLOYMENT_ID",
+            "PORT"  # Railway sempre define PORT
+        ]
+        return any(os.getenv(var) for var in railway_vars)
+
+    async def _start_with_webhook(self) -> None:
+        """Inicia bot com webhook (Railway)"""
+        logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado - WEBHOOK MODE!")
         
         try:
             # 1. Cria aplicação básica
-            logger.info("📱 Criando aplicação Telegram...")
+            logger.info("📱 Criando aplicação Telegram (webhook)...")
             self.application = Application.builder().token(self.bot_token).build()
             
             # 2. Configura handlers
@@ -317,31 +329,76 @@ class LoLBotV3UltraAdvanced:
             logger.info("🔧 Iniciando ScheduleManager...")
             schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
             
-            # 4. Inicia aplicação Telegram
-            logger.info("🚀 Iniciando aplicação Telegram...")
+            # 4. Configura webhook
+            webhook_url = self._get_webhook_url()
+            port = int(os.getenv("PORT", 8080))
+            
+            logger.info(f"🌐 Configurando webhook: {webhook_url}")
+            logger.info(f"🔌 Porta: {port}")
+            
+            # 5. Inicia aplicação com webhook
             await self.application.initialize()
             await self.application.start()
             
-            # 5. Configura handlers de shutdown
-            self._setup_signal_handlers(schedule_task)
+            # 6. Configura webhook
+            await self.application.bot.set_webhook(
+                url=webhook_url,
+                drop_pending_updates=True,
+                allowed_updates=["message", "callback_query"]
+            )
             
-            # 6. Inicia polling com proteção ultra avançada
-            logger.info("📞 Iniciando polling com proteção ultra avançada...")
-            await self._start_polling_with_advanced_retry()
+            # 7. Inicia servidor webhook
+            await self.application.run_webhook(
+                listen="0.0.0.0",
+                port=port,
+                webhook_url=webhook_url,
+                url_path="/webhook"
+            )
             
             self.is_running = True
-            logger.info("✅ Bot LoL V3 Ultra Avançado totalmente operacional!")
+            logger.info("✅ Bot LoL V3 Ultra Avançado totalmente operacional (WEBHOOK)!")
             
-            # 7. Mantém executando
+            # 8. Mantém executando
             try:
                 await schedule_task
             except asyncio.CancelledError:
                 logger.info("📋 ScheduleManager cancelado")
             
         except Exception as e:
-            logger.error(f"Erro crítico ao iniciar bot: {e}")
+            logger.error(f"Erro crítico ao iniciar bot (webhook): {e}")
             await self.stop_bot()
             raise
+
+    async def _start_local_tips_only(self) -> None:
+        """Inicia apenas sistema de tips (Local) - SEM TELEGRAM"""
+        logger.info("🚀 Iniciando Sistema de Tips LoL V3 - LOCAL MODE!")
+        logger.warning("🚨 TELEGRAM DESABILITADO para evitar conflitos com Railway")
+        logger.info("💡 Este ambiente executará apenas análise e geração de tips")
+        logger.info("📱 Para usar Telegram, acesse o bot no Railway")
+        
+        try:
+            # Apenas inicia ScheduleManager sem Telegram
+            logger.info("🔧 Iniciando ScheduleManager (sem Telegram)...")
+            await self.schedule_manager.start_scheduled_tasks()
+            
+            self.is_running = True
+            logger.info("✅ Sistema de Tips LoL V3 operacional (LOCAL)!")
+            
+        except Exception as e:
+            logger.error(f"Erro ao iniciar sistema de tips: {e}")
+            raise
+
+    def _get_webhook_url(self) -> str:
+        """Gera URL do webhook baseada no Railway"""
+        # Railway fornece URLs automáticas
+        railway_url = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+        if railway_url:
+            return f"https://{railway_url}/webhook"
+        
+        # Fallback para Railway
+        service_name = os.getenv("RAILWAY_SERVICE_NAME", "predictlol")
+        project_name = os.getenv("RAILWAY_PROJECT_NAME", "predictlol")
+        return f"https://{service_name}-{project_name}.up.railway.app/webhook"
 
     async def _start_polling_with_advanced_retry(self) -> None:
         """Inicia polling com proteção ultra avançada contra conflitos"""
