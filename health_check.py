@@ -908,7 +908,7 @@ def telegram_webhook():
                 # Comandos para grupos
                 elif clean_text == '/activate_group':
                     return _send_activate_group_response(chat_id, user_id, username, chat_type)
-                elif clean_text == '/group_status':
+                elif clean_text == '/group_status' or clean_text == '/groupstatus':
                     return _send_group_status_response(chat_id, chat_type)
                 elif clean_text == '/deactivate_group':
                     return _send_deactivate_group_response(chat_id, user_id, username, chat_type)
@@ -976,7 +976,7 @@ def _send_help_response(chat_id):
 
 *👥 COMANDOS PARA GRUPOS:*
 /activate\\_group \\- Ativar alertas de tips
-/group\\_status \\- Status do grupo
+/group\\_status ou /groupstatus \\- Status do grupo
 /deactivate\\_group \\- Desativar alertas
 
 *🔔 COMANDOS PESSOAIS:*
