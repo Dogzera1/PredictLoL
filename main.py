@@ -264,42 +264,53 @@ class BotApplication:
         try:
             logger.info("🧹 Limpando instâncias anteriores...")
             
-            # Para possíveis bots rodando
-            import aiohttp
+            # Verifica processos existentes
+            import psutil
+            current_pid = os.getpid()
             
-            try:
-                timeout = aiohttp.ClientTimeout(total=5)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    # Tenta conectar em portas comuns para parar bots
-                    for port in [5000, 8080, 3000]:
-                        try:
-                            async with session.get(f"http://localhost:{port}/stop") as resp:
-                                if resp.status == 200:
-                                    logger.info(f"🛑 Bot na porta {port} parado")
-                        except:
-                            pass  # Porta não tem bot ou falhou
-            except Exception as e:
-                logger.debug(f"Cleanup HTTP: {e}")
+            # Procura por outros processos Python que podem ser o bot
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    # Pula o processo atual
+                    if proc.pid == current_pid:
+                        continue
+                        
+                    # Verifica se é um processo Python
+                    if proc.name().lower().startswith('python'):
+                        cmdline = proc.cmdline()
+                        # Verifica se é nosso bot
+                        if any('main.py' in cmd for cmd in cmdline):
+                            logger.warning(f"🛑 Encontrada instância anterior do bot (PID: {proc.pid})")
+                            proc.terminate()
+                            proc.wait(timeout=5)
+                            logger.info(f"✅ Processo anterior terminado: {proc.pid}")
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                    continue
             
-            # Remove arquivos temporários
-            temp_files = [
+            # Remove arquivos de lock
+            lock_files = [
                 "bot_running.txt",
-                "telegram_bot.pid", 
-                "schedule_manager.lock"
+                "telegram_bot.pid",
+                "schedule_manager.lock",
+                "/tmp/lol_bot_v3.lock"
             ]
             
-            for temp_file in temp_files:
+            for lock_file in lock_files:
                 try:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                        logger.debug(f"🗑️ Removido: {temp_file}")
+                    if os.path.exists(lock_file):
+                        os.remove(lock_file)
+                        logger.info(f"🗑️ Arquivo de lock removido: {lock_file}")
                 except Exception as e:
-                    logger.debug(f"Erro ao remover {temp_file}: {e}")
+                    logger.debug(f"Erro ao remover {lock_file}: {e}")
+            
+            # Aguarda um pouco para garantir que tudo foi limpo
+            await asyncio.sleep(2)
             
             logger.info("✅ Cleanup concluído")
             
         except Exception as e:
             logger.warning(f"⚠️ Erro no cleanup: {e}")
+            # Continua mesmo com erro no cleanup
 
     async def _setup_metrics_integration(self) -> None:
         """Configura integração de métricas reais com health check"""

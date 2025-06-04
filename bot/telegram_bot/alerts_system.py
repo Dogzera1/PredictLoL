@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import asyncio
 import time
+import psutil  # Para gerenciamento de processos
 from typing import Dict, List, Optional, Set, Any, Union
 from dataclasses import dataclass
 from enum import Enum
@@ -236,23 +237,80 @@ class TelegramAlertsSystem:
             await self.initialize()
         
         try:
+            # Verifica se já existe um bot rodando
+            lock_file = "/tmp/lol_bot_v3.lock"
+            
+            # Se o arquivo existe, verifica se o processo ainda está vivo
+            if os.path.exists(lock_file):
+                try:
+                    with open(lock_file, 'r') as f:
+                        old_pid = int(f.read().strip())
+                    
+                    # Verifica se o processo ainda existe
+                    if psutil.pid_exists(old_pid):
+                        logger.error(f"❌ Outra instância do bot já está rodando (PID: {old_pid})")
+                        raise RuntimeError("Bot já está rodando em outra instância")
+                    else:
+                        # Processo morto, remove arquivo
+                        os.remove(lock_file)
+                except (ValueError, FileNotFoundError):
+                    # Arquivo inválido ou já removido
+                    if os.path.exists(lock_file):
+                        os.remove(lock_file)
+            
+            # Cria arquivo de lock
+            with open(lock_file, 'w') as f:
+                f.write(str(os.getpid()))
+            
             logger.info("🤖 Iniciando bot do Telegram...")
             await self.application.initialize()
             await self.application.start()
-            await self.application.updater.start_polling(allowed_updates=["message", "callback_query"])
+            
+            # Configura polling com timeout e limites
+            await self.application.updater.start_polling(
+                allowed_updates=["message", "callback_query"],
+                read_timeout=30,
+                write_timeout=30,
+                connect_timeout=30,
+                pool_timeout=30,
+                timeout=30,
+                bootstrap_retries=5,
+                drop_pending_updates=True  # Ignora updates antigos
+            )
+            
             logger.info("✅ Bot do Telegram iniciado com sucesso!")
+            
         except Exception as e:
+            # Remove arquivo de lock em caso de erro
+            try:
+                if os.path.exists(lock_file):
+                    os.remove(lock_file)
+            except:
+                pass
+            
             logger.error(f"❌ Erro ao iniciar bot do Telegram: {e}")
             raise
-
+        
     async def stop_bot(self) -> None:
         """Para o bot do Telegram"""
         if self.application and self.application.updater:
             logger.info("🛑 Parando bot do Telegram...")
-            await self.application.updater.stop()
-            await self.application.stop()
-            await self.application.shutdown()
-            logger.info("✅ Bot do Telegram parado com sucesso!")
+            
+            try:
+                # Para o polling
+                await self.application.updater.stop()
+                await self.application.stop()
+                await self.application.shutdown()
+                
+                # Remove arquivo de lock
+                lock_file = "/tmp/lol_bot_v3.lock"
+                if os.path.exists(lock_file):
+                    os.remove(lock_file)
+                    
+                logger.info("✅ Bot do Telegram parado com sucesso!")
+            except Exception as e:
+                logger.error(f"❌ Erro ao parar bot do Telegram: {e}")
+                raise
 
     async def send_professional_tip(self, tip: ProfessionalTip) -> bool:
         """
