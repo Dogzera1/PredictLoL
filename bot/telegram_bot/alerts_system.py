@@ -190,6 +190,7 @@ class TelegramAlertsSystem:
             token_preview = f"{self.bot_token[:4]}...{self.bot_token[-4:]}"
             logger.info(f"🔄 Inicializando bot com token: {token_preview}")
             
+            # Cria bot e application
             self.bot = Bot(token=self.bot_token)
             self.application = Application.builder().token(self.bot_token).build()
             
@@ -197,8 +198,12 @@ class TelegramAlertsSystem:
             self._setup_handlers()
             
             # Testa conexão
-            bot_info = await self.bot.get_me()
-            logger.info(f"✅ Bot conectado: @{bot_info.username} ({bot_info.first_name})")
+            try:
+                bot_info = await self.bot.get_me()
+                logger.info(f"✅ Bot conectado: @{bot_info.username} ({bot_info.first_name})")
+            except TelegramError as e:
+                logger.error(f"❌ Erro ao conectar com Telegram: {e}")
+                raise
             
         except Exception as e:
             logger.error(f"❌ Erro ao inicializar bot do Telegram: {e}")
@@ -230,10 +235,15 @@ class TelegramAlertsSystem:
         if not self.application:
             await self.initialize()
         
-        logger.info("🤖 Iniciando bot do Telegram...")
-        await self.application.initialize()
-        await self.application.start()
-        await self.application.updater.start_polling()
+        try:
+            logger.info("🤖 Iniciando bot do Telegram...")
+            await self.application.initialize()
+            await self.application.start()
+            await self.application.updater.start_polling(allowed_updates=["message", "callback_query"])
+            logger.info("✅ Bot do Telegram iniciado com sucesso!")
+        except Exception as e:
+            logger.error(f"❌ Erro ao iniciar bot do Telegram: {e}")
+            raise
 
     async def stop_bot(self) -> None:
         """Para o bot do Telegram"""
@@ -242,6 +252,7 @@ class TelegramAlertsSystem:
             await self.application.updater.stop()
             await self.application.stop()
             await self.application.shutdown()
+            logger.info("✅ Bot do Telegram parado com sucesso!")
 
     async def send_professional_tip(self, tip: ProfessionalTip) -> bool:
         """

@@ -174,6 +174,8 @@ class BotApplication:
             self.telegram_alerts = TelegramAlertsSystem(
                 bot_token=self.bot_token
             )
+            await self.telegram_alerts.initialize()  # Inicializa o bot
+            await self.telegram_alerts.start_bot()   # Inicia o bot
             
             # 4. ScheduleManager (orquestrador total)
             logger.info("⚙️ Inicializando ScheduleManager...")
