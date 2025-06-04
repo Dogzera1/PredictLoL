@@ -6,7 +6,7 @@ import asyncio
 import aiohttp
 import time
 
-BOT_TOKEN = "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg"
+BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
 
 async def simple_clear():
     print("🧹 LIMPEZA SIMPLES E RÁPIDA")

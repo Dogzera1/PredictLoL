@@ -28,7 +28,7 @@ async def test_production_bot():
     
     try:
         # Token de produção
-        BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAHkSPdwIRd87KiyoRAFuHkjqR72pcwOxP4")
+        BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
         
         if not BOT_TOKEN:
             print("❌ Token do bot não encontrado!")
@@ -115,7 +115,7 @@ async def test_production_bot():
 
 async def show_bot_info():
     """Mostra informações do bot sem inicializar polling"""
-    BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAHkSPdwIRd87KiyoRAFuHkjqR72pcwOxP4")
+    BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
     
     print("\n📊 INFORMAÇÕES DO BOT:")
     print("-" * 30)

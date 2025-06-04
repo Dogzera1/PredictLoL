@@ -10,7 +10,7 @@ import sys
 import os
 import signal
 
-BOT_TOKEN = "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg"
+BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
 
 def kill_all_python_processes():
     """Mata todos os processos Python relacionados ao bot"""

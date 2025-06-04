@@ -20,7 +20,7 @@ def verificar_variaveis_railway():
         "PORT": "5000", 
         "RAILWAY_ENVIRONMENT_ID": "be1cb85b-2d91-4eeb-aede-c22f425ce1ef",
         "TELEGRAM_ADMIN_USER_IDS": "8012415611",
-        "TELEGRAM_BOT_TOKEN": "7584060058:AAFux8K91QUyJH27Mg_mlYJEYLLlJBTHXY0"
+        "TELEGRAM_BOT_TOKEN": "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
     }
     
     print(f"📊 Encontradas {len(railway_vars)} variáveis no Railway:")

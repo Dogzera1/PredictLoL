@@ -12,7 +12,7 @@ import psutil
 import time
 from pathlib import Path
 
-BOT_TOKEN = "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg"
+BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
 
 class ConflictDiagnostic:
     def __init__(self):

@@ -42,7 +42,7 @@ No dashboard do Railway, vá em **Variables** e adicione:
 
 #### **🔑 OBRIGATÓRIAS (para produção):**
 ```env
-TELEGRAM_BOT_TOKEN=7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg
+TELEGRAM_BOT_TOKEN=7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0
 TELEGRAM_ADMIN_USER_IDS=8012415611
 ENVIRONMENT=production
 ```
@@ -74,7 +74,7 @@ O Railway fará deploy automaticamente quando detectar:
 
 ```env
 # ===== TELEGRAM (já configurado como padrão) =====
-TELEGRAM_BOT_TOKEN=7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg
+TELEGRAM_BOT_TOKEN=7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0
 TELEGRAM_ADMIN_USER_IDS=8012415611
 
 # ===== APIs (já configurado como padrão) =====

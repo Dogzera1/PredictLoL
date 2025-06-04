@@ -7,7 +7,7 @@ import aiohttp
 import json
 import time
 
-BOT_TOKEN = "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg"
+BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
 USER_ID = 8012415611  # Seu ID de usuário
 
 async def test_bot_commands():

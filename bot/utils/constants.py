@@ -182,7 +182,7 @@ RIOT_HEADERS = {
 
 # Configurações do Telegram
 TELEGRAM_CONFIG = {
-    "bot_token": "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg",  # Token real como padrão
+    "bot_token": "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0",  # Token atual
     "parse_mode": "MarkdownV2",
     "disable_web_page_preview": True,
     "max_message_length": 4096,
