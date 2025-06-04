@@ -265,10 +265,24 @@ class LoLBotV3UltraAdvanced:
         self.pandascore_client = schedule_manager.pandascore_client
         self.riot_client = schedule_manager.riot_client
         
-        # Estado do bot
-        self.application: Optional[Application] = None
+        # Estado do bot (DEFINIDO ANTES de criar application)
         self.is_running = False
+        self.handlers_configured = False  # Flag para evitar configuração dupla
         self.stats = BotStats(start_time=time.time())
+        
+        # Cria aplicação do Telegram imediatamente para uso no main.py
+        try:
+            self.application = Application.builder().token(self.bot_token).build()
+            logger.info("✅ Aplicação Telegram criada com sucesso")
+            
+            # Configura handlers imediatamente
+            self._setup_all_handlers()
+            logger.info("✅ Handlers configurados")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao criar aplicação Telegram: {e}")
+            self.application = None
+            raise
         
         logger.info("LoLBotV3UltraAdvanced inicializado com sucesso")
 
@@ -318,31 +332,30 @@ class LoLBotV3UltraAdvanced:
         logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado - WEBHOOK MODE!")
         
         try:
-            # 1. Cria aplicação básica
-            logger.info("📱 Criando aplicação Telegram (webhook)...")
-            self.application = Application.builder().token(self.bot_token).build()
+            # 1. Verifica se aplicação foi criada
+            if self.application is None:
+                logger.error("❌ Aplicação Telegram não foi criada no __init__")
+                raise Exception("Application not available")
             
-            # 2. Configura handlers
-            logger.info("🎮 Configurando handlers do bot...")
-            self._setup_all_handlers()
+            logger.info("✅ Usando aplicação criada no __init__")
             
-            # 3. Inicia ScheduleManager primeiro
+            # 2. Inicia ScheduleManager primeiro
             logger.info("🔧 Iniciando ScheduleManager...")
             schedule_task = asyncio.create_task(self.schedule_manager.start_scheduled_tasks())
             
-            # 4. Configura webhook
+            # 3. Configura webhook
             webhook_url = self._get_webhook_url()
             port = int(os.getenv("PORT", 8080))
             
             logger.info(f"🌐 Configurando webhook: {webhook_url}")
             logger.info(f"🔌 Porta: {port}")
             
-            # 5. Inicia aplicação com webhook
+            # 4. Inicia aplicação com webhook
             logger.info("⚡ Inicializando aplicação Telegram...")
             await self.application.initialize()
             await self.application.start()
             
-            # 6. Configura webhook no Telegram
+            # 5. Configura webhook no Telegram
             logger.info("🔗 Configurando webhook no Telegram...")
             webhook_info = await self.application.bot.set_webhook(
                 url=webhook_url,
@@ -355,7 +368,7 @@ class LoLBotV3UltraAdvanced:
             else:
                 logger.warning("⚠️ Webhook pode não ter sido configurado corretamente")
             
-            # 7. Inicia servidor webhook
+            # 6. Inicia servidor webhook
             logger.info("🚀 Iniciando servidor webhook...")
             
             try:
@@ -381,7 +394,7 @@ class LoLBotV3UltraAdvanced:
                 # Re-levanta o erro
                 raise webhook_error
             
-            # 8. Mantém executando
+            # 7. Mantém executando
             try:
                 await schedule_task
             except asyncio.CancelledError:
@@ -721,6 +734,11 @@ class LoLBotV3UltraAdvanced:
     def _setup_all_handlers(self) -> None:
         """Configura todos os handlers do bot"""
         
+        # Verifica se handlers já foram configurados
+        if self.handlers_configured:
+            logger.debug("Handlers já configurados, pulando...")
+            return
+        
         # Comandos básicos (todos os usuários)
         self.application.add_handler(CommandHandler("start", self._handle_start))
         self.application.add_handler(CommandHandler("help", self._handle_help))
@@ -750,6 +768,8 @@ class LoLBotV3UltraAdvanced:
         # Handler para mensagens não reconhecidas
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_unknown_message))
         
+        # Marca como configurado
+        self.handlers_configured = True
         logger.debug("Todos os handlers configurados")
 
     def _setup_signal_handlers(self, schedule_task: asyncio.Task) -> None:
