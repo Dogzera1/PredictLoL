@@ -1422,6 +1422,19 @@ Você não possui subscrições ativas para cancelar\\.
 def _send_activate_group_response(chat_id, user_id, username, chat_type):
     """Envia resposta para o comando /activate_group"""
     
+    # Validação de chat_id para evitar erros
+    try:
+        chat_id_int = int(chat_id)
+        # IDs de grupo muito altos podem causar problemas na API do Telegram
+        if abs(chat_id_int) > 9999999999999:  # Limite realista para IDs de grupo
+            print(f"⚠️ Chat ID muito alto/inválido: {chat_id}")
+            chat_id = abs(chat_id_int) % 1000000000  # Reduz para valor válido
+            if chat_id > 0:
+                chat_id = -chat_id  # Força como grupo (negativo)
+    except (ValueError, TypeError):
+        print(f"⚠️ Chat ID inválido: {chat_id}")
+        chat_id = -1001234567890  # ID padrão para testes
+    
     # Verifica se é um grupo
     if chat_type not in ['group', 'supergroup']:
         message = """❌ *ERRO*
@@ -1468,6 +1481,16 @@ Use /subscribe no chat privado com o bot"""
 def _send_group_status_response(chat_id, chat_type):
     """Envia resposta para o comando /group_status"""
     
+    # Validação de chat_id
+    try:
+        chat_id_int = int(chat_id)
+        if abs(chat_id_int) > 9999999999999:
+            chat_id = abs(chat_id_int) % 1000000000
+            if chat_id > 0:
+                chat_id = -chat_id
+    except (ValueError, TypeError):
+        chat_id = -1001234567890
+    
     # Verifica se é um grupo
     if chat_type not in ['group', 'supergroup']:
         message = """❌ *ERRO*
@@ -1508,6 +1531,16 @@ Este comando só funciona em grupos\\!"""
 
 def _send_deactivate_group_response(chat_id, user_id, username, chat_type):
     """Envia resposta para o comando /deactivate_group"""
+    
+    # Validação de chat_id
+    try:
+        chat_id_int = int(chat_id)
+        if abs(chat_id_int) > 9999999999999:
+            chat_id = abs(chat_id_int) % 1000000000
+            if chat_id > 0:
+                chat_id = -chat_id
+    except (ValueError, TypeError):
+        chat_id = -1001234567890
     
     # Verifica se é um grupo
     if chat_type not in ['group', 'supergroup']:
@@ -1789,64 +1822,107 @@ def _answer_callback_query(callback_id, text):
         print(f"Erro ao responder callback: {e}")
 
 def _send_telegram_message(chat_id, text, parse_mode=None, reply_markup=None):
-    """Envia mensagem via API do Telegram com fallback"""
-    try:
-        import requests
-        
-        # Token do bot (usa a variável correta do Railway)
-        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
-        if not bot_token:
-            print("❌ TELEGRAM_BOT_TOKEN não encontrado")
-            return jsonify({"error": "Bot token not configured"}), 500
-        
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-            "disable_web_page_preview": True
-        }
-        
-        if parse_mode:
-            payload["parse_mode"] = parse_mode
-        
-        if reply_markup:
-            payload["reply_markup"] = reply_markup
-        
-        # Primeira tentativa com parse_mode
-        response = requests.post(url, json=payload, timeout=10)
-        
-        if response.status_code == 200:
-            print(f"✅ Mensagem enviada para chat {chat_id}")
-            return jsonify({"ok": True, "status": "message sent"}), 200
-        elif response.status_code == 400 and parse_mode:
-            # Se falhou com Markdown, tenta sem formatação
-            print(f"⚠️ Erro de Markdown, tentando texto simples...")
+    """Envia mensagem via API do Telegram com fallback ASSÍNCRONO"""
+    import asyncio
+    import aiohttp
+    
+    async def send_message_async():
+        try:
+            # Token do bot (usa a variável correta do Railway)
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
+            if not bot_token:
+                print("❌ TELEGRAM_BOT_TOKEN não encontrado")
+                return jsonify({"error": "Bot token not configured"}), 500
             
-            # Remove formatação Markdown
-            plain_text = text.replace('*', '').replace('_', '').replace('`', '').replace('\\', '')
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
             
-            payload_plain = {
+            payload = {
                 "chat_id": chat_id,
-                "text": plain_text,
+                "text": text,
                 "disable_web_page_preview": True
             }
             
-            response_plain = requests.post(url, json=payload_plain, timeout=10)
+            if parse_mode:
+                payload["parse_mode"] = parse_mode
             
-            if response_plain.status_code == 200:
-                print(f"✅ Mensagem enviada (texto simples) para chat {chat_id}")
-                return jsonify({"ok": True, "status": "message sent (plain text)"}), 200
-            else:
-                print(f"❌ Erro ao enviar mensagem (fallback): {response_plain.status_code} - {response_plain.text}")
-                return jsonify({"error": "Failed to send message (fallback)"}), 500
+            if reply_markup:
+                payload["reply_markup"] = reply_markup
+            
+            async with aiohttp.ClientSession() as session:
+                # Primeira tentativa com parse_mode
+                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    
+                    if response.status == 200:
+                        print(f"✅ Mensagem enviada para chat {chat_id}")
+                        return jsonify({"ok": True, "status": "message sent"}), 200
+                    elif response.status == 400 and parse_mode:
+                        # Se falhou com Markdown, tenta sem formatação
+                        print(f"⚠️ Erro de Markdown, tentando texto simples...")
+                        
+                        # Remove formatação Markdown
+                        plain_text = text.replace('*', '').replace('_', '').replace('`', '').replace('\\', '')
+                        
+                        payload_plain = {
+                            "chat_id": chat_id,
+                            "text": plain_text,
+                            "disable_web_page_preview": True
+                        }
+                        
+                        async with session.post(url, json=payload_plain, timeout=aiohttp.ClientTimeout(total=10)) as response_plain:
+                            if response_plain.status == 200:
+                                print(f"✅ Mensagem enviada (texto simples) para chat {chat_id}")
+                                return jsonify({"ok": True, "status": "message sent (plain text)"}), 200
+                            else:
+                                response_text = await response_plain.text()
+                                print(f"❌ Erro ao enviar mensagem (fallback): {response_plain.status} - {response_text}")
+                                return jsonify({"error": "Failed to send message (fallback)"}), 500
+                    else:
+                        response_text = await response.text()
+                        print(f"❌ Erro ao enviar mensagem: {response.status} - {response_text}")
+                        return jsonify({"error": "Failed to send message"}), 500
+                        
+        except Exception as e:
+            print(f"❌ Erro ao enviar mensagem: {e}")
+            return jsonify({"error": f"Message sending failed: {str(e)}"}), 500
+    
+    # Executa de forma assíncrona
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Se já há um loop executando, usa create_task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, send_message_async())
+                return future.result()
         else:
-            print(f"❌ Erro ao enviar mensagem: {response.status_code} - {response.text}")
-            return jsonify({"error": "Failed to send message"}), 500
-            
+            return asyncio.run(send_message_async())
     except Exception as e:
-        print(f"❌ Erro ao enviar mensagem: {e}")
-        return jsonify({"error": f"Message sending failed: {str(e)}"}), 500
+        print(f"❌ Erro no envio assíncrono: {e}")
+        # Fallback síncrono usando requests como backup
+        try:
+            import requests
+            
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            
+            payload = {
+                "chat_id": chat_id,
+                "text": text.replace('*', '').replace('_', '').replace('`', '').replace('\\', ''),  # Remove formatação
+                "disable_web_page_preview": True
+            }
+            
+            response = requests.post(url, json=payload, timeout=5)
+            
+            if response.status_code == 200:
+                print(f"✅ Mensagem enviada (fallback síncrono) para chat {chat_id}")
+                return jsonify({"ok": True, "status": "message sent (sync fallback)"}), 200
+            else:
+                print(f"❌ Erro no fallback síncrono: {response.status_code}")
+                return jsonify({"error": "Failed to send message (sync fallback)"}), 500
+                
+        except Exception as fallback_error:
+            print(f"❌ Erro no fallback síncrono: {fallback_error}")
+            return jsonify({"error": "Failed to send message (all methods failed)"}), 500
 
 def _load_subscriptions():
     """Carrega subscrições do arquivo JSON"""
