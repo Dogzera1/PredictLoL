@@ -69,6 +69,7 @@ try:
     from bot.api_clients.riot_api_client import RiotAPIClient
     from bot.core_logic import DynamicPredictionSystem, LoLGameAnalyzer, ProfessionalUnitsSystem
     from bot.utils.constants import PANDASCORE_API_KEY, TELEGRAM_CONFIG
+    from bot.telegram_bot.instance_manager import BotInstanceManager
 except ImportError as e:
     logger.error(f"❌ Erro crítico ao importar módulos: {e}")
     sys.exit(1)
@@ -103,6 +104,9 @@ class BotApplication:
         
         # Validação de configuração
         self._validate_config()
+        
+        # Gerenciador de instância
+        self.instance_manager = BotInstanceManager()
         
         # Componentes principais
         self.pandascore_client = None
@@ -205,6 +209,14 @@ class BotApplication:
         logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado...")
         
         try:
+            # Verifica se já existe uma instância rodando
+            if not await self.instance_manager.check_instance():
+                logger.error("❌ Outra instância do bot já está rodando")
+                # Cria script de parada se não existir
+                BotInstanceManager.create_stop_script()
+                logger.info("💡 Use 'python stop_all_bots.py' para parar todas as instâncias")
+                return
+            
             # RAILWAY: Inicia health check server
             if HEALTH_CHECK_AVAILABLE:
                 logger.info("🏥 Iniciando health check server para Railway...")
@@ -216,9 +228,6 @@ class BotApplication:
                     await self._setup_metrics_integration()
                 except Exception as e:
                     logger.warning(f"⚠️ Erro ao configurar métricas: {e}")
-            
-            # NOVO: Limpa instâncias anteriores automaticamente
-            await self._cleanup_previous_instances()
             
             # Inicializa componentes
             await self.initialize_components()
@@ -257,60 +266,9 @@ class BotApplication:
             # RAILWAY: Marca bot como não rodando no shutdown
             if HEALTH_CHECK_AVAILABLE:
                 set_bot_running(False)
+            # Libera lock de instância
+            await self.instance_manager.release()
             await self.shutdown()
-
-    async def _cleanup_previous_instances(self) -> None:
-        """Limpa instâncias anteriores do bot"""
-        try:
-            logger.info("🧹 Limpando instâncias anteriores...")
-            
-            # Verifica processos existentes
-            import psutil
-            current_pid = os.getpid()
-            
-            # Procura por outros processos Python que podem ser o bot
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    # Pula o processo atual
-                    if proc.pid == current_pid:
-                        continue
-                        
-                    # Verifica se é um processo Python
-                    if proc.name().lower().startswith('python'):
-                        cmdline = proc.cmdline()
-                        # Verifica se é nosso bot
-                        if any('main.py' in cmd for cmd in cmdline):
-                            logger.warning(f"🛑 Encontrada instância anterior do bot (PID: {proc.pid})")
-                            proc.terminate()
-                            proc.wait(timeout=5)
-                            logger.info(f"✅ Processo anterior terminado: {proc.pid}")
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
-                    continue
-            
-            # Remove arquivos de lock
-            lock_files = [
-                "bot_running.txt",
-                "telegram_bot.pid",
-                "schedule_manager.lock",
-                "/tmp/lol_bot_v3.lock"
-            ]
-            
-            for lock_file in lock_files:
-                try:
-                    if os.path.exists(lock_file):
-                        os.remove(lock_file)
-                        logger.info(f"🗑️ Arquivo de lock removido: {lock_file}")
-                except Exception as e:
-                    logger.debug(f"Erro ao remover {lock_file}: {e}")
-            
-            # Aguarda um pouco para garantir que tudo foi limpo
-            await asyncio.sleep(2)
-            
-            logger.info("✅ Cleanup concluído")
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Erro no cleanup: {e}")
-            # Continua mesmo com erro no cleanup
 
     async def _setup_metrics_integration(self) -> None:
         """Configura integração de métricas reais com health check"""
