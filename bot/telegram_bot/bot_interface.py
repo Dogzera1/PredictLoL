@@ -1687,13 +1687,13 @@ Tem certeza?"""
                 await self.telegram_alerts._handle_subscription_callback(update, context)
             
             # Handlers de subscrição (CORRIGIDOS com nomes dos keyboards)
-            elif data in ["sub_all_tips", "sub_high_value", "sub_high_conf", "sub_premium"]:
+            elif data in ["all_tips", "high_value", "high_conf", "premium"]:
                 # Mapeia para os nomes esperados pelo alerts_system
                 subscription_mapping = {
-                    "sub_all_tips": "all_tips",
-                    "sub_high_value": "high_value", 
-                    "sub_high_conf": "high_conf",
-                    "sub_premium": "premium"
+                    "all_tips": "all_tips",
+                    "high_value": "high_value", 
+                    "high_conf": "high_conf",
+                    "premium": "premium"
                 }
                 
                 # Em vez de modificar query.data (que é read-only), 
@@ -2599,10 +2599,10 @@ Padrão recomendado ativo"""
     def _get_subscription_keyboard(self) -> InlineKeyboardMarkup:
         """Teclado de subscrições melhorado"""
         keyboard = [
-            [InlineKeyboardButton("🔔 Todas as Tips", callback_data="sub_all_tips")],
-            [InlineKeyboardButton("💎 Alto Valor (EV > 10%)", callback_data="sub_high_value")],
-            [InlineKeyboardButton("🎯 Alta Confiança (> 80%)", callback_data="sub_high_conf")],
-            [InlineKeyboardButton("👑 Premium (EV > 15% + Conf > 85%)", callback_data="sub_premium")],
+            [InlineKeyboardButton("🔔 Todas as Tips", callback_data="all_tips")],
+            [InlineKeyboardButton("💎 Alto Valor (EV > 10%)", callback_data="high_value")],
+            [InlineKeyboardButton("🎯 Alta Confiança (> 80%)", callback_data="high_conf")],
+            [InlineKeyboardButton("👑 Premium (EV > 15% + Conf > 85%)", callback_data="premium")],
             [InlineKeyboardButton("❌ Cancelar Alertas", callback_data="unsubscribe_all")],
             [InlineKeyboardButton("⚙️ Filtros Personalizados", callback_data="custom_filters")],
             [InlineKeyboardButton("🏠 Menu Principal", callback_data="main_menu")]
