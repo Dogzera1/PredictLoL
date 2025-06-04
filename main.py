@@ -50,6 +50,16 @@ except ImportError:
     HEALTH_CHECK_AVAILABLE = False
     logger.warning("⚠️ Health check não disponível")
 
+# Verificação explícita do token do Telegram
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not TELEGRAM_BOT_TOKEN:
+    logger.error("❌ TELEGRAM_BOT_TOKEN não encontrado nas variáveis de ambiente!")
+    sys.exit(1)
+else:
+    # Log apenas os primeiros e últimos 4 caracteres do token por segurança
+    token_preview = f"{TELEGRAM_BOT_TOKEN[:4]}...{TELEGRAM_BOT_TOKEN[-4:]}"
+    logger.info(f"✅ TELEGRAM_BOT_TOKEN configurado: {token_preview}")
+
 # Imports do sistema
 try:
     from bot.systems.schedule_manager import ScheduleManager
@@ -87,7 +97,7 @@ class BotApplication:
         logger.info("🚀 Inicializando Bot LoL V3 Ultra Avançado...")
         
         # Configuração de ambiente
-        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", TELEGRAM_CONFIG["bot_token"])
+        self.bot_token = TELEGRAM_BOT_TOKEN  # Usa o token já validado
         self.pandascore_api_key = os.getenv("PANDASCORE_API_KEY", PANDASCORE_API_KEY)
         self.admin_user_ids = self._parse_admin_user_ids()
         
@@ -109,41 +119,28 @@ class BotApplication:
         # Primeiro tenta variável de ambiente
         admin_ids_str = os.getenv("TELEGRAM_ADMIN_USER_IDS", "")
         
-        # Se não encontrar, usa o padrão das constantes
         if not admin_ids_str:
-            default_admins = TELEGRAM_CONFIG.get("admin_user_ids", [])
-            if isinstance(default_admins, list) and default_admins:
-                try:
-                    # Converte strings para int se necessário
-                    admin_ids = [int(uid) if isinstance(uid, str) else uid for uid in default_admins]
-                    logger.info(f"👑 {len(admin_ids)} administradores (padrão) configurados")
-                    return admin_ids
-                except (ValueError, TypeError) as e:
-                    logger.error(f"❌ Erro ao parsear admin IDs padrão: {e}")
-                    return []
-            
-            logger.warning("⚠️ Nenhum admin user ID configurado")
+            logger.warning("⚠️ TELEGRAM_ADMIN_USER_IDS não encontrado nas variáveis de ambiente")
             return []
         
         try:
             admin_ids = [int(uid.strip()) for uid in admin_ids_str.split(",") if uid.strip()]
-            logger.info(f"👑 {len(admin_ids)} administradores (env) configurados")
+            logger.info(f"👑 {len(admin_ids)} administradores configurados")
             return admin_ids
         except ValueError as e:
             logger.error(f"❌ Erro ao parsear admin user IDs: {e}")
             return []
 
     def _validate_config(self) -> None:
-        """Valida configuração essencial"""
-        if not self.bot_token or self.bot_token == "BOT_TOKEN_HERE":
-            logger.warning("⚠️ TELEGRAM_BOT_TOKEN não configurado via environment variable")
-            logger.info("ℹ️ Usando token padrão das constantes")
+        """Valida a configuração da aplicação"""
+        if not self.bot_token:
+            raise ValueError("TELEGRAM_BOT_TOKEN não configurado")
+        
+        if not self.admin_user_ids:
+            logger.warning("⚠️ Nenhum admin user ID configurado")
         
         if not self.pandascore_api_key:
-            logger.warning("⚠️ PandaScore API key não configurada")
-            logger.info("ℹ️ Usando API key padrão das constantes")
-        
-        logger.info("✅ Configuração validada")
+            logger.warning("⚠️ PANDASCORE_API_KEY não configurado, usando padrão")
 
     async def initialize_components(self) -> None:
         """Inicializa todos os componentes do sistema"""

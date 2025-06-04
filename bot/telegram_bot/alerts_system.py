@@ -142,6 +142,9 @@ class TelegramAlertsSystem:
         Args:
             bot_token: Token do bot do Telegram
         """
+        if not bot_token:
+            raise ValueError("Token do Telegram não pode estar vazio")
+            
         self.bot_token = bot_token
         self.bot: Optional[Bot] = None
         self.application: Optional[Application] = None
@@ -179,6 +182,14 @@ class TelegramAlertsSystem:
     async def initialize(self) -> None:
         """Inicializa o bot do Telegram"""
         try:
+            # Validação do token
+            if not self.bot_token:
+                raise ValueError("Token do Telegram não configurado")
+                
+            # Log seguro do token (apenas primeiros e últimos 4 caracteres)
+            token_preview = f"{self.bot_token[:4]}...{self.bot_token[-4:]}"
+            logger.info(f"🔄 Inicializando bot com token: {token_preview}")
+            
             self.bot = Bot(token=self.bot_token)
             self.application = Application.builder().token(self.bot_token).build()
             
@@ -187,10 +198,10 @@ class TelegramAlertsSystem:
             
             # Testa conexão
             bot_info = await self.bot.get_me()
-            logger.info(f"Bot conectado: @{bot_info.username} ({bot_info.first_name})")
+            logger.info(f"✅ Bot conectado: @{bot_info.username} ({bot_info.first_name})")
             
         except Exception as e:
-            logger.error(f"Erro ao inicializar bot do Telegram: {e}")
+            logger.error(f"❌ Erro ao inicializar bot do Telegram: {e}")
             raise
 
     def _setup_handlers(self) -> None:
