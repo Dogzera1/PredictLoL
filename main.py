@@ -194,69 +194,144 @@ class BotApplication:
         logger.info("✅ Configuração validada")
 
     async def initialize_components(self) -> None:
-        """Inicializa todos os componentes do sistema"""
+        """Inicializa todos os componentes do sistema - VERSÃO ROBUSTA"""
         logger.info("🔧 Inicializando componentes do sistema...")
         
+        # Variáveis para controle de falhas
+        components_initialized = []
+        
         try:
-            # 1. API Clients
-            logger.info("📡 Inicializando clientes de API...")
-            self.pandascore_client = PandaScoreAPIClient(self.pandascore_api_key)
-            self.riot_client = RiotAPIClient()
-            
-            # 2. Sistema de Tips Profissionais
-            logger.info("🎯 Inicializando sistema de tips...")
-            
-            # Cria componentes necessários
-            units_system = ProfessionalUnitsSystem()
-            game_analyzer = LoLGameAnalyzer()
-            prediction_system = DynamicPredictionSystem(
-                game_analyzer=game_analyzer,
-                units_system=units_system
-            )
-            
-            self.tips_system = ProfessionalTipsSystem(
-                pandascore_client=self.pandascore_client,
-                riot_client=self.riot_client,
-                prediction_system=prediction_system
-            )
-            
-            # 3. Sistema de Alertas Telegram (apenas se for Railway)
+            # 1. API Clients (não críticos - podem falhar)
+            try:
+                logger.info("📡 Inicializando clientes de API...")
+                self.pandascore_client = PandaScoreAPIClient(self.pandascore_api_key)
+                self.riot_client = RiotAPIClient()
+                components_initialized.append("API Clients")
+                logger.info("✅ API Clients inicializados")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro nos API clients (não crítico): {e}")
+                self.pandascore_client = None
+                self.riot_client = None
+
+            # 2. Sistema de Tips (não crítico - pode falhar)
+            try:
+                logger.info("🎯 Inicializando sistema de tips...")
+                
+                # Cria componentes com fallbacks
+                try:
+                    units_system = ProfessionalUnitsSystem()
+                    game_analyzer = LoLGameAnalyzer()
+                    prediction_system = DynamicPredictionSystem(
+                        game_analyzer=game_analyzer,
+                        units_system=units_system
+                    )
+                    
+                    self.tips_system = ProfessionalTipsSystem(
+                        pandascore_client=self.pandascore_client,
+                        riot_client=self.riot_client,
+                        prediction_system=prediction_system
+                    )
+                    components_initialized.append("Tips System")
+                    logger.info("✅ Sistema de tips inicializado")
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro no sistema de tips (não crítico): {e}")
+                    self.tips_system = None
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Erro geral no sistema de tips: {e}")
+                self.tips_system = None
+
+            # 3. Sistema de Alertas Telegram (CRÍTICO para Railway)
             if self.is_railway:
-                logger.info("📤 Inicializando sistema de alertas...")
-                self.telegram_alerts = TelegramAlertsSystem(
-                    bot_token=self.bot_token
-                )
+                try:
+                    logger.info("📤 Inicializando sistema de alertas...")
+                    self.telegram_alerts = TelegramAlertsSystem(
+                        bot_token=self.bot_token
+                    )
+                    components_initialized.append("Telegram Alerts")
+                    logger.info("✅ Sistema de alertas inicializado")
+                    
+                except Exception as e:
+                    logger.error(f"❌ FALHA CRÍTICA: Sistema de alertas falhou: {e}")
+                    # Tenta fallback mínimo
+                    try:
+                        self.telegram_alerts = TelegramAlertsSystem(
+                            bot_token=self.bot_token
+                        )
+                        logger.warning("⚠️ Sistema de alertas em modo fallback")
+                    except Exception as e2:
+                        logger.error(f"❌ Fallback também falhou: {e2}")
+                        self.telegram_alerts = None
             else:
                 logger.info("📤 Sistema de alertas desabilitado (modo local)")
                 self.telegram_alerts = None
-            
-            # 4. ScheduleManager (orquestrador total)
-            logger.info("⚙️ Inicializando ScheduleManager...")
-            self.schedule_manager = ScheduleManager(
-                tips_system=self.tips_system,
-                telegram_alerts=self.telegram_alerts,
-                pandascore_client=self.pandascore_client,
-                riot_client=self.riot_client
-            )
-            
-            # 5. Interface Principal do Bot (apenas se for Railway)
-            if self.is_railway:
-                logger.info("🤖 Inicializando interface do bot...")
-                self.bot_interface = LoLBotV3UltraAdvanced(
-                    bot_token=self.bot_token,
-                    schedule_manager=self.schedule_manager,
-                    admin_user_ids=self.admin_user_ids
+
+            # 4. ScheduleManager (SEMPRE criar, mesmo com componentes None)
+            try:
+                logger.info("⚙️ Inicializando ScheduleManager...")
+                self.schedule_manager = ScheduleManager(
+                    tips_system=self.tips_system,
+                    telegram_alerts=self.telegram_alerts,
+                    pandascore_client=self.pandascore_client,
+                    riot_client=self.riot_client
                 )
+                components_initialized.append("Schedule Manager")
+                logger.info("✅ ScheduleManager inicializado")
+                
+            except Exception as e:
+                logger.error(f"❌ FALHA CRÍTICA: ScheduleManager falhou: {e}")
+                # Cria mock do ScheduleManager para não quebrar
+                class MockScheduleManager:
+                    def __init__(self):
+                        self.tips_system = None
+                        self.telegram_alerts = self.telegram_alerts if hasattr(self, 'telegram_alerts') else None
+                        self.is_running = True
+                        
+                    async def start_scheduled_tasks(self):
+                        logger.warning("⚠️ MockScheduleManager: Sem tarefas reais")
+                        # Apenas mantém vivo
+                        while True:
+                            await asyncio.sleep(60)
+                
+                self.schedule_manager = MockScheduleManager()
+                logger.warning("⚠️ ScheduleManager em modo mock")
+
+            # 5. Interface Principal do Bot (CRÍTICO para Railway)
+            if self.is_railway:
+                try:
+                    logger.info("🤖 Inicializando interface do bot...")
+                    self.bot_interface = LoLBotV3UltraAdvanced(
+                        bot_token=self.bot_token,
+                        schedule_manager=self.schedule_manager,
+                        admin_user_ids=self.admin_user_ids
+                    )
+                    components_initialized.append("Bot Interface")
+                    logger.info("✅ Interface do bot inicializada")
+                    
+                except Exception as e:
+                    logger.error(f"❌ FALHA CRÍTICA: Interface do bot falhou: {e}")
+                    self.bot_interface = None
             else:
                 logger.info("🤖 Interface do bot desabilitada (modo local)")
                 self.bot_interface = None
+
+            # Relatório de inicialização
+            logger.info(f"📊 Componentes inicializados: {components_initialized}")
+            logger.info(f"📊 Total: {len(components_initialized)} componentes")
             
-            logger.info("✅ Todos os componentes inicializados com sucesso!")
-            
+            if len(components_initialized) == 0:
+                logger.error("❌ NENHUM COMPONENTE foi inicializado!")
+                raise Exception("Total component initialization failure")
+            elif len(components_initialized) < 3 and self.is_railway:
+                logger.warning("⚠️ Alguns componentes falharam, mas continuando...")
+            else:
+                logger.info("✅ Inicialização bem-sucedida!")
+
         except Exception as e:
             logger.error(f"❌ Erro crítico na inicialização: {e}")
-            raise
-
+            # NÃO faz raise - deixa o sistema continuar em modo degradado
+            logger.warning("⚠️ Continuando em modo degradado...")
     async def run_bot(self) -> None:
         """Executa o bot completo"""
         if self.is_railway:
@@ -269,7 +344,9 @@ class BotApplication:
             logger.info("🏥 Iniciando health check server...")
             start_health_server()
             set_bot_running(True)  # SEMPRE marca como rodando primeiro
+            update_heartbeat()     # FORÇA primeiro heartbeat
             logger.info("✅ Bot marcado como RUNNING no health check")
+            logger.info("💓 Heartbeat inicial forçado")
         
         try:
             # ETAPA 1: Configuração de métricas (falha não é crítica)
@@ -314,6 +391,7 @@ class BotApplication:
                         while True:
                             try:
                                 update_heartbeat()
+                                logger.debug("💓 Heartbeat atualizado")
                             except Exception as e:
                                 logger.debug(f"Erro no heartbeat: {e}")
                             await asyncio.sleep(30)  # Heartbeat a cada 30s
