@@ -732,12 +732,14 @@ class LoLBotV3UltraAdvanced:
             self.instance_manager.release_lock()
 
     def _setup_all_handlers(self) -> None:
-        """Configura todos os handlers do bot"""
+        """Configura todos os handlers do bot - VERSÃO UNIFICADA"""
         
         # Verifica se handlers já foram configurados
         if self.handlers_configured:
             logger.debug("Handlers já configurados, pulando...")
             return
+        
+        print("🔧 Configurando handlers únicos...")
         
         # Comandos básicos (todos os usuários)
         self.application.add_handler(CommandHandler("start", self._handle_start))
@@ -748,7 +750,7 @@ class LoLBotV3UltraAdvanced:
         self.application.add_handler(CommandHandler("unsubscribe", self._handle_unsubscribe))
         self.application.add_handler(CommandHandler("mystats", self._handle_my_stats))
         
-        # Comandos para grupos
+        # Comandos para grupos (SEM DUPLICAÇÃO)
         self.application.add_handler(CommandHandler("activate_group", self._handle_activate_group))
         self.application.add_handler(CommandHandler("group_status", self._handle_group_status))
         self.application.add_handler(CommandHandler("deactivate_group", self._handle_deactivate_group))
@@ -762,28 +764,23 @@ class LoLBotV3UltraAdvanced:
         self.application.add_handler(CommandHandler("logs", self._handle_logs))
         self.application.add_handler(CommandHandler("restart", self._handle_restart_system))
         
-        # Callbacks para botões inline
-        self.application.add_handler(CallbackQueryHandler(self._handle_callback_query))
-        
-        # Handler para mensagens não reconhecidas
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_unknown_message))
-        
-        # Comandos de grupo (apenas para administradores de grupo)
-        self.application.add_handler(CommandHandler("activate_group", self._handle_activate_group))
-        self.application.add_handler(CommandHandler("deactivate_group", self._handle_deactivate_group))
-        self.application.add_handler(CommandHandler("group_status", self._handle_group_status))
-        
-        # Comandos administrativos globais (apenas para super admins)
+        # Comandos administrativos extras (apenas para super admins)
         for admin_id in self.admin_user_ids:
             self.application.add_handler(CommandHandler("force_scan", self._handle_force_scan, filters=filters.User(admin_id)))
             self.application.add_handler(CommandHandler("send_broadcast", self._handle_send_broadcast, filters=filters.User(admin_id)))
             self.application.add_handler(CommandHandler("manage_users", self._handle_manage_users, filters=filters.User(admin_id)))
             self.application.add_handler(CommandHandler("system_restart", self._handle_system_restart, filters=filters.User(admin_id)))
         
+        # ÚNICO CallbackQueryHandler - este é o segredo!
+        self.application.add_handler(CallbackQueryHandler(self._handle_callback_query))
+        
+        # Handler para mensagens não reconhecidas
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_unknown_message))
+        
         # Marca como configurado
         self.handlers_configured = True
-        logger.debug("Todos os handlers configurados")
-
+        print("✅ Handlers únicos configurados com sucesso!")
+        logger.debug("Todos os handlers configurados SEM DUPLICAÇÃO")
     def _setup_signal_handlers(self, schedule_task: asyncio.Task) -> None:
         """Configura handlers para shutdown graceful"""
         def signal_handler(signum, frame):
@@ -991,14 +988,11 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
         await update.message.reply_text(stats_message, parse_mode=ParseMode.MARKDOWN_V2)
 
     async def _handle_subscribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler do comando /subscribe"""
+        """Handler do comando /subscribe - CORRIGIDO"""
         self.stats.commands_processed += 1
         
-        await update.message.reply_text(
-            "🔔 **Escolha seu tipo de subscrição:**",
-            parse_mode=ParseMode.MARKDOWN_V2,
-            reply_markup=self._get_subscription_keyboard()
-        )
+        # Delega para o alerts_system que tem toda a lógica
+        await self.telegram_alerts._handle_subscribe(update, context)
 
     async def _handle_unsubscribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /unsubscribe"""
@@ -1053,72 +1047,11 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
     # ===== COMANDOS PARA GRUPOS =====
 
     async def _handle_activate_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler do comando /activate_group - ativa alertas no grupo"""
-        chat = update.effective_chat
-        user = update.effective_user
-        
-        # Verifica se é um grupo
-        if chat.type not in ['group', 'supergroup']:
-            await update.message.reply_text(
-                "❌ **Este comando só funciona em grupos\\!**",
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            return
-        
-        # Verifica se o usuário é admin do grupo
-        try:
-            member = await context.bot.get_chat_member(chat.id, user.id)
-            if member.status not in ['administrator', 'creator']:
-                await update.message.reply_text(
-                    "❌ **Apenas administradores podem ativar alertas\\!**",
-                    parse_mode=ParseMode.MARKDOWN_V2
-                )
-                return
-        except Exception as e:
-            logger.error(f"Erro ao verificar admin: {e}")
-            await update.message.reply_text(
-                "❌ **Erro ao verificar permissões\\.**",
-                parse_mode=ParseMode.MARKDOWN_V2
-            )
-            return
-        
+        """Handler do comando /activate_group - CORRIGIDO"""
         self.stats.commands_processed += 1
         
-        # Envia menu de seleção de subscrição para grupo
-        message = f"""🔔 **ATIVAR ALERTAS DO GRUPO**
-
-📋 **Grupo:** {self._escape_markdown_v2(chat.title or "Grupo")}
-👤 **Solicitado por:** {self._escape_markdown_v2(user.first_name)}
-
-**🎯 TIPOS DE SUBSCRIÇÃO:**
-
-🔔 **Todas as Tips** \\- Recebe todas as análises
-💎 **Alto Valor** \\- Apenas EV > 10%
-🎯 **Alta Confiança** \\- Apenas confiança > 80%
-👑 **Premium** \\- EV > 15% \\+ Confiança > 85%
-
-**⚡ BENEFÍCIOS:**
-• Tips em tempo real 24/7
-• Análise ML \\+ Algoritmos heurísticos
-• Expected Value calculado
-• Gestão de risco profissional
-
-Escolha o tipo de subscrição:"""
-
-        keyboard = [
-            [InlineKeyboardButton("🔔 Todas as Tips", callback_data="group_all_tips")],
-            [InlineKeyboardButton("💎 Alto Valor (EV > 10%)", callback_data="group_high_value")],
-            [InlineKeyboardButton("🎯 Alta Confiança (> 80%)", callback_data="group_high_confidence")],
-            [InlineKeyboardButton("👑 Premium (EV > 15% + Conf > 85%)", callback_data="group_premium")],
-            [InlineKeyboardButton("❌ Cancelar", callback_data="group_cancel")]
-        ]
-        
-        await update.message.reply_text(
-            message,
-            parse_mode=ParseMode.MARKDOWN_V2,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
+        # Delega completamente para o alerts_system que tem toda a lógica
+        await self.telegram_alerts._handle_activate_group(update, context)
     async def _handle_group_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /group_status - mostra status do grupo"""
         chat = update.effective_chat
