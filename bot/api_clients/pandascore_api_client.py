@@ -93,14 +93,12 @@ class PandaScoreAPIClient:
 
     async def __aenter__(self) -> PandaScoreAPIClient:
         """Context manager entry"""
-        self.disable_auto_close()  # Desabilita auto-close no context manager
         await self.start_session()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit"""
         await self.close_session()
-        self.enable_auto_close()  # Reabilita auto-close após sair do context manager
 
     async def start_session(self) -> None:
         """Inicia sessão HTTP"""
@@ -182,9 +180,6 @@ class PandaScoreAPIClient:
     async def get_lol_live_matches(self) -> List[Dict[str, Any]]:
         """Busca partidas ao vivo de League of Legends"""
         try:
-            # Garante que a sessão está ativa
-            await self.start_session()
-            
             endpoint = "/lol/matches/running"
             matches = await self._make_request(endpoint)
             
@@ -197,162 +192,117 @@ class PandaScoreAPIClient:
         except Exception as e:
             logger.error(f"Erro ao buscar partidas LoL ao vivo no PandaScore: {e}")
             return []
-        finally:
-            # Auto-fecha sessão se não estiver em context manager
-            if hasattr(self, '_auto_close') and self._auto_close:
-                await self.close_session()
 
     async def get_lol_upcoming_matches(self, hours_ahead: int = 24) -> List[Dict[str, Any]]:
         """Busca partidas futuras de League of Legends"""
         try:
-            # Garante que a sessão está ativa
-            await self.start_session()
-            
             endpoint = "/lol/matches/upcoming"
             params = {"per_page": 50}
             
             matches = await self._make_request(endpoint, params)
             
             if isinstance(matches, list):
-                # Filtra por tempo
-                filtered_matches = [
-                    match for match in matches
-                    if self._is_within_time_window(match, hours_ahead)
-                ]
+                logger.info(f"PandaScore: {len(matches)} partidas LoL futuras encontradas")
+                return matches
                 
-                logger.info(f"PandaScore: {len(filtered_matches)} partidas futuras filtradas (próximas {hours_ahead}h)")
-                return filtered_matches
-            
             return []
             
         except Exception as e:
-            logger.error(f"Erro ao buscar partidas futuras no PandaScore: {e}")
+            logger.error(f"Erro ao buscar partidas LoL futuras no PandaScore: {e}")
             return []
-        finally:
-            # Auto-fecha sessão se não estiver em context manager
-            if hasattr(self, '_auto_close') and self._auto_close:
-                await self.close_session()
-
-    def _is_within_time_window(self, match: Dict, hours_ahead: int) -> bool:
-        """Verifica se a partida está dentro da janela de tempo"""
-        try:
-            # Implementa lógica de filtro temporal
-            # Por agora retorna True, será implementado conforme estrutura da API
-            return True
-        except Exception:
-            return True
 
     async def get_match_odds(self, match_id: int) -> Optional[Dict[str, Any]]:
-        """Busca odds para uma partida específica"""
+        """Busca odds de uma partida específica"""
         try:
-            # Garante que a sessão está ativa
-            await self.start_session()
-            
             endpoint = f"/lol/matches/{match_id}/odds"
-            odds = await self._make_request(endpoint)
+            odds_data = await self._make_request(endpoint)
             
-            logger.info(f"PandaScore: Odds recuperadas para match {match_id}")
-            return odds
+            logger.debug(f"PandaScore: odds obtidas para partida {match_id}")
+            return odds_data
             
         except Exception as e:
-            logger.error(f"Erro ao buscar odds para match {match_id}: {e}")
+            logger.error(f"Erro ao buscar odds da partida {match_id}: {e}")
             return None
-        finally:
-            # Auto-fecha sessão se não estiver em context manager
-            if hasattr(self, '_auto_close') and self._auto_close:
-                await self.close_session()
 
     async def find_match_odds_by_teams(self, team1: str, team2: str, league: str = "") -> Optional[Dict[str, Any]]:
         """
-        Busca odds para uma partida específica usando nomes dos times
+        Encontra odds de uma partida baseada nos nomes dos times
         
         Args:
             team1: Nome do primeiro time
             team2: Nome do segundo time
-            league: Liga/torneio (opcional)
+            league: Liga (opcional para filtrar)
             
         Returns:
-            Dicionário com odds se encontradas, None caso contrário
+            Dados das odds ou None se não encontrado
         """
         try:
-            # Garante que a sessão está ativa
-            await self.start_session()
+            # Busca partidas ao vivo e futuras
+            live_matches = await self.get_lol_live_matches()
+            upcoming_matches = await self.get_lol_upcoming_matches()
             
-            # Normaliza nomes dos times
+            all_matches = live_matches + upcoming_matches
+            
+            # Normaliza nomes dos times para comparação
             norm_team1 = normalize_team_name(team1)
             norm_team2 = normalize_team_name(team2)
             
-            logger.info(f"PandaScore: Buscando odds para {norm_team1} vs {norm_team2}")
-            
-            # Busca partidas ao vivo primeiro
-            live_matches = await self.get_lol_live_matches()
-            
-            for match in live_matches:
-                match_team1 = match.get("opponents", [{}])[0].get("opponent", {}).get("name", "")
-                match_team2 = match.get("opponents", [{}])[1].get("opponent", {}).get("name", "") if len(match.get("opponents", [])) > 1 else ""
+            for match in all_matches:
+                if not isinstance(match, dict):
+                    continue
+                    
+                # Extrai nomes dos times da partida
+                opponents = match.get("opponents", [])
+                if len(opponents) != 2:
+                    continue
                 
+                match_team1 = opponents[0].get("opponent", {}).get("name", "")
+                match_team2 = opponents[1].get("opponent", {}).get("name", "")
+                
+                # Verifica se os times coincidem
                 if self._teams_match(norm_team1, norm_team2, match_team1, match_team2):
+                    # Verifica liga se especificada
+                    if league:
+                        match_league = match.get("league", {}).get("name", "")
+                        if league.lower() not in match_league.lower():
+                            continue
+                    
+                    # Busca odds desta partida
                     match_id = match.get("id")
                     if match_id:
-                        return await self.get_match_odds(match_id)
-            
-            # Se não encontrou ao vivo, busca nas próximas partidas
-            upcoming_matches = await self.get_lol_upcoming_matches(24)
-            
-            for match in upcoming_matches:
-                match_team1 = match.get("opponents", [{}])[0].get("opponent", {}).get("name", "")
-                match_team2 = match.get("opponents", [{}])[1].get("opponent", {}).get("name", "") if len(match.get("opponents", [])) > 1 else ""
-                
-                if self._teams_match(norm_team1, norm_team2, match_team1, match_team2):
-                    match_id = match.get("id")
-                    if match_id:
-                        return await self.get_match_odds(match_id)
+                        odds = await self.get_match_odds(match_id)
+                        if odds:
+                            return {
+                                "match": match,
+                                "odds": odds,
+                                "team1": match_team1,
+                                "team2": match_team2
+                            }
             
             logger.warning(f"PandaScore: Nenhuma partida encontrada para {team1} vs {team2}")
             return None
             
         except Exception as e:
-            logger.error(f"Erro ao buscar odds por times no PandaScore: {e}")
+            logger.error(f"Erro ao buscar odds por times {team1} vs {team2}: {e}")
             return None
-        finally:
-            # Auto-fecha sessão se não estiver em context manager
-            if hasattr(self, '_auto_close') and self._auto_close:
-                await self.close_session()
 
     def _teams_match(self, target_team1: str, target_team2: str, match_team1: str, match_team2: str) -> bool:
-        """
-        Verifica se os times da partida correspondem aos alvos
+        """Verifica se os times da partida coincidem com os procurados"""
+        norm_match1 = normalize_team_name(match_team1)
+        norm_match2 = normalize_team_name(match_team2)
         
-        Args:
-            target_team1, target_team2: Times que estamos procurando
-            match_team1, match_team2: Times da partida encontrada
-            
-        Returns:
-            True se há correspondência
-        """
-        norm_match_team1 = normalize_team_name(match_team1)
-        norm_match_team2 = normalize_team_name(match_team2)
-        
-        # Verifica correspondência direta
-        direct_match = (
-            (teams_similarity(target_team1, norm_match_team1) > 0.8 and 
-             teams_similarity(target_team2, norm_match_team2) > 0.8) or
-            (teams_similarity(target_team1, norm_match_team2) > 0.8 and 
-             teams_similarity(target_team2, norm_match_team1) > 0.8)
+        # Verifica ambas as combinações (A vs B ou B vs A)
+        match1 = (
+            teams_similarity(target_team1, norm_match1) and 
+            teams_similarity(target_team2, norm_match2)
         )
         
-        return direct_match
-
-    # Auto-close flag para sessões que não usam context manager
-    _auto_close: bool = True
-
-    def enable_auto_close(self) -> None:
-        """Habilita auto-close de sessões"""
-        self._auto_close = True
-
-    def disable_auto_close(self) -> None:
-        """Desabilita auto-close (para context managers)"""
-        self._auto_close = False
+        match2 = (
+            teams_similarity(target_team1, norm_match2) and 
+            teams_similarity(target_team2, norm_match1)
+        )
+        
+        return match1 or match2
 
     async def get_moneyline_odds(self, team1: str, team2: str, league: str = "") -> Optional[Dict[str, float]]:
         """

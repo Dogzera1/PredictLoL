@@ -10,7 +10,6 @@ import re
 import logging
 import json
 from datetime import datetime, timedelta
-import aiohttp
 
 try:
     from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -136,22 +135,14 @@ class TelegramAlertsSystem:
     - Tratamento de usuários bloqueados
     """
 
-    def __init__(self, bot_token: Optional[str] = None):
-        # Usa token das variáveis do Railway ou o fornecido
-        self.bot_token = bot_token or os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
+    def __init__(self, bot_token: str):
+        """
+        Inicializa o sistema de alertas
         
-        # Admin IDs das variáveis do Railway
-        admin_ids_str = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611")
-        self.admin_ids = [int(id.strip()) for id in admin_ids_str.split(",") if id.strip().isdigit()]
-        
-        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
-        self.session: Optional[aiohttp.ClientSession] = None
-        
-        logger.info(f"TelegramAlertsSystem inicializado - Admin IDs: {self.admin_ids}")
-        
-        if not self.bot_token:
-            logger.warning("⚠️ Bot token não fornecido - Sistema de alertas desabilitado")
-        
+        Args:
+            bot_token: Token do bot do Telegram
+        """
+        self.bot_token = bot_token
         self.bot: Optional[Bot] = None
         self.application: Optional[Application] = None
         
@@ -203,14 +194,201 @@ class TelegramAlertsSystem:
             raise
 
     def _setup_handlers(self) -> None:
-        """Handlers DESABILITADOS - usando bot_interface.py como handler único"""
+        """Configura handlers de comandos"""
         
-        # NOTA: Handlers movidos para bot_interface.py para evitar conflitos
-        # Este sistema agora funciona apenas como backend de processamento
-        # Os handlers são registrados apenas em bot_interface.py
+        # Comandos básicos
+        self.application.add_handler(CommandHandler("start", self._handle_start))
+        self.application.add_handler(CommandHandler("help", self._handle_help))
+        self.application.add_handler(CommandHandler("subscribe", self._handle_subscribe))
+        self.application.add_handler(CommandHandler("unsubscribe", self._handle_unsubscribe))
+        self.application.add_handler(CommandHandler("status", self._handle_status))
+        self.application.add_handler(CommandHandler("mystats", self._handle_my_stats))
         
-        logger.debug("Handlers do alerts_system DESABILITADOS (usando bot_interface)")
-        print("📝 alerts_system: Handlers delegados para bot_interface.py")
+        # Comandos para grupos
+        self.application.add_handler(CommandHandler("activate_group", self._handle_activate_group))
+        self.application.add_handler(CommandHandler("group_status", self._handle_group_status))
+        self.application.add_handler(CommandHandler("deactivate_group", self._handle_deactivate_group))
+        
+        # Callback handlers para botões inline
+        self.application.add_handler(CallbackQueryHandler(self._handle_subscription_callback))
+        
+        logger.debug("Handlers configurados")
+
+    async def start_bot(self) -> None:
+        """Inicia o bot do Telegram"""
+        if not self.application:
+            await self.initialize()
+        
+        logger.info("🤖 Iniciando bot do Telegram...")
+        await self.application.initialize()
+        await self.application.start()
+        await self.application.updater.start_polling()
+
+    async def stop_bot(self) -> None:
+        """Para o bot do Telegram"""
+        if self.application and self.application.updater:
+            logger.info("🛑 Parando bot do Telegram...")
+            await self.application.updater.stop()
+            await self.application.stop()
+            await self.application.shutdown()
+
+    async def send_professional_tip(self, tip: ProfessionalTip) -> bool:
+        """
+        Envia tip profissional para usuários e grupos cadastrados
+        
+        Args:
+            tip: Tip profissional com informações completas
+            
+        Returns:
+            True se enviado com sucesso para pelo menos um destinatário
+        """
+        try:
+            # Verifica cache para evitar duplicatas
+            tip_cache_key = f"{tip.team_a}_{tip.team_b}_{tip.odds}_{int(tip.timestamp)}"
+            current_time = time.time()
+            
+            if tip_cache_key in self.recent_tips_cache:
+                if current_time - self.recent_tips_cache[tip_cache_key] < self.cache_duration:
+                    logger.debug(f"Tip duplicada ignorada (cache): {tip.team_a} vs {tip.team_b}")
+                    return False
+            
+            # Adiciona ao cache
+            self.recent_tips_cache[tip_cache_key] = current_time
+            
+            # Formata mensagem
+            message = self._format_tip_message(tip)
+            
+            # Obter usuários e grupos elegíveis
+            eligible_users = self._get_eligible_users_for_tip(tip)
+            eligible_groups = self._get_eligible_groups_for_tip(tip)
+            
+            logger.info(f"📤 Enviando tip: {tip.team_a} vs {tip.team_b}")
+            logger.info(f"🎯 Destinatários: {len(eligible_users)} usuários + {len(eligible_groups)} grupos")
+            
+            # Contadores de sucesso
+            users_sent = 0
+            groups_sent = 0
+            
+            # Envia para usuários individuais
+            for user_id in eligible_users:
+                if self._can_send_to_user(user_id):
+                    try:
+                        success = await self._send_message_to_user(
+                            user_id, 
+                            message, 
+                            NotificationType.TIP_ALERT
+                        )
+                        if success:
+                            users_sent += 1
+                        
+                        # Rate limiting
+                        await asyncio.sleep(0.05)
+                        
+                    except Exception as e:
+                        logger.debug(f"Erro ao enviar para usuário {user_id}: {e}")
+                        continue
+            
+            # Envia para grupos
+            for group_id in eligible_groups:
+                try:
+                    success = await self._send_message_to_group(
+                        group_id, 
+                        message, 
+                        NotificationType.TIP_ALERT
+                    )
+                    if success:
+                        groups_sent += 1
+                        # Atualiza contador do grupo
+                        if group_id in self.groups:
+                            self.groups[group_id].tips_received += 1
+                    
+                    # Rate limiting
+                    await asyncio.sleep(0.05)
+                    
+                except Exception as e:
+                    logger.debug(f"Erro ao enviar para grupo {group_id}: {e}")
+                    continue
+            
+            # Atualiza estatísticas
+            total_sent = users_sent + groups_sent
+            if total_sent > 0:
+                self.stats.tips_sent += 1
+                self.stats.total_alerts_sent += total_sent
+                self.users_notified_count = users_sent
+                self.groups_notified_count = groups_sent
+                
+                logger.info(f"✅ Tip enviada com sucesso!")
+                logger.info(f"📊 Entregues: {users_sent} usuários + {groups_sent} grupos")
+                
+                return True
+            else:
+                logger.warning(f"⚠️ Nenhum destinatário recebeu a tip")
+                return False
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao enviar tip profissional: {e}")
+            self.stats.failed_deliveries += 1
+            return False
+
+    async def send_match_update(self, analysis: GameAnalysis, match_id: str) -> None:
+        """Envia atualização de partida"""
+        try:
+            message = self._format_match_update(analysis, match_id)
+            
+            # Envia apenas para usuários com subscrição ALL_TIPS ou PREMIUM
+            eligible_users = [
+                user_id for user_id, user in self.users.items()
+                if user.is_active and user.subscription_type in [
+                    SubscriptionType.ALL_TIPS, 
+                    SubscriptionType.PREMIUM
+                ]
+            ]
+            
+            for user_id in eligible_users:
+                if self._can_send_to_user(user_id):
+                    await self._send_message_to_user(
+                        user_id, 
+                        message, 
+                        NotificationType.MATCH_UPDATE
+                    )
+            
+            self.stats.match_updates_sent += len(eligible_users)
+            logger.debug(f"Atualização de partida enviada para {len(eligible_users)} usuários")
+            
+        except Exception as e:
+            logger.error(f"Erro ao enviar atualização de partida: {e}")
+
+    async def send_system_alert(self, message: str, alert_type: str = "info") -> None:
+        """Envia alerta do sistema para admins"""
+        try:
+            # Envia apenas para usuários premium (admins)
+            admin_users = [
+                user_id for user_id, user in self.users.items()
+                if user.subscription_type == SubscriptionType.PREMIUM
+            ]
+            
+            emoji_map = {
+                "info": "ℹ️",
+                "warning": "⚠️", 
+                "error": "❌",
+                "success": "✅"
+            }
+            
+            formatted_message = f"{emoji_map.get(alert_type, 'ℹ️')} **SISTEMA**\n\n{message}"
+            
+            for user_id in admin_users:
+                await self._send_message_to_user(
+                    user_id, 
+                    formatted_message, 
+                    NotificationType.SYSTEM_STATUS
+                )
+            
+            self.stats.system_alerts_sent += len(admin_users)
+            logger.info(f"Alerta do sistema enviado para {len(admin_users)} admins")
+            
+        except Exception as e:
+            logger.error(f"Erro ao enviar alerta do sistema: {e}")
+
     def _format_tip_message(self, tip: ProfessionalTip) -> str:
         """Formata tip para Telegram (texto simples)"""
         try:
@@ -902,21 +1080,4 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         for char in escape_chars:
             text = text.replace(char, f'\\{char}')
         
-        return text
-
-    async def start_session(self) -> None:
-        """Inicia sessão HTTP"""
-        if not self.session or self.session.closed:
-            self.session = aiohttp.ClientSession()
-    
-    async def close_session(self) -> None:
-        """Fecha sessão HTTP"""
-        if self.session and not self.session.closed:
-            await self.session.close()
-    
-    async def __aenter__(self):
-        await self.start_session()
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close_session() 
+        return text 

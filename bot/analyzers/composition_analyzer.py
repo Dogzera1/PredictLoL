@@ -31,13 +31,9 @@ class CompositionAnalyzer:
         self.champions_db: Dict[str, Any] = {}
         self.synergies_db: Dict[str, Any] = {}
         self.counters_db: Dict[str, Any] = {}
-        self._initialized: bool = False
-    
-    async def _ensure_initialized(self) -> None:
-        """Garante que as databases estão inicializadas (lazy loading)"""
-        if not self._initialized:
-            await self._initialize_databases()
-            self._initialized = True
+        
+        # Carrega databases
+        asyncio.create_task(self._initialize_databases())
     
     async def _initialize_databases(self) -> None:
         """Inicializa todas as databases necessárias"""
@@ -103,9 +99,6 @@ class CompositionAnalyzer:
         Returns:
             Dict com análise completa da composição
         """
-        # Garante que está inicializado antes de usar
-        await self._ensure_initialized()
-        
         logger.info(f"🎮 Analisando composição: {[pick['champion'] for pick in team_picks]}")
         
         try:

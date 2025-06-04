@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configurações
-BOT_TOKEN = "7584060058:AAHiZkgr-TFlbt8Ym1GNFMdvjfVa6oED9l8"
+BOT_TOKEN = "7584060058:AAFTZcmirun47zLiCCm48Trre6c3oXnM-Cg"
 ADMIN_ID = 8012415611
 START_TIME = time.time()
 

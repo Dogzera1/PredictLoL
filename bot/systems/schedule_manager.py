@@ -100,7 +100,7 @@ class ScheduleManager:
     def __init__(
         self,
         tips_system: "ProfessionalTipsSystem",
-        telegram_alerts: Optional[TelegramAlertsSystem],
+        telegram_alerts: TelegramAlertsSystem,
         pandascore_client: PandaScoreAPIClient,
         riot_client: RiotAPIClient
     ):
@@ -109,7 +109,7 @@ class ScheduleManager:
         
         Args:
             tips_system: Sistema de tips profissionais
-            telegram_alerts: Sistema de alertas Telegram (opcional - None para modo local)
+            telegram_alerts: Sistema de alertas Telegram
             pandascore_client: Cliente do PandaScore API
             riot_client: Cliente da Riot API
         """
@@ -393,8 +393,8 @@ class ScheduleManager:
             self.health.is_healthy = all_healthy
             self.health.components_status = components_health
             
-            # Envia alerta se sistema não estiver saudável (apenas se telegram_alerts disponível)
-            if not all_healthy and self.telegram_alerts:
+            # Envia alerta se sistema não estiver saudável
+            if not all_healthy:
                 unhealthy_components = [
                     comp for comp, healthy in components_health.items() 
                     if not healthy
@@ -416,11 +416,6 @@ class ScheduleManager:
         """Tarefa de manutenção de cache"""
         try:
             logger.debug("🔧 Executando manutenção de cache...")
-            
-            # Só executa se telegram_alerts estiver disponível
-            if not self.telegram_alerts:
-                logger.debug("📤 Cache de telegram não disponível - modo local")
-                return
             
             # Estatísticas antes da limpeza
             telegram_cache_before = len(self.telegram_alerts.recent_tips_cache)
@@ -498,22 +493,17 @@ class ScheduleManager:
         # Log do erro
         logger.error(f"Erro recuperado no scheduler: {error}")
         
-        # Tenta notificar via Telegram (apenas se disponível)
-        if self.telegram_alerts:
-            try:
-                await self.telegram_alerts.send_system_alert(
-                    f"Erro recuperado no ScheduleManager: {str(error)[:100]}...",
-                    "warning"
-                )
-            except Exception:
-                logger.error("Falha ao enviar alerta de erro")
+        # Tenta notificar via Telegram
+        try:
+            await self.telegram_alerts.send_system_alert(
+                f"Erro recuperado no ScheduleManager: {str(error)[:100]}...",
+                "warning"
+            )
+        except Exception:
+            logger.error("Falha ao enviar alerta de erro")
 
     async def _notify_system_start(self) -> None:
         """Notifica início do sistema"""
-        if not self.telegram_alerts:
-            logger.debug("📤 Sistema de alertas não disponível - modo local")
-            return
-            
         try:
             await self.telegram_alerts.send_system_alert(
                 f"🚀 Bot LoL V3 Ultra Avançado INICIADO!\n\n"
@@ -528,10 +518,6 @@ class ScheduleManager:
 
     async def _notify_system_stop(self) -> None:
         """Notifica parada do sistema"""
-        if not self.telegram_alerts:
-            logger.debug("📤 Sistema de alertas não disponível - modo local")
-            return
-            
         try:
             uptime_hours = (time.time() - self.start_time) / 3600
             await self.telegram_alerts.send_system_alert(
@@ -547,10 +533,6 @@ class ScheduleManager:
 
     async def _notify_system_error(self, error_msg: str) -> None:
         """Notifica erro crítico do sistema"""
-        if not self.telegram_alerts:
-            logger.debug("📤 Sistema de alertas não disponível - modo local")
-            return
-            
         try:
             await self.telegram_alerts.send_system_alert(
                 f"❌ ERRO CRÍTICO no Bot LoL V3\n\n{error_msg}\n\nSistema sendo reiniciado...",
