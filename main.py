@@ -64,7 +64,7 @@ except ImportError as e:
     sys.exit(1)
 
 # Força o token correto ANTES de qualquer inicialização
-os.environ["TELEGRAM_BOT_TOKEN"] = "7584060058:AAHiZkgr-TFlbt8Ym1GNFMdvjfVa6oED9l8"
+os.environ["TELEGRAM_BOT_TOKEN"] = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
 os.environ["TELEGRAM_ADMIN_USER_IDS"] = "8012415611"
 
 # Detecta se está rodando no Railway

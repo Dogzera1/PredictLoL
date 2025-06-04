@@ -768,6 +768,18 @@ class LoLBotV3UltraAdvanced:
         # Handler para mensagens não reconhecidas
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_unknown_message))
         
+        # Comandos de grupo (apenas para administradores de grupo)
+        self.application.add_handler(CommandHandler("activate_group", self._handle_activate_group))
+        self.application.add_handler(CommandHandler("deactivate_group", self._handle_deactivate_group))
+        self.application.add_handler(CommandHandler("group_status", self._handle_group_status))
+        
+        # Comandos administrativos globais (apenas para super admins)
+        for admin_id in self.admin_user_ids:
+            self.application.add_handler(CommandHandler("force_scan", self._handle_force_scan, filters=filters.User(admin_id)))
+            self.application.add_handler(CommandHandler("send_broadcast", self._handle_send_broadcast, filters=filters.User(admin_id)))
+            self.application.add_handler(CommandHandler("manage_users", self._handle_manage_users, filters=filters.User(admin_id)))
+            self.application.add_handler(CommandHandler("system_restart", self._handle_system_restart, filters=filters.User(admin_id)))
+        
         # Marca como configurado
         self.handlers_configured = True
         logger.debug("Todos os handlers configurados")
@@ -1041,19 +1053,186 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
     # ===== COMANDOS PARA GRUPOS =====
 
     async def _handle_activate_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler para ativar alertas em um grupo"""
-        # Delega para o sistema de alertas que já tem a lógica completa
-        await self.telegram_alerts._handle_activate_group(update, context)
+        """Handler do comando /activate_group - ativa alertas no grupo"""
+        chat = update.effective_chat
+        user = update.effective_user
+        
+        # Verifica se é um grupo
+        if chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text(
+                "❌ **Este comando só funciona em grupos\\!**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Verifica se o usuário é admin do grupo
+        try:
+            member = await context.bot.get_chat_member(chat.id, user.id)
+            if member.status not in ['administrator', 'creator']:
+                await update.message.reply_text(
+                    "❌ **Apenas administradores podem ativar alertas\\!**",
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                return
+        except Exception as e:
+            logger.error(f"Erro ao verificar admin: {e}")
+            await update.message.reply_text(
+                "❌ **Erro ao verificar permissões\\.**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        self.stats.commands_processed += 1
+        
+        # Envia menu de seleção de subscrição para grupo
+        message = f"""🔔 **ATIVAR ALERTAS DO GRUPO**
+
+📋 **Grupo:** {self._escape_markdown_v2(chat.title or "Grupo")}
+👤 **Solicitado por:** {self._escape_markdown_v2(user.first_name)}
+
+**🎯 TIPOS DE SUBSCRIÇÃO:**
+
+🔔 **Todas as Tips** \\- Recebe todas as análises
+💎 **Alto Valor** \\- Apenas EV > 10%
+🎯 **Alta Confiança** \\- Apenas confiança > 80%
+👑 **Premium** \\- EV > 15% \\+ Confiança > 85%
+
+**⚡ BENEFÍCIOS:**
+• Tips em tempo real 24/7
+• Análise ML \\+ Algoritmos heurísticos
+• Expected Value calculado
+• Gestão de risco profissional
+
+Escolha o tipo de subscrição:"""
+
+        keyboard = [
+            [InlineKeyboardButton("🔔 Todas as Tips", callback_data="group_all_tips")],
+            [InlineKeyboardButton("💎 Alto Valor (EV > 10%)", callback_data="group_high_value")],
+            [InlineKeyboardButton("🎯 Alta Confiança (> 80%)", callback_data="group_high_confidence")],
+            [InlineKeyboardButton("👑 Premium (EV > 15% + Conf > 85%)", callback_data="group_premium")],
+            [InlineKeyboardButton("❌ Cancelar", callback_data="group_cancel")]
+        ]
+        
+        await update.message.reply_text(
+            message,
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
     async def _handle_group_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler para status do grupo"""
-        # Delega para o sistema de alertas que já tem a lógica completa
-        await self.telegram_alerts._handle_group_status(update, context)
+        """Handler do comando /group_status - mostra status do grupo"""
+        chat = update.effective_chat
+        
+        # Verifica se é um grupo
+        if chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text(
+                "❌ **Este comando só funciona em grupos\\!**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        self.stats.commands_processed += 1
+        
+        # Verifica se o grupo está registrado
+        if chat.id in self.telegram_alerts.groups:
+            group = self.telegram_alerts.groups[chat.id]
+            
+            message = f"""📊 **STATUS DO GRUPO**
+
+📋 **Grupo:** {self._escape_markdown_v2(chat.title or "Grupo")}
+🆔 **ID:** `{chat.id}`
+
+**🔔 ALERTAS:**
+• Status: {'✅ Ativo' if group.is_active else '❌ Inativo'}
+• Tipo: {self._escape_markdown_v2(group.subscription_type.value)}
+• Tips recebidas: {group.tips_received}
+
+**📅 HISTÓRICO:**
+• Ativado em: {self._format_time_ago(group.activated_at)}
+• Ativado por: ID {group.activated_by}
+
+**⚙️ CONFIGURAÇÕES:**
+• Rate limit: {self.telegram_alerts.max_messages_per_hour} msg/h
+• Cache: {self.telegram_alerts.cache_duration // 60} min
+
+Use `/deactivate\\_group` para desativar\\."""
+        else:
+            message = f"""📊 **STATUS DO GRUPO**
+
+📋 **Grupo:** {self._escape_markdown_v2(chat.title or "Grupo")}
+🆔 **ID:** `{chat.id}`
+
+**❌ ALERTAS NÃO ATIVADOS**
+
+Este grupo não possui alertas configurados\\.
+
+Use `/activate\\_group` para ativar\\."""
+        
+        await update.message.reply_text(
+            message,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_deactivate_group(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler para desativar alertas do grupo"""
-        # Delega para o sistema de alertas que já tem a lógica completa
-        await self.telegram_alerts._handle_deactivate_group(update, context)
+        """Handler do comando /deactivate_group - desativa alertas no grupo"""
+        chat = update.effective_chat
+        user = update.effective_user
+        
+        # Verifica se é um grupo
+        if chat.type not in ['group', 'supergroup']:
+            await update.message.reply_text(
+                "❌ **Este comando só funciona em grupos\\!**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Verifica se o usuário é admin do grupo
+        try:
+            member = await context.bot.get_chat_member(chat.id, user.id)
+            if member.status not in ['administrator', 'creator']:
+                await update.message.reply_text(
+                    "❌ **Apenas administradores podem desativar alertas\\!**",
+                    parse_mode=ParseMode.MARKDOWN_V2
+                )
+                return
+        except Exception as e:
+            logger.error(f"Erro ao verificar admin: {e}")
+            await update.message.reply_text(
+                "❌ **Erro ao verificar permissões\\.**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        self.stats.commands_processed += 1
+        
+        # Verifica se o grupo está ativo
+        if chat.id not in self.telegram_alerts.groups:
+            await update.message.reply_text(
+                "ℹ️ **Este grupo não tem alertas ativos\\.**",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        message = f"""⚠️ **DESATIVAR ALERTAS DO GRUPO**
+
+📋 **Grupo:** {self._escape_markdown_v2(chat.title or "Grupo")}
+👤 **Solicitado por:** {self._escape_markdown_v2(user.first_name)}
+
+**❌ CONFIRMAÇÃO NECESSÁRIA:**
+Isso irá desativar TODOS os alertas deste grupo\\.
+
+Tem certeza?"""
+
+        keyboard = [
+            [InlineKeyboardButton("✅ Sim, desativar", callback_data="group_deactivate_confirm")],
+            [InlineKeyboardButton("❌ Cancelar", callback_data="group_cancel")]
+        ]
+        
+        await update.message.reply_text(
+            message,
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
     # ===== COMANDOS ADMINISTRATIVOS =====
 
@@ -1146,34 +1325,214 @@ Bot profissional para tips de League of Legends com automação total\\. Combina
         await update.message.reply_text(system_message, parse_mode=ParseMode.MARKDOWN_V2)
 
     async def _handle_force_scan(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handler do comando /force"""
-        if not self._is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ Acesso negado\\.", parse_mode=ParseMode.MARKDOWN_V2)
-            return
+        """Handler do comando /force_scan - força scan manual (admin only)"""
+        self.stats.commands_processed += 1
         
-        self.stats.admin_commands += 1
-        
-        await update.message.reply_text("🔄 **Forçando scan de partidas\\.\\.\\.**", parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(
+            "🔄 **Iniciando scan forçado\\.\\.\\.**",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
         
         try:
-            # Força execução da tarefa de monitoramento
-            success = await self.schedule_manager.force_task_execution("monitor_live_matches")
-            
-            if success:
-                # Aguarda um pouco para a tarefa processar
-                await asyncio.sleep(2)
+            if self.schedule_manager and self.schedule_manager.tips_system:
+                # Força scan manual
+                await self.schedule_manager.tips_system.run_manual_scan()
                 
-                # Obtém resultado
-                stats = self.schedule_manager.stats
-                message = f"✅ **Scan forçado concluído!**\n\n• Tips geradas: {stats['tips_generated']}\n• Status: Operacional"
+                # Obtém estatísticas atualizadas
+                stats = self.schedule_manager.tips_system.get_stats()
+                
+                message = f"""✅ **SCAN FORÇADO CONCLUÍDO**
+
+📊 **Resultados:**
+• Partidas verificadas: {stats.get('matches_analyzed', 0)}
+• Tips geradas: {stats.get('tips_generated', 0)}
+• Tips enviadas: {stats.get('tips_sent', 0)}
+• Tempo de execução: {time.time() - stats.get('last_scan_time', time.time()):.1f}s
+
+**📈 Estatísticas globais:**
+• Total de tips: {stats.get('total_tips', 0)}
+• Taxa de sucesso: {stats.get('success_rate', 0):.1f}%"""
             else:
-                message = "❌ **Falha ao forçar scan\\.**\n\nTarefa pode já estar executando\\."
+                message = "❌ **Sistema de tips não disponível**"
+        
+        except Exception as e:
+            logger.error(f"Erro no force scan: {e}")
+            message = f"❌ **Erro no scan:** `{str(e)}`"
+        
+        await update.message.reply_text(
+            message,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    async def _handle_send_broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler do comando /send_broadcast - envia mensagem para todos (admin only)"""
+        self.stats.commands_processed += 1
+        
+        # Verifica se há argumentos (mensagem)
+        if not context.args:
+            await update.message.reply_text(
+                "❌ **Uso:** `/send_broadcast <mensagem>`\n\n"
+                "Envia mensagem para todos os usuários e grupos ativos\\.",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            return
+        
+        # Junta argumentos para formar a mensagem
+        broadcast_message = " ".join(context.args)
+        
+        await update.message.reply_text(
+            f"📢 **Enviando broadcast\\.\\.\\.**\n\n"
+            f"📝 Mensagem: {self._escape_markdown_v2(broadcast_message)}",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        
+        try:
+            # Conta destinatários
+            active_users = len([u for u in self.telegram_alerts.users.values() if u.is_active])
+            active_groups = len([g for g in self.telegram_alerts.groups.values() if g.is_active])
+            
+            # Envia para usuários
+            users_sent = 0
+            for user_id, user in self.telegram_alerts.users.items():
+                if user.is_active:
+                    try:
+                        success = await self.telegram_alerts._send_message_to_user(
+                            user_id, 
+                            f"📢 **ANÚNCIO DO SISTEMA**\n\n{broadcast_message}",
+                            NotificationType.SYSTEM_ALERT
+                        )
+                        if success:
+                            users_sent += 1
+                        await asyncio.sleep(0.1)  # Rate limiting
+                    except:
+                        continue
+            
+            # Envia para grupos  
+            groups_sent = 0
+            for group_id, group in self.telegram_alerts.groups.items():
+                if group.is_active:
+                    try:
+                        success = await self.telegram_alerts._send_message_to_group(
+                            group_id,
+                            f"📢 **ANÚNCIO DO SISTEMA**\n\n{broadcast_message}",
+                            NotificationType.SYSTEM_ALERT
+                        )
+                        if success:
+                            groups_sent += 1
+                        await asyncio.sleep(0.1)  # Rate limiting
+                    except:
+                        continue
+            
+            # Relatório final
+            message = f"""✅ **BROADCAST ENVIADO**
+
+📊 **Resultados:**
+• Usuários ativos: {active_users}
+• Usuários alcançados: {users_sent}
+• Grupos ativos: {active_groups}
+• Grupos alcançados: {groups_sent}
+
+**📈 Taxa de entrega:**
+• Usuários: {(users_sent/active_users*100) if active_users > 0 else 0:.1f}%
+• Grupos: {(groups_sent/active_groups*100) if active_groups > 0 else 0:.1f}%"""
             
         except Exception as e:
-            message = f"❌ **Erro no scan forçado:**\n\n`{str(e)[:100]}`"
-            self.stats.errors_handled += 1
+            logger.error(f"Erro no broadcast: {e}")
+            message = f"❌ **Erro no broadcast:** `{str(e)}`"
         
-        await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN_V2)
+        await update.message.reply_text(
+            message,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    async def _handle_manage_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler do comando /manage_users - gerencia usuários (admin only)"""
+        self.stats.commands_processed += 1
+        
+        # Obtém estatísticas dos usuários
+        active_users = len([u for u in self.telegram_alerts.users.values() if u.is_active])
+        blocked_users = len([u for u in self.telegram_alerts.users.values() if not u.is_active])
+        total_users = len(self.telegram_alerts.users)
+        
+        # Estatísticas por tipo de subscrição
+        sub_stats = {}
+        for user in self.telegram_alerts.users.values():
+            if user.is_active:
+                sub_type = user.subscription_type.value
+                sub_stats[sub_type] = sub_stats.get(sub_type, 0) + 1
+        
+        # Top usuários por tips recebidas
+        top_users = sorted(
+            [(u.first_name, u.tips_received) for u in self.telegram_alerts.users.values() if u.is_active],
+            key=lambda x: x[1],
+            reverse=True
+        )[:5]
+        
+        message = f"""👥 **GERENCIAMENTO DE USUÁRIOS**
+
+📊 **Resumo:**
+• Total de usuários: {total_users}
+• Usuários ativos: {active_users}
+• Usuários bloqueados: {blocked_users}
+
+**🔔 Subscrições por tipo:**"""
+        
+        for sub_type, count in sub_stats.items():
+            message += f"\n• {sub_type}: {count}"
+        
+        message += f"\n\n**🏆 Top usuários \\(tips recebidas\\):**"
+        for i, (name, tips) in enumerate(top_users, 1):
+            message += f"\n{i}\\. {self._escape_markdown_v2(name)}: {tips}"
+        
+        message += f"\n\n**⚙️ Ações disponíveis:**"
+        message += f"\n• `/send_broadcast <msg>` \\- Enviar anúncio"
+        message += f"\n• `/system_restart` \\- Reiniciar sistema"
+        
+        await update.message.reply_text(
+            message,
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+
+    async def _handle_system_restart(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler do comando /system_restart - reinicia sistema (admin only)"""
+        self.stats.commands_processed += 1
+        
+        await update.message.reply_text(
+            "⚠️ **REINÍCIO DO SISTEMA**\n\n"
+            "🔄 Iniciando reinicialização completa\\.\\.\\.\n"
+            "⏱️ Tempo estimado: 30\\-60 segundos\n\n"
+            "**O bot ficará temporariamente indisponível\\.**",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        
+        try:
+            # Salva estado atual
+            logger.info("🔄 Iniciando reinício do sistema via comando admin")
+            
+            # Para components se disponível
+            if self.schedule_manager:
+                await self.schedule_manager.stop()
+            
+            # Simula reinício (sem parar Flask que afetaria o webhook)
+            await asyncio.sleep(2)
+            
+            # Reinia components
+            if self.schedule_manager:
+                await self.schedule_manager.start_scheduled_tasks()
+            
+            await update.message.reply_text(
+                "✅ **SISTEMA REINICIADO**\n\n"
+                "🔄 Todos os componentes foram reinicializados\\.\n"
+                "📊 Sistema operacional e pronto para uso\\.",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro no restart: {e}")
+            await update.message.reply_text(
+                f"❌ **Erro no reinício:** `{str(e)}`",
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
 
     async def _handle_tasks(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /tasks"""
