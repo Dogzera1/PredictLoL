@@ -191,6 +191,9 @@ class TelegramAlertsSystem:
             token_preview = f"{self.bot_token[:4]}...{self.bot_token[-4:]}"
             logger.info(f"🔄 Inicializando bot com token: {token_preview}")
             
+            # CORREÇÃO: Limpa cache de grupos na inicialização
+            self._clear_groups_cache()
+            
             # Cria bot e application
             self.bot = Bot(token=self.bot_token)
             self.application = Application.builder().token(self.bot_token).build()
@@ -225,6 +228,7 @@ class TelegramAlertsSystem:
         self.application.add_handler(CommandHandler("activate_group", self._handle_activate_group))
         self.application.add_handler(CommandHandler("group_status", self._handle_group_status))
         self.application.add_handler(CommandHandler("deactivate_group", self._handle_deactivate_group))
+        self.application.add_handler(CommandHandler("reset_groups", self._handle_reset_groups))
         
         # Callback handlers para botões inline
         self.application.add_handler(CallbackQueryHandler(self._handle_subscription_callback))
@@ -1130,3 +1134,44 @@ Comandos disponíveis:
             text = text.replace(char, f'\\{char}')
         
         return text 
+
+    def _clear_groups_cache(self) -> None:
+        """Limpa cache de grupos registrados"""
+        groups_count = len(self.groups)
+        self.groups.clear()
+        self.blocked_groups.clear()
+        
+        logger.info(f"🧹 Cache de grupos limpo: {groups_count} grupos removidos")
+
+    async def _handle_reset_groups(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handler para resetar cache de grupos (comando de debug)"""
+        chat = update.effective_chat
+        user = update.effective_user
+        
+        # Apenas para uso em grupos ou por usuários específicos em chat privado
+        if chat.type in ['group', 'supergroup']:
+            # Em grupos, qualquer membro pode usar
+            logger.info(f"Reset de grupos solicitado por {user.first_name} ({user.id}) no grupo {chat.title} ({chat.id})")
+            
+            # Remove apenas este grupo do cache
+            if chat.id in self.groups:
+                del self.groups[chat.id]
+                await update.message.reply_text(
+                    "🧹 Cache deste grupo foi resetado!\n\n"
+                    "Agora você pode usar /activate_group normalmente."
+                )
+            else:
+                await update.message.reply_text(
+                    "ℹ️ Este grupo não estava no cache.\n\n"
+                    "Use /activate_group para configurar alertas."
+                )
+        else:
+            # Em chat privado, limpa todo o cache (apenas para debug)
+            groups_count = len(self.groups)
+            self._clear_groups_cache()
+            
+            await update.message.reply_text(
+                f"🧹 Cache completo resetado!\n\n"
+                f"• {groups_count} grupos removidos do cache\n"
+                f"• Todos os grupos podem ser reativados normalmente"
+            ) 
