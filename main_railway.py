@@ -39,6 +39,9 @@ class SimpleLogger:
     
     def warning(self, msg):
         print(f"[WARN] {msg}")
+    
+    def debug(self, msg):
+        print(f"[DEBUG] {msg}")
 
 logger = SimpleLogger()
 
@@ -90,8 +93,17 @@ class RailwayBot:
                 # Usar o método correto de limpeza
                 if hasattr(self.alerts_system, 'cleanup_old_cache'):
                     self.alerts_system.cleanup_old_cache()
-                if hasattr(self.alerts_system, 'stop_bot'):
-                    await self.alerts_system.stop_bot()
+                    
+                # Tentar parar o bot de forma segura
+                if hasattr(self.alerts_system, 'application') and self.alerts_system.application:
+                    try:
+                        if self.alerts_system.application.updater and self.alerts_system.application.updater.running:
+                            await self.alerts_system.application.updater.stop()
+                        if self.alerts_system.application.running:
+                            await self.alerts_system.application.stop()
+                        await self.alerts_system.application.shutdown()
+                    except Exception as cleanup_error:
+                        logger.warning(f"⚠️ Erro na limpeza do Telegram: {cleanup_error}")
                     
             logger.info("✅ Limpeza concluída")
             
