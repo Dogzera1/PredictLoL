@@ -159,6 +159,11 @@ class ProfessionalTipsSystem:
             logger.warning("Monitoramento já está ativo")
             return
         
+        # CORREÇÃO CRÍTICA: Força limpeza de cache na inicialização
+        old_count = len(self.processed_maps)
+        self.processed_maps.clear()
+        logger.info(f"🧹 FORCE CLEANUP: Cache limpo na inicialização ({old_count} mapas removidos)")
+        
         self.is_monitoring = True
         logger.info("🚀 Iniciando monitoramento profissional de tips")
         
@@ -210,8 +215,9 @@ class ProfessionalTipsSystem:
                 if suitable_matches:
                     await self._process_matches_for_tips(suitable_matches)
                 
-                # 5. Limpa tips expiradas
+                # 5. Limpa tips expiradas e mapas antigos
                 self._cleanup_expired_tips()
+                self._cleanup_old_processed_maps()  # CORREÇÃO: Limpa mapas a cada 30min
                 
                 # 6. Atualiza estatísticas
                 self.stats.matches_scanned += len(live_matches)
@@ -736,24 +742,28 @@ class ProfessionalTipsSystem:
 
     def _cleanup_old_processed_maps(self) -> None:
         """
-        Limpa mapas processados muito antigos do cache
+        Limpa mapas processados antigos do cache
         
-        Remove mapas processados há mais de 4 horas para permitir
-        reprocessamento em séries muito longas ou em dias diferentes
+        CORREÇÃO CRÍTICA: Limpa cache mais agressivamente para evitar repetições
         """
         try:
             current_time = time.time()
             
-            # Para simplificar, limpa todo cache a cada 4 horas
-            # Em produção poderia ser mais granular com timestamps
+            # CORREÇÃO: Limpa cache a cada 30 minutos ao invés de 4 horas
+            # Isso resolve o problema de tips repetidas após restarts
+            cleanup_interval = 30 * 60  # 30 minutos
+            
             if hasattr(self, '_last_cleanup_time'):
-                if current_time - self._last_cleanup_time > (4 * 3600):  # 4 horas
+                if current_time - self._last_cleanup_time > cleanup_interval:
                     old_count = len(self.processed_maps)
                     self.processed_maps.clear()
                     self._last_cleanup_time = current_time
-                    logger.debug(f"Cache de mapas processados limpo: {old_count} entradas removidas")
+                    logger.info(f"🧹 Cache de mapas processados limpo: {old_count} entradas removidas (30min cleanup)")
             else:
+                # FORÇAR limpeza na inicialização para resolver problema Railway
+                self.processed_maps.clear()
                 self._last_cleanup_time = current_time
+                logger.info("🔄 Cache de mapas forçadamente limpo na inicialização")
                 
         except Exception as e:
             logger.warning(f"Erro ao limpar cache de mapas: {e}")
