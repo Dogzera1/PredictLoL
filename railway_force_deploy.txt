@@ -1,0 +1,14 @@
+🚀 DEPLOY FORÇADO - SISTEMA DE TIPS CORRIGIDO
+=========================================
+
+Data: 2025-06-07 19:30
+Correções aplicadas:
+
+✅ Tips apenas pós-draft (10/10 champions)
+✅ Máximo 1 tip por mapa
+✅ Sem repetição de tips
+✅ Timing 0-2 minutos após draft
+✅ Informação do mapa na mensagem
+✅ Cache anti-spam ativo
+
+Forçando redeploy no Railway... 
