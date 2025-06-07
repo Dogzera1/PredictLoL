@@ -1,2 +1,3 @@
+# FORÇA RESTART - CORREÇÕES APLICADAS - 2025-06-07 18:44
 web: python main.py
 worker: python main.py 
