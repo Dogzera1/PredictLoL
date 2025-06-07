@@ -472,6 +472,45 @@ class ProfessionalTipsSystem:
             except Exception as e:
                 logger.error(f"Erro ao processar partida {match.match_id}: {e}")
 
+    
+    async def _validate_real_odds_first(self, match: MatchData) -> Dict:
+        """
+        CORREÇÃO: Tenta buscar odds REAIS antes de usar estimadas
+        """
+        try:
+            # 1. Busca no PandaScore por match_id
+            real_odds = await self.pandascore_client.get_match_odds(match.match_id)
+            if real_odds and self._are_valid_odds(real_odds):
+                logger.info(f"✅ Odds reais encontradas: {match.match_id}")
+                return real_odds
+            
+            # 2. Busca por nomes dos times
+            real_odds = await self.pandascore_client.find_match_odds_by_teams(
+                match.team1_name, match.team2_name
+            )
+            if real_odds and self._are_valid_odds(real_odds):
+                logger.info(f"✅ Odds reais por times: {match.team1_name} vs {match.team2_name}")
+                return real_odds
+            
+            # 3. Busca na liga específica
+            if hasattr(match, 'league') and match.league:
+                league_matches = await self.pandascore_client.get_league_matches(match.league)
+                for league_match in league_matches:
+                    if (league_match.get('team1') == match.team1_name and 
+                        league_match.get('team2') == match.team2_name):
+                        odds_data = league_match.get('odds')
+                        if odds_data and self._are_valid_odds(odds_data):
+                            logger.info(f"✅ Odds reais da liga: {match.league}")
+                            return odds_data
+            
+            # Se não encontrou odds reais, retorna None para usar estimadas
+            logger.warning(f"⚠️ Odds reais não encontradas para {match.match_id} - usando estimativa")
+            return None
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar odds reais: {e}")
+            return None
+
     async def _generate_tip_for_match(self, match: MatchData) -> Optional[ProfessionalTip]:
         """Gera tip profissional para uma partida (apenas dados reais)"""
         try:
@@ -480,15 +519,8 @@ class ProfessionalTipsSystem:
                 logger.debug(f"Partida rejeitada: dados não são reais - {match.match_id}")
                 return None
             
-            # 1. Tenta buscar odds reais do PandaScore
-            odds_data = await self.pandascore_client.get_match_odds(match.match_id)
-            
-            # 2. Se não tem odds do PandaScore, tenta buscar por nomes dos times
-            if not odds_data:
-                odds_data = await self.pandascore_client.find_match_odds_by_teams(
-                    match.team1_name, match.team2_name
-                )
-            
+            # 1. CORREÇÃO: Busca odds reais com método aprimorado
+            odds_data = await self._validate_real_odds_first(match)
             # 3. Se ainda não tem odds, gera estimativa baseada em dados da partida
             if not odds_data:
                 logger.debug(f"Sem odds reais - gerando estimativa para {match.match_id}")

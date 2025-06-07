@@ -353,7 +353,7 @@ class DynamicPredictionSystem:
                 confidence_percentage=predicted_probability * 100,
                 ev_percentage=ev_percentage,
                 analysis_reasoning=analysis_reasoning,
-                game_time_at_tip=f"{match_data.get_game_time_minutes():.0f}min",
+                game_time_at_tip=f"🔴 LIVE",  # CORREÇÃO: Indica partida ao vivo
                 game_time_seconds=match_data.game_time_seconds,
                 map_number=enhanced_info["map_number"],
                 match_status=enhanced_info["match_status"],
@@ -1096,6 +1096,468 @@ class DynamicPredictionSystem:
             "prediction_threshold": 0.6,
             "confidence_threshold": 0.7
         }
+
+    def get_prediction_stats(self) -> Dict:
+        """Retorna estatísticas de performance do sistema"""
+        total_predictions = self.prediction_stats["total_predictions"]
+        
+        return {
+            "total_predictions": total_predictions,
+            "method_breakdown": {
+                "ml_predictions": self.prediction_stats["ml_predictions"],
+                "algorithm_predictions": self.prediction_stats["algorithm_predictions"],
+                "hybrid_predictions": self.prediction_stats["hybrid_predictions"]
+            },
+            "tip_generation": {
+                "tips_generated": self.prediction_stats["tips_generated"],
+                "tips_rejected": self.prediction_stats["tips_rejected"],
+                "acceptance_rate": (
+                    self.prediction_stats["tips_generated"] / 
+                    max(self.prediction_stats["tips_generated"] + self.prediction_stats["tips_rejected"], 1)
+                ) * 100
+            },
+            "composition_analysis": {
+                "total_analyses": self.prediction_stats["composition_analyses"],
+                "usage_rate": (
+                    self.prediction_stats["composition_analyses"] / max(total_predictions, 1)
+                ) * 100 if total_predictions > 0 else 0
+            },
+            "patch_analysis": {
+                "total_analyses": self.prediction_stats["patch_analyses"],
+                "usage_rate": (
+                    self.prediction_stats["patch_analyses"] / max(total_predictions, 1)
+                ) * 100 if total_predictions > 0 else 0
+            },
+            "feature_weights": self.feature_weights,
+            "cache_status": {
+                "cached_predictions": len(self.predictions_cache),
+                "cache_hit_rate": "Not implemented"
+            }
+        }
+
+    def clear_old_predictions(self, max_age_hours: int = 24) -> None:
+        """Remove predições antigas do cache"""
+        current_time = time.time()
+        cutoff_time = current_time - (max_age_hours * 3600)
+        
+        old_predictions = [
+            match_id for match_id, prediction in self.predictions_cache.items()
+            if prediction.prediction_timestamp < cutoff_time
+        ]
+        
+        for match_id in old_predictions:
+            del self.predictions_cache[match_id]
+        
+        if old_predictions:
+            logger.info(f"Removidas {len(old_predictions)} predições antigas do cache")
+
+    async def _analyze_team_compositions(self, match_data: MatchData) -> Dict:
+        """
+        Analisa composições dos times usando o CompositionAnalyzer
+        
+        Args:
+            match_data: Dados da partida com informações dos times
+            
+        Returns:
+            Dict com análise de composições e vantagem relativa
+        """
+        try:
+            # Incrementa estatísticas
+            self.prediction_stats["composition_analyses"] += 1
+            
+            # Extrai dados de composição do match_data
+            team1_composition = self._extract_team_composition(match_data, "team1")
+            team2_composition = self._extract_team_composition(match_data, "team2")
+            
+            if not team1_composition or not team2_composition:
+                logger.warning("Dados de composição insuficientes, usando análise básica")
+                return {
+                    "composition_score": 0.0,  # Neutro
+                    "team1_analysis": None,
+                    "team2_analysis": None,
+                    "advantage_team": None,
+                    "confidence": 0.3
+                }
+            
+            # Análise detalhada de cada composição
+            team1_analysis = await self.composition_analyzer.analyze_team_composition(
+                team_picks=team1_composition,
+                enemy_picks=team2_composition,
+                patch_version=getattr(match_data, 'patch_version', '14.10')
+            )
+            
+            team2_analysis = await self.composition_analyzer.analyze_team_composition(
+                team_picks=team2_composition,
+                enemy_picks=team1_composition,
+                patch_version=getattr(match_data, 'patch_version', '14.10')
+            )
+            
+            # Calcula vantagem relativa (Team1 vs Team2)
+            team1_score = team1_analysis["overall_score"]
+            team2_score = team2_analysis["overall_score"]
+            composition_advantage = team1_score - team2_score  # -10 a +10
+            
+            # Normaliza para -100 a +100 (compatível com outras métricas)
+            normalized_score = composition_advantage * 10
+            
+            # Determina time com vantagem
+            advantage_team = None
+            if abs(composition_advantage) > 0.5:  # Diferença significativa
+                advantage_team = match_data.team1_name if composition_advantage > 0 else match_data.team2_name
+            
+            # Calcula confiança baseada na qualidade das análises
+            confidence = min(
+                team1_analysis.get("team_synergies", 5.0) / 10,
+                team2_analysis.get("team_synergies", 5.0) / 10
+            )
+            
+            logger.info(f"Análise de composições: {match_data.team1_name} {team1_score:.1f} vs {match_data.team2_name} {team2_score:.1f}")
+            
+            return {
+                "composition_score": normalized_score,
+                "team1_analysis": team1_analysis,
+                "team2_analysis": team2_analysis,
+                "advantage_team": advantage_team,
+                "confidence": confidence,
+                "raw_scores": {
+                    "team1": team1_score,
+                    "team2": team2_score
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro na análise de composições: {e}")
+            return {
+                "composition_score": 0.0,
+                "team1_analysis": None,
+                "team2_analysis": None,
+                "advantage_team": None,
+                "confidence": 0.1,
+                "error": str(e)
+            }
+
+    def _extract_team_composition(self, match_data: MatchData, team_key: str) -> List[Dict]:
+        """
+        Extrai composição de campeões de um time específico
+        
+        Args:
+            match_data: Dados da partida
+            team_key: "team1" ou "team2"
+            
+        Returns:
+            Lista de picks do time no formato esperado pelo CompositionAnalyzer
+        """
+        try:
+            # Tenta extrair de diferentes estruturas possíveis
+            composition = []
+            
+            # Verifica se há dados de picks & bans
+            if hasattr(match_data, 'draft_data') and match_data.draft_data:
+                draft = match_data.draft_data
+                
+                # Verifica se draft_data é um dicionário
+                if isinstance(draft, dict):
+                    team_picks = draft.get(f"{team_key}_picks", [])
+                    
+                    for i, pick in enumerate(team_picks):
+                        if isinstance(pick, dict):
+                            champion = pick.get("champion", pick.get("champion_name", ""))
+                            position = pick.get("position", pick.get("role", self._guess_position(i)))
+                            
+                            composition.append({
+                                "champion": champion,
+                                "position": position,
+                                "pick_order": i + 1
+                            })
+                else:
+                    # Se draft_data não é um dict, tenta acessar como atributo
+                    team_picks = getattr(draft, f"{team_key}_picks", [])
+                    if team_picks:
+                        for i, pick in enumerate(team_picks):
+                            if hasattr(pick, 'champion'):
+                                champion = pick.champion
+                                position = getattr(pick, 'position', self._guess_position(i))
+                                
+                                composition.append({
+                                    "champion": champion,
+                                    "position": position,
+                                    "pick_order": i + 1
+                                })
+            
+            # Fallback: tenta extrair dos dados gerais do match
+            elif hasattr(match_data, 'teams') and match_data.teams:
+                teams_data = match_data.teams
+                if isinstance(teams_data, dict):
+                    team_data = teams_data.get(team_key, {})
+                    players = team_data.get('players', [])
+                    
+                    for i, player in enumerate(players):
+                        if isinstance(player, dict):
+                            champion = player.get("champion", player.get("champion_name", ""))
+                            position = player.get("position", player.get("role", self._guess_position(i)))
+                            
+                            if champion:
+                                composition.append({
+                                    "champion": champion,
+                                    "position": position,
+                                    "pick_order": i + 1
+                                })
+            
+            # Se ainda não tem dados, tenta estrutura simples
+            else:
+                team_attr = getattr(match_data, f"{team_key}_composition", None)
+                if team_attr and isinstance(team_attr, list):
+                    for i, champion in enumerate(team_attr):
+                        composition.append({
+                            "champion": champion,
+                            "position": self._guess_position(i),
+                            "pick_order": i + 1
+                        })
+            
+            logger.debug(f"Composição extraída para {team_key}: {[pick['champion'] for pick in composition]}")
+            return composition
+            
+        except Exception as e:
+            logger.error(f"Erro ao extrair composição do {team_key}: {e}")
+            return []
+
+    def _guess_position(self, pick_order: int) -> str:
+        """Estima posição baseada na ordem de pick (convenção padrão)"""
+        positions = ["top", "jungle", "mid", "adc", "support"]
+        return positions[pick_order] if pick_order < len(positions) else "unknown"
+
+    async def _analyze_patch_impact(self, match_data: MatchData) -> Dict:
+        """
+        Analisa impacto do patch atual nas composições dos times
+        
+        Args:
+            match_data: Dados da partida com informações dos times
+            
+        Returns:
+            Dict com análise de impacto do patch e vantagem relativa
+        """
+        try:
+            # Incrementa estatísticas
+            self.prediction_stats["patch_analyses"] += 1
+            
+            # Obtém patch atual
+            patch_version = getattr(match_data, 'patch_version', self.patch_analyzer.current_patch)
+            
+            if not patch_version:
+                logger.warning("Versão do patch não disponível, usando análise básica")
+                return {
+                    "patch_meta_score": 0.0,
+                    "team1_patch_impact": 0.0,
+                    "team2_patch_impact": 0.0,
+                    "meta_shift": None,
+                    "confidence": 0.3
+                }
+            
+            # Extrai composições dos times
+            team1_composition = self._extract_team_composition(match_data, "team1")
+            team2_composition = self._extract_team_composition(match_data, "team2")
+            
+            if not team1_composition or not team2_composition:
+                logger.warning("Dados de composição insuficientes para análise de patch")
+                return {
+                    "patch_meta_score": 0.0,
+                    "team1_patch_impact": 0.0,
+                    "team2_patch_impact": 0.0,
+                    "meta_shift": None,
+                    "confidence": 0.2
+                }
+            
+            # Calcula impacto do patch em cada campeão
+            team1_patch_impact = 0.0
+            team1_champions_analyzed = 0
+            
+            for pick in team1_composition:
+                champion = pick.get("champion", "").lower()
+                if champion:
+                    strength_adjustment = self.patch_analyzer.get_champion_strength_adjustment(champion, patch_version)
+                    team1_patch_impact += strength_adjustment
+                    team1_champions_analyzed += 1
+            
+            team2_patch_impact = 0.0
+            team2_champions_analyzed = 0
+            
+            for pick in team2_composition:
+                champion = pick.get("champion", "").lower()
+                if champion:
+                    strength_adjustment = self.patch_analyzer.get_champion_strength_adjustment(champion, patch_version)
+                    team2_patch_impact += strength_adjustment
+                    team2_champions_analyzed += 1
+            
+            # Normaliza por número de campeões analisados
+            if team1_champions_analyzed > 0:
+                team1_patch_impact /= team1_champions_analyzed
+            if team2_champions_analyzed > 0:
+                team2_patch_impact /= team2_champions_analyzed
+            
+            # Calcula vantagem relativa (Team1 vs Team2)
+            patch_advantage = team1_patch_impact - team2_patch_impact
+            
+            # Normaliza para -100 a +100 (compatível com outras métricas)
+            normalized_score = patch_advantage * 10  # Ajuste de escala
+            
+            # Analisa meta shift geral
+            meta_shift = self._analyze_meta_shift(team1_composition, team2_composition, patch_version)
+            
+            # Calcula confiança baseada no número de campeões com dados de patch
+            total_champions = team1_champions_analyzed + team2_champions_analyzed
+            confidence = min(0.9, total_champions / 10)  # Máximo de 0.9 com 10 campeões
+            
+            logger.debug(f"Análise de patch: Team1 {team1_patch_impact:.2f}, Team2 {team2_patch_impact:.2f}, Vantagem: {patch_advantage:.2f}")
+            
+            return {
+                "patch_meta_score": normalized_score,
+                "team1_patch_impact": team1_patch_impact,
+                "team2_patch_impact": team2_patch_impact,
+                "meta_shift": meta_shift,
+                "confidence": confidence,
+                "patch_version": patch_version,
+                "champions_analyzed": total_champions
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro na análise de patch: {e}")
+            return {
+                "patch_meta_score": 0.0,
+                "team1_patch_impact": 0.0,
+                "team2_patch_impact": 0.0,
+                "meta_shift": None,
+                "confidence": 0.1,
+                "error": str(e)
+            }
+
+    def _analyze_meta_shift(self, team1_composition: List[Dict], team2_composition: List[Dict], patch_version: str) -> Dict:
+        """
+        Analisa mudanças no meta que afetam as composições
+        
+        Args:
+            team1_composition: Composição do time 1
+            team2_composition: Composição do time 2
+            patch_version: Versão do patch
+            
+        Returns:
+            Dict com análise de meta shift
+        """
+        try:
+            # Mapeamento de campeões para classes
+            champion_classes = {
+                "akali": "assassins", "zed": "assassins", "leblanc": "assassins",
+                "azir": "mages", "viktor": "mages", "orianna": "mages",
+                "jinx": "marksmen", "caitlyn": "marksmen", "vayne": "marksmen", "aphelios": "marksmen",
+                "malphite": "tanks", "leona": "tanks", "sejuani": "tanks",
+                "irelia": "fighters", "jax": "fighters", "fiora": "fighters", "gnar": "fighters", "graves": "fighters",
+                "thresh": "supports", "lulu": "supports"
+            }
+            
+            # Conta classes em cada time
+            team1_classes = {}
+            team2_classes = {}
+            
+            for pick in team1_composition:
+                champion = pick.get("champion", "").lower()
+                champion_class = champion_classes.get(champion, "unknown")
+                team1_classes[champion_class] = team1_classes.get(champion_class, 0) + 1
+            
+            for pick in team2_composition:
+                champion = pick.get("champion", "").lower()
+                champion_class = champion_classes.get(champion, "unknown")
+                team2_classes[champion_class] = team2_classes.get(champion_class, 0) + 1
+            
+            # Analisa força das classes no meta atual
+            meta_advantages = {}
+            
+            for class_name in ["assassins", "mages", "marksmen", "tanks", "fighters", "supports"]:
+                team1_count = team1_classes.get(class_name, 0)
+                team2_count = team2_classes.get(class_name, 0)
+                meta_strength = self.patch_analyzer.get_meta_strength(class_name, patch_version)
+                
+                # Vantagem = (diferença de campeões) * força no meta
+                class_advantage = (team1_count - team2_count) * meta_strength
+                meta_advantages[class_name] = class_advantage
+            
+            # Identifica mudança de meta mais significativa
+            strongest_shift = max(meta_advantages.items(), key=lambda x: abs(x[1]))
+            
+            return {
+                "class_advantages": meta_advantages,
+                "strongest_shift": {
+                    "class": strongest_shift[0],
+                    "advantage": strongest_shift[1]
+                },
+                "total_meta_impact": sum(meta_advantages.values())
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro ao analisar meta shift: {e}")
+            return {
+                "class_advantages": {},
+                "strongest_shift": {"class": "unknown", "advantage": 0.0},
+                "total_meta_impact": 0.0
+            }
+
+    def _get_current_game_time(self, match_data: MatchData) -> str:
+        """
+        CORREÇÃO CRÍTICA: Busca tempo real do jogo ao invés de usar dados defasados
+        """
+        try:
+            # Tenta buscar dados atualizados diretamente da API
+            if hasattr(self, 'riot_client') and self.riot_client:
+                try:
+                    current_match_data = self.riot_client.get_live_match_by_id(match_data.match_id)
+                    if current_match_data and hasattr(current_match_data, 'game_time_seconds'):
+                        game_time = current_match_data.game_time_seconds
+                        if game_time > 0:
+                            minutes = game_time // 60
+                            seconds = game_time % 60
+                            return f"{minutes}:{seconds:02d}"
+                except:
+                    pass  # Falha silenciosa, usa fallback
+            
+            # Fallback 1: Usa dados do match_data se parecem válidos
+            game_time = match_data.game_time_seconds
+            if game_time > 0:
+                minutes = game_time // 60
+                seconds = game_time % 60
+                return f"{minutes}:{seconds:02d}"
+            
+            # Fallback 2: Marca como LIVE sem tempo específico
+            return "LIVE"
+            
+        except Exception as e:
+            logger.warning(f"Erro ao obter tempo real do jogo: {e}")
+            return "LIVE"
+
+    def _extract_map_number(self, match_data: MatchData) -> int:
+        """Extrai número do mapa ou assume padrão"""
+        # Tenta extrair do game_id, tournament ou match_id
+        try:
+            if hasattr(match_data, 'game_number'):
+                return int(match_data.game_number)
+            if hasattr(match_data, 'map_number'):
+                return int(match_data.map_number)
+            # Busca por indicadores no match_id
+            match_id_str = str(match_data.match_id).lower()
+            if 'game2' in match_id_str or 'map2' in match_id_str:
+                return 2
+            elif 'game3' in match_id_str or 'map3' in match_id_str:
+                return 3
+            elif 'game4' in match_id_str or 'map4' in match_id_str:
+                return 4
+            elif 'game5' in match_id_str or 'map5' in match_id_str:
+                return 5
+        except:
+            pass
+        return 1  # Padrão: Mapa 1
+
+    def _extract_league_name(self, league_data) -> str:
+        """Extrai nome da liga dos dados"""
+        if isinstance(league_data, dict):
+            return league_data.get('name', league_data.get('slug', 'Liga Desconhecida'))
+        return str(league_data) if league_data else 'Liga Desconhecida'
 
     def get_prediction_stats(self) -> Dict:
         """Retorna estatísticas de performance do sistema"""
