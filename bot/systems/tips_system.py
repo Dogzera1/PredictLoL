@@ -5,6 +5,8 @@ import time
 from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
+from datetime import datetime, timedelta
+import logging
 
 from ..api_clients.pandascore_api_client import PandaScoreAPIClient
 from ..api_clients.riot_api_client import RiotAPIClient
@@ -24,6 +26,7 @@ from ..utils.constants import (
 )
 from ..utils.helpers import get_current_timestamp, normalize_team_name
 from ..utils.logger_config import get_logger
+from .alternative_api_client import AlternativeAPIClient, get_match_compositions
 
 logger = get_logger(__name__)
 
@@ -926,10 +929,13 @@ class ProfessionalTipsSystem:
         
         logger.info(f"Limite de tips atualizado: {old_limit} -> {max_tips} por hora")
 
-    def _is_draft_complete(self, match: MatchData) -> bool:
-        """Verifica se o draft está completo (todos os 10 champions selecionados)"""
+    async def _is_draft_complete(self, match: MatchData) -> bool:
+        """
+        VERSÃO MELHORADA: Verifica se o draft está completo usando APIs alternativas
+        Resolve problema quando PandaScore não retorna dados de composição
+        """
         try:
-            # Verifica se tem dados de composição dos times
+            # Verifica se tem dados de composição dos times (método original)
             has_team1_comp = hasattr(match, 'team1_composition') and match.team1_composition
             has_team2_comp = hasattr(match, 'team2_composition') and match.team2_composition
             
@@ -940,29 +946,58 @@ class ProfessionalTipsSystem:
                 
                 draft_complete = team1_champions == 5 and team2_champions == 5
                 if draft_complete:
-                    logger.debug(f"Draft completo: {team1_champions + team2_champions}/10 champions")
+                    logger.debug(f"✅ Draft completo via PandaScore: {team1_champions + team2_champions}/10 champions")
                     return True
                 else:
-                    logger.debug(f"Draft incompleto: {team1_champions + team2_champions}/10 champions")
-                    return False
+                    logger.debug(f"⏳ Draft incompleto via PandaScore: {team1_champions + team2_champions}/10 champions")
             
-            # Se não tem dados de composição, verifica por outros indicadores
+            # NOVA FUNCIONALIDADE: Tenta APIs alternativas se PandaScore falhar
+            logger.debug("🔍 Tentando APIs alternativas para dados de composição...")
+            
+            try:
+                composition_data = await get_match_compositions(match)
+                
+                if composition_data and composition_data.draft_complete:
+                    logger.info(f"✅ Draft completo via {composition_data.source.upper()}!")
+                    
+                    # Atualiza dados do match com composições obtidas
+                    if not has_team1_comp or not has_team2_comp:
+                        # Converte para formato esperado pelo sistema
+                        match.team1_composition = [
+                            {'name': champ} for champ in composition_data.team1_composition
+                        ]
+                        match.team2_composition = [
+                            {'name': champ} for champ in composition_data.team2_composition
+                        ]
+                        
+                        logger.info(f"🔄 Composições atualizadas via {composition_data.source}")
+                        logger.debug(f"   Team 1: {', '.join(composition_data.team1_composition)}")
+                        logger.debug(f"   Team 2: {', '.join(composition_data.team2_composition)}")
+                    
+                    return True
+                else:
+                    logger.debug("❌ APIs alternativas não retornaram draft completo")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Erro nas APIs alternativas: {e}")
+            
+            # Se não conseguiu dados de composição, usa outros indicadores
             # Status específicos que indicam draft completo
             draft_complete_status = [
                 'in_game', 'in-game', 'ingame', 'started', 'live', 'running'
             ]
             
             if match.status and match.status.lower() in draft_complete_status:
-                logger.debug(f"Draft presumivelmente completo pelo status: {match.status}")
+                logger.debug(f"✅ Draft presumivelmente completo pelo status: {match.status}")
                 return True
             
             # Se tem tempo de jogo > 0, draft provavelmente está completo
             if match.get_game_time_minutes() > 0:
-                logger.debug("Draft completo: jogo já iniciado")
+                logger.debug("✅ Draft completo: jogo já iniciado")
                 return True
             
             # Por segurança, se não conseguiu determinar, assume que não está completo
-            logger.debug("Não foi possível determinar se draft está completo - assumindo incompleto")
+            logger.debug("❌ Não foi possível determinar se draft está completo - aguardando")
             return False
             
         except Exception as e:
