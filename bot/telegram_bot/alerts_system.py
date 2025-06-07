@@ -241,20 +241,28 @@ class TelegramAlertsSystem:
             logger.info("⚠️ Verificação de lock desabilitada para teste")
             
             logger.info("🤖 Iniciando bot do Telegram...")
-            await self.application.initialize()
-            await self.application.start()
             
-            # Configura polling com timeout e limites
-            await self.application.updater.start_polling(
-                allowed_updates=["message", "callback_query"],
-                read_timeout=30,
-                write_timeout=30,
-                connect_timeout=30,
-                pool_timeout=30,
-                timeout=30,
-                bootstrap_retries=5,
-                drop_pending_updates=True  # Ignora updates antigos
-            )
+            # Verifica se já foi inicializado durante initialize()
+            if not self.application.running:
+                await self.application.initialize()
+                await self.application.start()
+            
+            # Verifica se polling já está rodando
+            if not (self.application.updater and self.application.updater.running):
+                # Configura polling com timeout e limites
+                await self.application.updater.start_polling(
+                    allowed_updates=["message", "callback_query"],
+                    read_timeout=30,
+                    write_timeout=30,
+                    connect_timeout=30,
+                    pool_timeout=30,
+                    timeout=30,
+                    bootstrap_retries=5,
+                    drop_pending_updates=True  # Ignora updates antigos
+                )
+                logger.info("✅ Polling iniciado com sucesso!")
+            else:
+                logger.info("ℹ️ Polling já estava ativo")
             
             logger.info("✅ Bot do Telegram iniciado com sucesso!")
             

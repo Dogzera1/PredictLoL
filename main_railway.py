@@ -70,7 +70,10 @@ class RailwayBot:
                 
                 self.alerts_system = TelegramAlertsSystem(bot_token=bot_token)
                 await self.alerts_system.initialize()
-                logger.info("✅ Telegram inicializado")
+                
+                # CRÍTICO: Inicia o polling para receber comandos
+                await self.alerts_system.start_bot()
+                logger.info("✅ Telegram inicializado com polling ativo")
             except Exception as e:
                 logger.error(f"❌ Erro Telegram: {e}")
                 raise
@@ -117,14 +120,24 @@ class RailwayBot:
             
             logger.info("🚀 Bot LoL V3 Railway executando!")
             logger.info("💡 Sistema básico ativo - Telegram Bot funcionando")
+            logger.info("🔄 Bot aguardando comandos via polling...")
             
-            # Loop principal simples para manter o bot ativo
+            # Loop principal para manter o processo ativo
+            # O polling do Telegram roda em background
             while True:
-                await asyncio.sleep(60)  # Verifica a cada minuto
+                await asyncio.sleep(30)  # Health check a cada 30s
                 
-                # Health check básico
-                if hasattr(self, 'alerts_system'):
-                    logger.debug("🔄 Sistema ativo - Telegram OK")
+                # Verifica se o bot ainda está rodando
+                if hasattr(self, 'alerts_system') and self.alerts_system:
+                    if (hasattr(self.alerts_system, 'application') and 
+                        self.alerts_system.application and 
+                        hasattr(self.alerts_system.application, 'updater') and
+                        self.alerts_system.application.updater and
+                        self.alerts_system.application.updater.running):
+                        logger.debug("🔄 Sistema ativo - Telegram polling OK")
+                    else:
+                        logger.warning("⚠️ Polling do Telegram não está ativo")
+                        break
                 else:
                     logger.warning("⚠️ Sistema não inicializado corretamente")
                     break
