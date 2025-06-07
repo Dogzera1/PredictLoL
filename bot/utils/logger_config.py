@@ -11,7 +11,10 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
-import colorlog
+try:
+    import colorlog
+except ImportError:  # Fallback simples quando colorlog não está disponível
+    colorlog = None
 
 
 def setup_logging(
@@ -47,24 +50,30 @@ def setup_logging(
     log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
     
-    # Handler para console com cores
-    console_handler = colorlog.StreamHandler()
-    console_handler.setLevel(numeric_level)
-    
-    # Formato colorido para console
-    color_format = "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    color_formatter = colorlog.ColoredFormatter(
-        color_format,
-        datefmt=date_format,
-        log_colors={
-            'DEBUG': 'cyan',
-            'INFO': 'green',
-            'WARNING': 'yellow',
-            'ERROR': 'red',
-            'CRITICAL': 'red,bg_white',
-        }
-    )
-    console_handler.setFormatter(color_formatter)
+    # Handler para console (usa cores se colorlog estiver disponível)
+    if colorlog:
+        console_handler = colorlog.StreamHandler()
+        console_handler.setLevel(numeric_level)
+
+        color_format = "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        color_formatter = colorlog.ColoredFormatter(
+            color_format,
+            datefmt=date_format,
+            log_colors={
+                'DEBUG': 'cyan',
+                'INFO': 'green',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'red,bg_white',
+            }
+        )
+        console_handler.setFormatter(color_formatter)
+    else:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(numeric_level)
+        formatter = logging.Formatter(log_format, datefmt=date_format)
+        console_handler.setFormatter(formatter)
+
     logger.addHandler(console_handler)
     
     # Handler para arquivo (se especificado)
