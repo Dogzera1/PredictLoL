@@ -88,7 +88,10 @@ VALID_LIVE_STATUSES = {
     "loading",        # Carregando jogo
     "paused",         # Partida pausada (ainda válida)
     "ready",          # Pronta para iniciar
-    "configured"      # Configurada e pronta
+    "configured",     # Configurada e pronta
+    "in_game",        # Partida em andamento (Riot API)
+    "ingame",         # Variação do in_game
+    "game_started"    # Jogo iniciado
 }
 
 # Rate limits
@@ -323,6 +326,7 @@ SUPPORTED_LEAGUES = {
     "LRS", "Circuito Desafiante", "CBLOL Academy", "Liga Brasileira",
     "Liga Latinoamérica", "LLA Academy", "Copa América", "LLA Closing",
     "LLA Opening", "Liga Regional", "Torneio Brasileiro", "CBLoL",
+    "LTA Norte", "LTA Norte 2024", "LTA Norte Championship", "LTA",
     
     # EUROPA - TODAS AS LIGAS REGIONAIS
     "LFL", "Prime League", "Superliga", "GLL", "LVP", "PG Nationals",
