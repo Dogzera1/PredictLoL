@@ -324,12 +324,16 @@ class ProfessionalTip:
                 if not value:
                     return False, f"Campo obrigatório ausente: {field}"
         
-        # Verifica valores mínimos
-        if self.confidence_percentage < 45:  # Reduzido para permitir mais tips
-            return False, f"Confiança muito baixa: {self.confidence_percentage}%"
+        # CORREÇÃO: Valores mínimos profissionais mais rigorosos
+        if self.confidence_percentage < 65:  # Mínimo 65% de confiança
+            return False, f"Confiança muito baixa: {self.confidence_percentage}% (mín: 65%)"
         
-        if self.ev_percentage < 0.5:  # Reduzido para permitir mais tips
-            return False, f"EV muito baixo: {self.ev_percentage}%"
+        if self.ev_percentage < 5.0:  # Mínimo 5% de EV para ser lucrativo
+            return False, f"EV muito baixo: {self.ev_percentage}% (mín: 5.0%)"
+        
+        # NOVO: Validação de qualidade dos dados
+        if self.data_quality_score < 0.70:  # Mínimo 70% de qualidade
+            return False, f"Qualidade dos dados insuficiente: {self.data_quality_score:.1%} (mín: 70%)"
         
         if self.odds < 1.15 or self.odds > 6.0:  # Range expandido
             return False, f"Odds fora do range aceitável: {self.odds}"

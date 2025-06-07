@@ -383,28 +383,29 @@ class ProfessionalTipsSystem:
             logger.debug(f"Momento ideal: draft completo, jogo começando")
             return True
         
-        # 5. Qualidade dos dados - PRIORIZA DADOS DE COMPOSIÇÃO PÓS-DRAFT
+        # 5. Qualidade dos dados - CRITÉRIOS RIGOROSOS PARA TIPS PROFISSIONAIS
         data_quality = match.calculate_data_quality()
         min_quality = self.quality_filters["min_data_quality"]
         
-        # Se tem composição completa (pós-draft), reduz requisito de qualidade
+        # CORREÇÃO: Padrões mais rigorosos de qualidade
+        # Se tem composição completa (pós-draft), reduz requisito moderadamente
         has_composition = (hasattr(match, 'team1_composition') and match.team1_composition and
                           hasattr(match, 'team2_composition') and match.team2_composition)
         
         if has_composition:
-            min_quality = max(0.4, min_quality - 0.2)  # Reduz em 20% se tem composição
+            min_quality = max(0.65, min_quality - 0.05)  # Reduz apenas 5% se tem composição, mínimo 65%
             logger.debug(f"Tem composição pós-draft - qualidade mínima reduzida para: {min_quality:.1%}")
         
-        # Para partidas da Riot API, aceita qualidade menor se são dados reais
-        if is_riot_live_match and data_quality >= 0.3:
+        # Para partidas da Riot API, mantém padrão rigoroso de qualidade
+        if is_riot_live_match and data_quality >= 0.70:  # Mínimo 70% mesmo para Riot API
             logger.debug(f"Partida da Riot com qualidade aceitável: {data_quality:.1%}")
             return True
         
         if data_quality < min_quality:
-            logger.debug(f"Qualidade dos dados baixa: {data_quality:.1%} (min: {min_quality:.1%})")
+            logger.debug(f"❌ QUALIDADE INSUFICIENTE: {data_quality:.1%} (min: {min_quality:.1%})")
             return False
         
-        # 5. Eventos cruciais mínimos - FLEXIBILIZADO para início de partida
+        # 6. Eventos cruciais mínimos - FLEXIBILIZADO para início de partida
         # Se é partida recente (≤ 10min), não exige muitos eventos
         if game_minutes <= 10:
             min_events = max(0, self.quality_filters["required_events"] - 2)
@@ -413,9 +414,9 @@ class ProfessionalTipsSystem:
         
         if len(match.events) < min_events:
             logger.debug(f"Poucos eventos cruciais: {len(match.events)} (min: {min_events})")
-            # Para partidas da Riot, aceita mesmo sem eventos se tem dados básicos
-            if is_riot_live_match and match.team1_name and match.team2_name:
-                logger.debug("Aceitando partida da Riot mesmo sem eventos - tem dados básicos")
+            # Para partidas da Riot, aceita mesmo sem eventos se tem dados básicos E qualidade alta
+            if is_riot_live_match and match.team1_name and match.team2_name and data_quality >= 0.75:
+                logger.debug("Aceitando partida da Riot mesmo sem eventos - tem dados básicos e qualidade alta")
                 return True
             return False
         
@@ -508,7 +509,7 @@ class ProfessionalTipsSystem:
                             logger.info(f"✅ Odds reais da liga: {match.league}")
                             return odds_data
             
-            # Se não encontrou odds reais, retorna None para usar estimadas
+            # Se não encontrou odds reais, retorna None para usar estimativas
             logger.warning(f"⚠️ Odds reais não encontradas para {match.match_id} - usando estimativa")
             return None
             
@@ -969,88 +970,179 @@ class ProfessionalTipsSystem:
             return False
 
     def _get_game_number_in_series(self, match: MatchData) -> int:
-        """Determina qual game da série é esta partida"""
+        """
+        DETECÇÃO ULTRA-ROBUSTA DO MAPA ATUAL NA SÉRIE
+        
+        ✅ CORRIGE PROBLEMA: Tips mostrando "Game 1" quando está no Game 4
+        
+        Usa 6 estratégias combinadas para máxima precisão
+        """
         try:
-            # PRIORIDADE 1: Informação direta da API sobre game number
-            if hasattr(match, 'game_number') and match.game_number:
-                return int(match.game_number)
+            debug_info = f"🔍 DETECTANDO GAME: {match.team1_name} vs {match.team2_name} (ID: {match.match_id})"
+            logger.debug(debug_info)
             
-            if hasattr(match, 'number_of_game') and match.number_of_game:
-                return int(match.number_of_game)
-                
-            if hasattr(match, 'serie_game_number') and match.serie_game_number:
-                return int(match.serie_game_number)
+            # ESTRATÉGIA 1: Dados diretos da API (máxima prioridade)
+            direct_sources = [
+                ('game_number', getattr(match, 'game_number', None)),
+                ('number_of_game', getattr(match, 'number_of_game', None)), 
+                ('serie_game_number', getattr(match, 'serie_game_number', None)),
+                ('current_game', getattr(match, 'current_game', None)),
+                ('game_in_series', getattr(match, 'game_in_series', None))
+            ]
             
-            # PRIORIDADE 2: Análise do status da série
+            for source_name, source_value in direct_sources:
+                if source_value is not None:
+                    try:
+                        game_num = int(source_value)
+                        if 1 <= game_num <= 5:
+                            logger.debug(f"   ✅ API direta ({source_name}): Game {game_num}")
+                            return game_num
+                    except (ValueError, TypeError):
+                        continue
+            
+            # ESTRATÉGIA 2: Análise FORÇADA da série (wins + games)
             if hasattr(match, 'serie') and match.serie:
                 serie_info = match.serie
                 if isinstance(serie_info, dict):
-                    # Verifica status atual da série
+                    
+                    # 2a: Contagem PRECISA de wins
+                    if 'opponent1' in serie_info and 'opponent2' in serie_info:
+                        team1_wins = int(serie_info['opponent1'].get('wins', 0))
+                        team2_wins = int(serie_info['opponent2'].get('wins', 0))
+                        total_games_played = team1_wins + team2_wins
+                        current_game = total_games_played + 1
+                        
+                        if 1 <= current_game <= 5:
+                            logger.debug(f"   ✅ Wins analysis: {team1_wins}-{team2_wins} = Game {current_game}")
+                            return current_game
+                    
+                    # 2b: Análise DETALHADA dos games da série
                     if 'games' in serie_info:
                         games = serie_info['games']
-                        if isinstance(games, list):
-                            # Conta jogos já finalizados + 1 para o atual
-                            finished_games = len([g for g in games if g.get('status') in ['finished', 'closed']])
-                            return finished_games + 1
-                    
-                    # Verifica wins dos times para determinar game atual
-                    if 'opponent1' in serie_info and 'opponent2' in serie_info:
-                        team1_wins = serie_info['opponent1'].get('wins', 0)
-                        team2_wins = serie_info['opponent2'].get('wins', 0)
-                        total_games_played = team1_wins + team2_wins
-                        return total_games_played + 1  # Próximo game
+                        if isinstance(games, list) and games:
+                            finished_count = 0
+                            current_live_game = None
+                            max_game_number = 0
+                            
+                            for game in games:
+                                if isinstance(game, dict):
+                                    status = str(game.get('status', '')).lower()
+                                    game_number = game.get('number', game.get('position', 0))
+                                    
+                                    try:
+                                        game_num = int(game_number) if game_number else 0
+                                        max_game_number = max(max_game_number, game_num)
+                                        
+                                        if status in ['finished', 'ended', 'closed', 'completed']:
+                                            finished_count += 1
+                                        elif status in ['live', 'running', 'in_progress', 'ongoing']:
+                                            current_live_game = game_num
+                                            
+                                    except (ValueError, TypeError):
+                                        continue
+                            
+                            # Se há um game AO VIVO específico
+                            if current_live_game and 1 <= current_live_game <= 5:
+                                logger.debug(f"   ✅ Game AO VIVO: Game {current_live_game}")
+                                return current_live_game
+                            
+                            # Se há games finalizados, próximo é finished_count + 1
+                            if finished_count > 0 and finished_count < 5:
+                                next_game = finished_count + 1
+                                logger.debug(f"   ✅ {finished_count} finalizados = Game {next_game}")
+                                return next_game
+                            
+                            # Se detectou algum número de game válido
+                            if max_game_number > 0:
+                                logger.debug(f"   ✅ Maior game detectado: Game {max_game_number}")
+                                return max_game_number
             
-            # PRIORIDADE 3: Análise de contexto temporal da partida
+            # ESTRATÉGIA 3: Análise temporal AGRESSIVA
             if hasattr(match, 'begin_at') and match.begin_at:
-                # Se a partida começou há mais tempo, provavelmente é um game posterior
-                import datetime
                 try:
+                    import datetime
+                    begin_time = None
+                    
                     if isinstance(match.begin_at, str):
-                        begin_time = datetime.datetime.fromisoformat(match.begin_at.replace('Z', '+00:00'))
+                        # Múltiplos formatos de data para robustez
+                        for fmt in ['%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S.%fZ']:
+                            try:
+                                begin_time = datetime.datetime.strptime(match.begin_at.replace('Z', ''), fmt.replace('Z', ''))
+                                begin_time = begin_time.replace(tzinfo=datetime.timezone.utc)
+                                break
+                            except:
+                                continue
+                        
+                        if not begin_time:
+                            begin_time = datetime.datetime.fromisoformat(match.begin_at.replace('Z', '+00:00'))
                     else:
                         begin_time = match.begin_at
                     
-                    time_diff = datetime.datetime.now(datetime.timezone.utc) - begin_time
-                    hours_elapsed = time_diff.total_seconds() / 3600
-                    
-                    # Estima game baseado no tempo decorrido (games duram ~30-45min)
-                    if hours_elapsed > 2.5:  # 2.5+ horas = Game 4+
-                        return 4
-                    elif hours_elapsed > 1.8:  # 1.8+ horas = Game 3+  
-                        return 3
-                    elif hours_elapsed > 1.0:  # 1+ hora = Game 2+
-                        return 2
-                    else:
-                        return 1
-                except Exception:
-                    pass
+                    if begin_time:
+                        time_diff = datetime.datetime.now(datetime.timezone.utc) - begin_time
+                        hours_elapsed = time_diff.total_seconds() / 3600
+                        
+                        # Estimativa REFINADA (35-50min por game)
+                        if hours_elapsed > 0.5:  # Mais de 30min = não é Game 1
+                            estimated_game = min(5, max(1, int(hours_elapsed / 0.6) + 1))
+                            logger.debug(f"   ⏰ Análise temporal: {hours_elapsed:.1f}h = Game {estimated_game}")
+                            return estimated_game
+                            
+                except Exception as e:
+                    logger.debug(f"   ❌ Erro análise temporal: {e}")
             
-            # PRIORIDADE 4: Padrões no match_id 
+            # ESTRATÉGIA 4: Análise AGRESSIVA do match_id
             match_id_str = str(match.match_id).lower()
-            if 'game5' in match_id_str or '_5_' in match_id_str or 'g5' in match_id_str:
-                return 5
-            elif 'game4' in match_id_str or '_4_' in match_id_str or 'g4' in match_id_str:
-                return 4
-            elif 'game3' in match_id_str or '_3_' in match_id_str or 'g3' in match_id_str:
-                return 3
-            elif 'game2' in match_id_str or '_2_' in match_id_str or 'g2' in match_id_str:
-                return 2
-            elif 'game1' in match_id_str or '_1_' in match_id_str or 'g1' in match_id_str:
-                return 1
             
-            # PRIORIDADE 5: Análise do nome/título da partida
+            # Padrões mais específicos (ordem decrescente)
+            patterns = [
+                ('game5', 5), ('g5_', 5), ('_5_', 5), ('map5', 5), ('-5-', 5),
+                ('game4', 4), ('g4_', 4), ('_4_', 4), ('map4', 4), ('-4-', 4),
+                ('game3', 3), ('g3_', 3), ('_3_', 3), ('map3', 3), ('-3-', 3),
+                ('game2', 2), ('g2_', 2), ('_2_', 2), ('map2', 2), ('-2-', 2),
+                ('game1', 1), ('g1_', 1), ('_1_', 1), ('map1', 1), ('-1-', 1)
+            ]
+            
+            for pattern, game_num in patterns:
+                if pattern in match_id_str:
+                    logger.debug(f"   🔍 Match_ID pattern: '{pattern}' = Game {game_num}")
+                    return game_num
+            
+            # ESTRATÉGIA 5: Análise do nome da partida
             if hasattr(match, 'name') and match.name:
                 name_lower = match.name.lower()
-                for i in range(5, 0, -1):  # 5, 4, 3, 2, 1
-                    if f"game {i}" in name_lower or f"game{i}" in name_lower or f"g{i}" in name_lower:
-                        return i
+                for pattern, game_num in patterns:
+                    cleaned_pattern = pattern.replace('_', ' ').replace('-', ' ')
+                    if cleaned_pattern in name_lower:
+                        logger.debug(f"   📝 Nome pattern: '{cleaned_pattern}' = Game {game_num}")
+                        return game_num
             
-            # Se nada funcionar, assume Game 1 mas loga warning
-            logger.warning(f"Não foi possível determinar game number para match {match.match_id}, assumindo Game 1")
+            # ESTRATÉGIA 6: Contexto avançado do tempo de jogo
+            game_minutes = match.get_game_time_minutes()
+            if game_minutes > 0:
+                if game_minutes > 120:  # >2h = Game 4+
+                    estimated_game = 4
+                elif game_minutes > 80:  # >1h20 = Game 3+
+                    estimated_game = 3
+                elif game_minutes > 40:  # >40min = Game 2+
+                    estimated_game = 2
+                else:
+                    estimated_game = 1
+                
+                logger.debug(f"   ⏱️ Tempo {game_minutes}min = Game {estimated_game}")
+                return estimated_game
+            
+            # FALLBACK INTELIGENTE
+            if hasattr(match, 'serie') and match.serie:
+                # Se tem série ativa, assume pelo menos Game 2
+                logger.debug("   🔄 Série ativa detectada = assumindo Game 2")
+                return 2
+            
+            logger.warning(f"Todas estratégias falharam para {match.match_id} - assumindo Game 1")
             return 1
             
         except Exception as e:
-            logger.error(f"Erro ao determinar game number: {e}")
+            logger.error(f"Erro crítico ao determinar game number: {e}")
             return 1
 
     def _is_current_game_active(self, match: MatchData) -> bool:
