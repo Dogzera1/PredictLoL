@@ -449,6 +449,11 @@ class ProfessionalTipsSystem:
                     logger.debug("Rate limit atingido, pulando geração de tips")
                     break
                 
+                # VALIDAÇÃO CRÍTICA: Verifica se o mapa atual ainda está ativo
+                if not self._is_current_game_active(match):
+                    logger.warning(f"❌ MAPA JÁ FINALIZADO - pulando: {match.match_id}")
+                    continue
+                
                 # Gera identificador do mapa
                 map_id = self._get_map_identifier(match)
                 
@@ -966,26 +971,146 @@ class ProfessionalTipsSystem:
     def _get_game_number_in_series(self, match: MatchData) -> int:
         """Determina qual game da série é esta partida"""
         try:
-            # Tenta extrair número do game do match_id ou outros campos
-            match_id_str = str(match.match_id)
+            # PRIORIDADE 1: Informação direta da API sobre game number
+            if hasattr(match, 'game_number') and match.game_number:
+                return int(match.game_number)
             
-            # Padrões comuns para identificar game na série
-            if 'game1' in match_id_str.lower() or '_1_' in match_id_str:
-                return 1
-            elif 'game2' in match_id_str.lower() or '_2_' in match_id_str:
-                return 2
-            elif 'game3' in match_id_str.lower() or '_3_' in match_id_str:
-                return 3
-            elif 'game4' in match_id_str.lower() or '_4_' in match_id_str:
-                return 4
-            elif 'game5' in match_id_str.lower() or '_5_' in match_id_str:
+            if hasattr(match, 'number_of_game') and match.number_of_game:
+                return int(match.number_of_game)
+                
+            if hasattr(match, 'serie_game_number') and match.serie_game_number:
+                return int(match.serie_game_number)
+            
+            # PRIORIDADE 2: Análise do status da série
+            if hasattr(match, 'serie') and match.serie:
+                serie_info = match.serie
+                if isinstance(serie_info, dict):
+                    # Verifica status atual da série
+                    if 'games' in serie_info:
+                        games = serie_info['games']
+                        if isinstance(games, list):
+                            # Conta jogos já finalizados + 1 para o atual
+                            finished_games = len([g for g in games if g.get('status') in ['finished', 'closed']])
+                            return finished_games + 1
+                    
+                    # Verifica wins dos times para determinar game atual
+                    if 'opponent1' in serie_info and 'opponent2' in serie_info:
+                        team1_wins = serie_info['opponent1'].get('wins', 0)
+                        team2_wins = serie_info['opponent2'].get('wins', 0)
+                        total_games_played = team1_wins + team2_wins
+                        return total_games_played + 1  # Próximo game
+            
+            # PRIORIDADE 3: Análise de contexto temporal da partida
+            if hasattr(match, 'begin_at') and match.begin_at:
+                # Se a partida começou há mais tempo, provavelmente é um game posterior
+                import datetime
+                try:
+                    if isinstance(match.begin_at, str):
+                        begin_time = datetime.datetime.fromisoformat(match.begin_at.replace('Z', '+00:00'))
+                    else:
+                        begin_time = match.begin_at
+                    
+                    time_diff = datetime.datetime.now(datetime.timezone.utc) - begin_time
+                    hours_elapsed = time_diff.total_seconds() / 3600
+                    
+                    # Estima game baseado no tempo decorrido (games duram ~30-45min)
+                    if hours_elapsed > 2.5:  # 2.5+ horas = Game 4+
+                        return 4
+                    elif hours_elapsed > 1.8:  # 1.8+ horas = Game 3+  
+                        return 3
+                    elif hours_elapsed > 1.0:  # 1+ hora = Game 2+
+                        return 2
+                    else:
+                        return 1
+                except Exception:
+                    pass
+            
+            # PRIORIDADE 4: Padrões no match_id 
+            match_id_str = str(match.match_id).lower()
+            if 'game5' in match_id_str or '_5_' in match_id_str or 'g5' in match_id_str:
                 return 5
+            elif 'game4' in match_id_str or '_4_' in match_id_str or 'g4' in match_id_str:
+                return 4
+            elif 'game3' in match_id_str or '_3_' in match_id_str or 'g3' in match_id_str:
+                return 3
+            elif 'game2' in match_id_str or '_2_' in match_id_str or 'g2' in match_id_str:
+                return 2
+            elif 'game1' in match_id_str or '_1_' in match_id_str or 'g1' in match_id_str:
+                return 1
             
-            # Se não conseguiu identificar, assume Game 1
+            # PRIORIDADE 5: Análise do nome/título da partida
+            if hasattr(match, 'name') and match.name:
+                name_lower = match.name.lower()
+                for i in range(5, 0, -1):  # 5, 4, 3, 2, 1
+                    if f"game {i}" in name_lower or f"game{i}" in name_lower or f"g{i}" in name_lower:
+                        return i
+            
+            # Se nada funcionar, assume Game 1 mas loga warning
+            logger.warning(f"Não foi possível determinar game number para match {match.match_id}, assumindo Game 1")
             return 1
             
-        except Exception:
+        except Exception as e:
+            logger.error(f"Erro ao determinar game number: {e}")
             return 1
+
+    def _is_current_game_active(self, match: MatchData) -> bool:
+        """
+        VALIDAÇÃO CRÍTICA: Verifica se o mapa atual ainda está ativo para tips
+        
+        Previne tips para mapas já finalizados
+        """
+        try:
+            # 1. Verifica se o status indica que o jogo atual terminou
+            if match.status:
+                finished_status = ['finished', 'ended', 'closed', 'completed', 'done']
+                if match.status.lower() in finished_status:
+                    logger.debug(f"Game finalizado pelo status: {match.status}")
+                    return False
+            
+            # 2. Analisa informações da série para ver se o game atual terminou
+            if hasattr(match, 'serie') and match.serie:
+                serie_info = match.serie
+                if isinstance(serie_info, dict):
+                    # Verifica se há games finalizados na série
+                    if 'games' in serie_info:
+                        games = serie_info['games']
+                        if isinstance(games, list):
+                            current_game_number = self._get_game_number_in_series(match)
+                            
+                            # Verifica se o game atual existe na lista e está finalizado
+                            for game in games:
+                                if isinstance(game, dict):
+                                    game_number = game.get('number', game.get('position', 0))
+                                    if game_number == current_game_number:
+                                        game_status = game.get('status', '').lower()
+                                        if game_status in ['finished', 'ended', 'closed']:
+                                            logger.warning(f"Game {current_game_number} já finalizado na série")
+                                            return False
+                    
+                    # Verifica se a série já terminou completamente
+                    serie_status = serie_info.get('status', '').lower()
+                    if serie_status in ['finished', 'ended', 'closed']:
+                        logger.debug(f"Série já finalizada: {serie_status}")
+                        return False
+            
+            # 3. Verifica tempo de jogo - se muito avançado pode estar próximo do fim
+            game_minutes = match.get_game_time_minutes()
+            if game_minutes > 50:  # Games muito longos (50+ min) podem estar terminando
+                logger.debug(f"Game com {game_minutes} minutos - pode estar terminando")
+                # Ainda permite tip mas com cautela
+            
+            # 4. Verifica se há indicadores específicos de fim de jogo
+            if hasattr(match, 'winner') and match.winner:
+                logger.warning(f"Game já tem vencedor definido: {match.winner}")
+                return False
+            
+            # 5. Se passou por todas as validações, considera ativo
+            return True
+            
+        except Exception as e:
+            logger.error(f"Erro ao validar se game está ativo: {e}")
+            # Em caso de erro, assume que está ativo para não bloquear desnecessariamente
+            return True
 
     def _get_map_identifier(self, match: MatchData) -> str:
         """
