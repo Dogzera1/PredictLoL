@@ -4,6 +4,9 @@ Bot LoL V3 Ultra Avançado - Sistema Principal
 Versão com TODAS as APIs integradas
 """
 
+# FORÇA REDEPLOY - CORREÇÕES APLICADAS - TIMESTAMP: 2025-06-07 18:43
+# Sistema corrigido: LTA Norte + in_game status + tips pós-draft
+
 import os
 import sys
 import asyncio

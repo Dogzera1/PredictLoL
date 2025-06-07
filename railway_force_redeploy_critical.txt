@@ -1,0 +1,20 @@
+🚨 FORÇA REDEPLOY CRÍTICO - TIMESTAMP: 2025-06-07 18:43:30
+========================================================
+
+CORREÇÕES APLICADAS:
+✅ LTA Norte adicionada às ligas suportadas
+✅ Status "in_game" adicionado aos status válidos
+✅ Sistema de tips corrigido para funcionar pós-draft
+✅ Anti-repetição implementado
+✅ Identificação de mapas implementada
+
+PROBLEMA ATUAL:
+❌ Railway não aplicou as correções
+❌ Mesma tip sendo enviada repetidamente
+❌ Tips ainda sendo enviadas durante draft
+
+URGÊNCIA: MÁXIMA
+DEPLOY NECESSÁRIO: IMEDIATO
+
+Este arquivo força um redeploy crítico do sistema.
+======================================================= 
