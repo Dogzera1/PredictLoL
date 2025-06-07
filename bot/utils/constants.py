@@ -380,4 +380,19 @@ ML_FEATURE_WEIGHTS = {
 # Configurações de Qualidade de Dados
 USE_ONLY_REAL_DATA = True  # Sistema trabalha apenas com dados reais, sem mocks/simulações
 REQUIRE_LIVE_ODDS = True   # Exige odds reais para gerar tips
-MIN_DATA_QUALITY_THRESHOLD = 0.8  # Qualidade mínima de dados para aceitar 
+MIN_DATA_QUALITY_THRESHOLD = 0.8  # Qualidade mínima de dados para aceitar
+
+# Configurações do Telegram - Variáveis de ambiente
+import os
+
+# Token do bot Telegram (vem das variáveis de ambiente)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+# IDs dos administradores (vem das variáveis de ambiente)
+TELEGRAM_ADMIN_USER_IDS = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611")
+
+# Configuração final do Telegram com fallbacks
+TELEGRAM_CONFIG.update({
+    "bot_token": TELEGRAM_BOT_TOKEN,
+    "admin_user_ids": TELEGRAM_ADMIN_USER_IDS.split(",") if TELEGRAM_ADMIN_USER_IDS else ["8012415611"]
+})
