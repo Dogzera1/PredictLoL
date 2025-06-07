@@ -446,6 +446,10 @@ class ProfessionalTipsSystem:
                 # Gera identificador do mapa
                 map_id = self._get_map_identifier(match)
                 
+                # CRÍTICO: Marca como processado ANTES de gerar para evitar condições de corrida
+                self.processed_maps.add(map_id)
+                logger.info(f"🔒 Mapa marcado como processado: {map_id}")
+                
                 # Gera tip para a partida
                 tip_result = await self._generate_tip_for_match(match)
                 
@@ -453,13 +457,11 @@ class ProfessionalTipsSystem:
                     game_number = self._get_game_number_in_series(match)
                     logger.info(f"✅ Tip gerada: {match.team1_name} vs {match.team2_name} - Game {game_number}")
                     
-                    # Marca este mapa como processado para evitar repetição
-                    self.processed_maps.add(map_id)
-                    logger.debug(f"Mapa marcado como processado: {map_id}")
-                    
                     await self._handle_generated_tip(tip_result, match)
                 else:
-                    logger.debug(f"Nenhuma tip gerada para: {match.team1_name} vs {match.team2_name} - {map_id}")
+                    # Se falhou na geração, remove do cache para tentar novamente depois
+                    self.processed_maps.discard(map_id)
+                    logger.debug(f"❌ Tip não gerada - removendo do cache: {map_id}")
                 
             except Exception as e:
                 logger.error(f"Erro ao processar partida {match.match_id}: {e}")
