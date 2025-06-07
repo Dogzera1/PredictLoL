@@ -14,7 +14,7 @@ O sistema **contempla corretamente** as variáveis essenciais do Railway, mas h�
 | `PORT` | `5000` | ✅ **Contemplada e funcionando** |
 | `RAILWAY_ENVIRONMENT_ID` | `be1cb85b-2d91-4eeb-aede-c22f425ce1ef` | ⚠️ Disponível mas não usada |
 | `TELEGRAM_ADMIN_USER_IDS` | `8012415611` | ✅ **Contemplada e funcionando** |
-| `TELEGRAM_BOT_TOKEN` | `7584060058:AAFux8K91QUyJH27Mg_mlYJEYLLlJBTHXY0` | ✅ **Contemplada e funcionando** |
+| `TELEGRAM_BOT_TOKEN` | `7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0` | ✅ **Contemplada e funcionando** |
 
 ---
 
