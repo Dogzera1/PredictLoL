@@ -306,7 +306,7 @@ EV_EMOJIS = {
     "low": "📉"      # EV <= 5%
 }
 
-# Ligas suportadas para análise - EXPANDIDA PARA INCLUIR TODAS AS REGIONAIS
+# Ligas suportadas para análise - TODAS AS LIGAS PROFISSIONAIS DO MUNDO
 SUPPORTED_LEAGUES = {
     # Tier 1 - Principais ligas internacionais
     "LCS", "LEC", "LPL", "LCK", "CBLOL", "LLA", "WORLDS", "MSI",
@@ -317,33 +317,84 @@ SUPPORTED_LEAGUES = {
     # Tier 3 - Ligas menores e qualificatórias  
     "LCKC", "LDL", "ERL", "ACADEMY", "PRIME",
     
-    # Ligas regionais específicas - BRASIL
+    # === TODAS AS LIGAS REGIONAIS DO MUNDO ===
+    
+    # BRASIL E AMÉRICA LATINA
     "LRS", "Circuito Desafiante", "CBLOL Academy", "Liga Brasileira",
+    "Liga Latinoamérica", "LLA Academy", "Copa América", "LLA Closing",
+    "LLA Opening", "Liga Regional", "Torneio Brasileiro", "CBLoL",
     
-    # Ligas regionais específicas - EUROPA
+    # EUROPA - TODAS AS LIGAS REGIONAIS
     "LFL", "Prime League", "Superliga", "GLL", "LVP", "PG Nationals",
-    "NLC", "Ultraliga", "TCL Academy", "LCL Academy",
+    "NLC", "Ultraliga", "TCL Academy", "LCL Academy", "Hitpoint Masters",
+    "ESL Premiership", "LFL Division 2", "Prime League Division 2",
+    "Greek Legends", "Liga Portuguesa", "LPLOL", "Italian League",
+    "UKLC", "NLC Division 2", "Balkan League", "Swiss League",
     
-    # EMEA Masters e variações - ADICIONADO EXPLICITAMENTE
+    # EMEA Masters e variações completas
     "EMEA Masters", "EM", "European Masters", "EU Masters", 
-    "EMEA Championship", "European Championship", "EMEA",
+    "EMEA Championship", "European Championship", "EMEA", "EUM",
+    "European Regional League", "ERL Championship", "EMEA Qualifiers",
     
-    # Ligas regionais específicas - ÁSIA
+    # ÁSIA PACÍFICO - TODAS AS LIGAS
     "LJL Academy", "LCO Academy", "VCS Academy", "PCS Academy",
+    "LJL2", "OPL", "GPL", "LMS", "LGCT", "LCK Academy",
+    "Japan League", "Oceania League", "Taiwan League", "Hong Kong League",
+    "Thailand League", "Singapore League", "Malaysia League", "Philippines League",
     
-    # Ligas regionais específicas - AMERICAS
-    "LCS Academy", "LLA Academy", "Copa América",
+    # CHINA - TODAS AS LIGAS
+    "LDL", "LSPL", "TGA", "NEST", "LPL Academy", "CFPL",
+    "China University Championship", "China Regional", "LPL Rookies",
     
-    # Torneios e eventos especiais
-    "Demacia Cup", "Rift Rivals", "All-Star", "Clash",
-    "University Championship", "Student Championship",
+    # COREIA - TODAS AS LIGAS  
+    "LCK CL", "LCK Academy", "LCK Challengers", "Korea Regional",
+    "University League Korea", "LCK Rookies", "KeSPA",
     
-    # Ligas semi-profissionais
+    # AMÉRICA DO NORTE - TODAS AS LIGAS
+    "LCS Academy", "LCS Amateur", "Collegiate Championship",
+    "University Championship", "Student Championship", "Academy League",
+    "North America Challengers", "LCS Proving Grounds", "LCS Scouting Grounds",
+    
+    # WILDCARDS E OUTRAS REGIÕES
+    "CIS", "Russia League", "Ukraine League", "SEA League",
+    "Middle East League", "Africa League", "South America League",
+    "Central America League", "Caribbean League",
+    
+    # TORNEIOS E EVENTOS ESPECIAIS
+    "Demacia Cup", "Rift Rivals", "All-Star", "Clash", "MSC",
+    "Intel Extreme Masters", "DreamHack", "ESL", "BLAST",
+    "Red Bull", "Mercedes-Benz", "BMW Championship",
+    
+    # CATEGORIAS UNIVERSITÁRIAS E AMADORAS
+    "University Championship", "Student Championship", "Collegiate",
+    "Amateur Championship", "Open Championship", "Community Tournament",
+    "Uniliga", "University League", "College Championship",
+    
+    # LIGAS LOCAIS E NACIONAIS
+    "National Championship", "Local League", "Regional Championship",
+    "State Championship", "Provincial League", "District League",
+    "City Championship", "Municipal League",
+    
+    # === WILDCARDS MÁXIMOS PARA CAPTURAR TUDO ===
+    
+    # Termos genéricos que cobrem qualquer liga profissional
     "Challengers", "Amateur", "Regional", "Open", "Qualifier",
-    
-    # Wildcards genéricos para capturar outras ligas
     "Academy", "Championship", "League", "Tournament", "Cup",
-    "Series", "Circuit", "Challenge", "Masters", "Premier"
+    "Series", "Circuit", "Challenge", "Masters", "Premier",
+    "Division", "Conference", "Federation", "Association",
+    "Competition", "Contest", "Event", "Season", "Split",
+    
+    # Prefixos comuns de ligas
+    "Pro", "Professional", "Elite", "Super", "Major", "Minor",
+    "First", "Second", "Third", "Primary", "Secondary",
+    "National", "International", "Continental", "Global",
+    
+    # Sufixos comuns de ligas  
+    "League", "Series", "Championship", "Cup", "Tournament",
+    "Competition", "Contest", "Games", "Arena", "Circuit",
+    
+    # Meta-wildcards que aceitam praticamente qualquer combinação
+    "LoL", "League of Legends", "Esports", "Gaming", "Electronic Sports"
 }
 
 # Thresholds para sistema de predição - OTIMIZADOS para odds altas e valor

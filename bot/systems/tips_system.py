@@ -300,7 +300,7 @@ class ProfessionalTipsSystem:
     def _match_meets_quality_criteria(self, match: MatchData) -> bool:
         """Verifica se partida atende critérios de qualidade"""
         
-        # 1. Liga suportada
+        # 1. Liga suportada - MODO SUPER INCLUSIVO
         # match.league pode ser string ou dict
         league_name = match.league
         if isinstance(match.league, dict):
@@ -309,10 +309,33 @@ class ProfessionalTipsSystem:
         # Extrai apenas o nome principal da liga (ex: "LCK Spring" -> "LCK")
         league_key = league_name.upper()
         is_supported_league = False
+        
+        # Primeiro tenta match exato
         for supported_league in self.quality_filters["supported_leagues"]:
-            if supported_league in league_key:
+            if supported_league.upper() in league_key or league_key in supported_league.upper():
                 is_supported_league = True
                 break
+        
+        # Se não encontrou match direto, tenta por palavras-chave profissionais
+        if not is_supported_league:
+            professional_keywords = [
+                'LEAGUE', 'CHAMPIONSHIP', 'CUP', 'TOURNAMENT', 'SERIES', 'MASTERS',
+                'ACADEMY', 'PREMIER', 'PRO', 'PROFESSIONAL', 'ELITE', 'SUPER',
+                'REGIONAL', 'NATIONAL', 'INTERNATIONAL', 'QUALIFIER', 'CIRCUIT',
+                'DIVISION', 'CONFERENCE', 'ESPORTS', 'GAMING', 'LOL', 'LEAGUE OF LEGENDS'
+            ]
+            
+            # Se contém pelo menos uma palavra-chave profissional, aceita
+            if any(keyword in league_key for keyword in professional_keywords):
+                is_supported_league = True
+                logger.debug(f"Liga aceita por palavra-chave profissional: {league_name}")
+        
+        # Se ainda não aceitou, mas tem teams válidos e estrutura de liga, aceita
+        if not is_supported_league and match.team1_name and match.team2_name:
+            # Se tem nomes de teams válidos e pelo menos 3 caracteres na liga, provavelmente é legítima
+            if len(league_name.strip()) >= 3:
+                is_supported_league = True
+                logger.debug(f"Liga aceita por ter estrutura válida: {league_name}")
         
         if not is_supported_league:
             logger.debug(f"Liga não suportada: {league_name}")
