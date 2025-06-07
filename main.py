@@ -133,7 +133,6 @@ class BotLoLV3:
             # Import dinâmico para evitar erros de import circular
             from bot.telegram_bot.alerts_system import TelegramAlertsSystem
             from bot.systems.schedule_manager import ScheduleManager
-            from bot.systems.bot_interface import BotInterface
             
             # 1. Sistema de alertas Telegram
             main_logger.info("📱 Inicializando sistema de alertas...")
@@ -146,12 +145,9 @@ class BotLoLV3:
                 alerts_system=self.alerts_system
             )
             
-            # 3. Interface do Bot (comandos e handlers)
-            main_logger.info("🎮 Inicializando interface do bot...")
-            self.bot_interface = BotInterface(
-                schedule_manager=self.schedule_manager,
-                alerts_system=self.alerts_system
-            )
+            # 3. Interface do Bot simplificada (apenas o que é necessário)
+            main_logger.info("🎮 Bot interface integrada no ScheduleManager...")
+            self.bot_interface = self.alerts_system  # Usar o próprio alerts_system
             
             main_logger.info("✅ Todos os componentes inicializados com sucesso!")
             
@@ -173,8 +169,8 @@ class BotLoLV3:
             # 1. Inicia tarefas agendadas
             await self.schedule_manager.start_scheduled_tasks()
             
-            # 2. Inicia interface do bot
-            await self.bot_interface.start()
+            # 2. O alerts_system já gerencia o bot Telegram
+            main_logger.info("📱 Sistema Telegram ativo via AlertsSystem")
             
             main_logger.info("🎉 Bot LoL V3 Ultra Avançado iniciado com sucesso!")
             main_logger.info("📊 Sistema de tips automático ativo")
@@ -200,9 +196,6 @@ class BotLoLV3:
         
         try:
             # Para sistemas na ordem inversa
-            if self.bot_interface:
-                await self.bot_interface.stop()
-                
             if self.schedule_manager:
                 await self.schedule_manager.stop_scheduled_tasks()
                 
