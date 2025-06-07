@@ -136,7 +136,13 @@ class BotLoLV3:
             
             # 1. Sistema de alertas Telegram
             main_logger.info("📱 Inicializando sistema de alertas...")
-            self.alerts_system = TelegramAlertsSystem()
+            
+            # Pega o token das variáveis de ambiente
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+            if not bot_token:
+                raise ValueError("TELEGRAM_BOT_TOKEN não configurado")
+            
+            self.alerts_system = TelegramAlertsSystem(bot_token=bot_token)
             await self.alerts_system.initialize()
             
             # 2. Schedule Manager (orquestrador principal)
