@@ -127,10 +127,14 @@ class ProfessionalTip:
         """Formata tip para mensagem do Telegram"""
         risk_emoji = self.get_risk_emoji()
         
+        # Formata número do mapa
+        game_info = f"Game {self.map_number}" if self.map_number > 1 else "Game 1"
+        
         message = f"""🔥 **TIP PROFISSIONAL LoL** 🔥
 
-🎮 **{self.team_a} vs {self.team_b}**
+🎮 **{self.team_a} vs {self.team_b}** 
 🏆 **Liga:** {self.league}
+🗺️ **Mapa:** {game_info}
 ⚡ **Tip:** {self.tip_on_team}
 💰 **Odds:** {self.get_formatted_odds()}
 📊 **Unidades:** {self.units} ({self.risk_level}) {risk_emoji}

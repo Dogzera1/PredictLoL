@@ -132,6 +132,9 @@ class ProfessionalTipsSystem:
         self.monitored_matches: Dict[str, MatchData] = {}
         self.generated_tips: Dict[str, GeneratedTip] = {}
         
+        # NOVO: Controle de tips por mapa individual (1 tip por mapa)
+        self.processed_maps: Set[str] = set()  # Cache de mapas já processados
+        
         # Rate limiting
         self.last_tip_times: List[float] = []
         self.max_tips_per_hour = 5
@@ -282,7 +285,13 @@ class ProfessionalTipsSystem:
         suitable = []
         
         for match in matches:
-            # Verifica se já foi processada recentemente
+            # NOVO: Verifica se este mapa específico já foi processado
+            map_id = self._get_map_identifier(match)
+            if map_id in self.processed_maps:
+                logger.debug(f"Mapa já processado: {map_id}")
+                continue
+            
+            # Verifica se já foi processada recentemente (fallback)
             if match.match_id in self.generated_tips:
                 existing_tip = self.generated_tips[match.match_id]
                 if existing_tip.is_valid:
@@ -293,7 +302,7 @@ class ProfessionalTipsSystem:
                 continue
             
             suitable.append(match)
-            logger.debug(f"Partida adequada: {match.team1_name} vs {match.team2_name} ({match.get_game_time_minutes()}min)")
+            logger.debug(f"Mapa adequado: {match.team1_name} vs {match.team2_name} - {map_id} ({match.get_game_time_minutes()}min)")
         
         return suitable
 
@@ -350,22 +359,35 @@ class ProfessionalTipsSystem:
             logger.debug(f"Status inválido e não é partida ao vivo da Riot: {match.status}")
             return False
         
-        # 3. Tempo de jogo - FLEXIBILIZADO para permitir partidas logo após o draft
-        game_minutes = match.get_game_time_minutes()
-        # Se é partida da Riot sem tempo explícito, considera como válida (provavelmente início/pré-jogo)
-        if game_minutes == 0.0 and is_riot_live_match:
-            logger.debug(f"Partida da Riot sem tempo explícito - considerando válida")
-            return True
-        
-        if not (self.quality_filters["min_game_time_minutes"] <= 
-                game_minutes <= 
-                self.quality_filters["max_game_time_minutes"]):
-            logger.debug(f"Tempo de jogo fora do range: {game_minutes}min")
+        # 3. NOVO: Verificação de draft completo - APENAS TIPS APÓS DRAFT FECHADO
+        if not self._is_draft_complete(match):
+            logger.debug(f"Draft incompleto - aguardando fechamento do draft: {match.match_id}")
             return False
         
-        # 4. Qualidade dos dados - FLEXIBILIZADA para dados reais
+        # 4. Tempo de jogo - AJUSTADO para tips pós-draft (0-2 minutos após draft)
+        game_minutes = match.get_game_time_minutes()
+        
+        # Tips apenas nos primeiros 2 minutos APÓS o draft estar completo
+        if game_minutes > 2.0:
+            logger.debug(f"Tempo de jogo muito avançado para tip: {game_minutes}min")
+            return False
+        
+        # Se tem tempo 0 mas draft completo, é o momento ideal para tip
+        if game_minutes == 0.0 and self._is_draft_complete(match):
+            logger.debug(f"Momento ideal: draft completo, jogo começando")
+            return True
+        
+        # 5. Qualidade dos dados - PRIORIZA DADOS DE COMPOSIÇÃO PÓS-DRAFT
         data_quality = match.calculate_data_quality()
         min_quality = self.quality_filters["min_data_quality"]
+        
+        # Se tem composição completa (pós-draft), reduz requisito de qualidade
+        has_composition = (hasattr(match, 'team1_composition') and match.team1_composition and
+                          hasattr(match, 'team2_composition') and match.team2_composition)
+        
+        if has_composition:
+            min_quality = max(0.4, min_quality - 0.2)  # Reduz em 20% se tem composição
+            logger.debug(f"Tem composição pós-draft - qualidade mínima reduzida para: {min_quality:.1%}")
         
         # Para partidas da Riot API, aceita qualidade menor se são dados reais
         if is_riot_live_match and data_quality >= 0.3:
@@ -373,7 +395,7 @@ class ProfessionalTipsSystem:
             return True
         
         if data_quality < min_quality:
-            logger.debug(f"Qualidade dos dados baixa: {data_quality:.1%}")
+            logger.debug(f"Qualidade dos dados baixa: {data_quality:.1%} (min: {min_quality:.1%})")
             return False
         
         # 5. Eventos cruciais mínimos - FLEXIBILIZADO para início de partida
@@ -421,14 +443,23 @@ class ProfessionalTipsSystem:
                     logger.debug("Rate limit atingido, pulando geração de tips")
                     break
                 
+                # Gera identificador do mapa
+                map_id = self._get_map_identifier(match)
+                
                 # Gera tip para a partida
                 tip_result = await self._generate_tip_for_match(match)
                 
                 if tip_result:
-                    logger.info(f"✅ Tip gerada: {match.team1_name} vs {match.team2_name}")
+                    game_number = self._get_game_number_in_series(match)
+                    logger.info(f"✅ Tip gerada: {match.team1_name} vs {match.team2_name} - Game {game_number}")
+                    
+                    # Marca este mapa como processado para evitar repetição
+                    self.processed_maps.add(map_id)
+                    logger.debug(f"Mapa marcado como processado: {map_id}")
+                    
                     await self._handle_generated_tip(tip_result, match)
                 else:
-                    logger.debug(f"Nenhuma tip gerada para: {match.team1_name} vs {match.team2_name}")
+                    logger.debug(f"Nenhuma tip gerada para: {match.team1_name} vs {match.team2_name} - {map_id}")
                 
             except Exception as e:
                 logger.error(f"Erro ao processar partida {match.match_id}: {e}")
@@ -466,9 +497,13 @@ class ProfessionalTipsSystem:
             )
             
             if tip_generation_result.is_valid and tip_generation_result.tip:
+                # Adiciona informação do mapa na tip
+                game_number = self._get_game_number_in_series(match)
+                tip_generation_result.tip.map_number = game_number
+                
                 logger.info(
                     f"✅ Tip gerada: {tip_generation_result.tip.tip_on_team} @ "
-                    f"{tip_generation_result.tip.odds} ({tip_generation_result.tip.units}u)"
+                    f"{tip_generation_result.tip.odds} ({tip_generation_result.tip.units}u) - Game {game_number}"
                 )
                 return tip_generation_result.tip
             else:
@@ -693,6 +728,33 @@ class ProfessionalTipsSystem:
             self.generated_tips[match_id].status = TipStatus.EXPIRED
             self.stats.tips_expired += 1
             del self.generated_tips[match_id]
+        
+        # NOVO: Limpa mapas processados antigos (após 4 horas)
+        self._cleanup_old_processed_maps()
+
+    def _cleanup_old_processed_maps(self) -> None:
+        """
+        Limpa mapas processados muito antigos do cache
+        
+        Remove mapas processados há mais de 4 horas para permitir
+        reprocessamento em séries muito longas ou em dias diferentes
+        """
+        try:
+            current_time = time.time()
+            
+            # Para simplificar, limpa todo cache a cada 4 horas
+            # Em produção poderia ser mais granular com timestamps
+            if hasattr(self, '_last_cleanup_time'):
+                if current_time - self._last_cleanup_time > (4 * 3600):  # 4 horas
+                    old_count = len(self.processed_maps)
+                    self.processed_maps.clear()
+                    self._last_cleanup_time = current_time
+                    logger.debug(f"Cache de mapas processados limpo: {old_count} entradas removidas")
+            else:
+                self._last_cleanup_time = current_time
+                
+        except Exception as e:
+            logger.warning(f"Erro ao limpar cache de mapas: {e}")
 
     def get_monitoring_status(self) -> Dict[str, Any]:
         """Retorna status detalhado do monitoramento"""
@@ -733,6 +795,7 @@ class ProfessionalTipsSystem:
             "current_state": {
                 "monitored_matches": len(self.monitored_matches),
                 "active_tips": len(self.generated_tips),
+                "processed_maps": len(self.processed_maps),
                 "tips_by_status": tips_by_status
             },
             "rate_limiting": {
@@ -811,4 +874,96 @@ class ProfessionalTipsSystem:
         old_limit = self.max_tips_per_hour
         self.max_tips_per_hour = max_tips
         
-        logger.info(f"Limite de tips atualizado: {old_limit} -> {max_tips} por hora") 
+        logger.info(f"Limite de tips atualizado: {old_limit} -> {max_tips} por hora")
+
+    def _is_draft_complete(self, match: MatchData) -> bool:
+        """Verifica se o draft está completo (todos os 10 champions selecionados)"""
+        try:
+            # Verifica se tem dados de composição dos times
+            has_team1_comp = hasattr(match, 'team1_composition') and match.team1_composition
+            has_team2_comp = hasattr(match, 'team2_composition') and match.team2_composition
+            
+            # Se tem composições, verifica se estão completas (5 champions cada)
+            if has_team1_comp and has_team2_comp:
+                team1_champions = len([c for c in match.team1_composition if c and c.strip()])
+                team2_champions = len([c for c in match.team2_composition if c and c.strip()])
+                
+                draft_complete = team1_champions == 5 and team2_champions == 5
+                if draft_complete:
+                    logger.debug(f"Draft completo: {team1_champions + team2_champions}/10 champions")
+                    return True
+                else:
+                    logger.debug(f"Draft incompleto: {team1_champions + team2_champions}/10 champions")
+                    return False
+            
+            # Se não tem dados de composição, verifica por outros indicadores
+            # Status específicos que indicam draft completo
+            draft_complete_status = [
+                'in_game', 'in-game', 'ingame', 'started', 'live', 'running'
+            ]
+            
+            if match.status and match.status.lower() in draft_complete_status:
+                logger.debug(f"Draft presumivelmente completo pelo status: {match.status}")
+                return True
+            
+            # Se tem tempo de jogo > 0, draft provavelmente está completo
+            if match.get_game_time_minutes() > 0:
+                logger.debug("Draft completo: jogo já iniciado")
+                return True
+            
+            # Por segurança, se não conseguiu determinar, assume que não está completo
+            logger.debug("Não foi possível determinar se draft está completo - assumindo incompleto")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Erro ao verificar draft completo: {e}")
+            return False
+
+    def _get_game_number_in_series(self, match: MatchData) -> int:
+        """Determina qual game da série é esta partida"""
+        try:
+            # Tenta extrair número do game do match_id ou outros campos
+            match_id_str = str(match.match_id)
+            
+            # Padrões comuns para identificar game na série
+            if 'game1' in match_id_str.lower() or '_1_' in match_id_str:
+                return 1
+            elif 'game2' in match_id_str.lower() or '_2_' in match_id_str:
+                return 2
+            elif 'game3' in match_id_str.lower() or '_3_' in match_id_str:
+                return 3
+            elif 'game4' in match_id_str.lower() or '_4_' in match_id_str:
+                return 4
+            elif 'game5' in match_id_str.lower() or '_5_' in match_id_str:
+                return 5
+            
+            # Se não conseguiu identificar, assume Game 1
+            return 1
+            
+        except Exception:
+            return 1
+
+    def _get_map_identifier(self, match: MatchData) -> str:
+        """
+        Cria identificador único para o mapa individual
+        
+        Formato: {team1}_vs_{team2}_{league}_{game_number}
+        Exemplo: flyquest_vs_cloud9_lta_norte_game2
+        """
+        try:
+            team1 = normalize_team_name(match.team1_name).lower()
+            team2 = normalize_team_name(match.team2_name).lower()
+            league = normalize_team_name(match.league).lower()
+            game_number = self._get_game_number_in_series(match)
+            
+            map_id = f"{team1}_vs_{team2}_{league}_game{game_number}"
+            
+            # Remove caracteres especiais e espaços
+            import re
+            map_id = re.sub(r'[^a-z0-9_]', '', map_id)
+            
+            return map_id
+            
+        except Exception as e:
+            logger.warning(f"Erro ao gerar map identifier: {e}")
+            return f"map_{match.match_id}_game1"
