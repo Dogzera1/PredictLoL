@@ -31,10 +31,20 @@ class BotInstanceManager:
                     with open(self.lock_file, 'r') as f:
                         old_pid = int(f.read().strip())
                     
-                    # Verifica se o processo ainda existe
+                    # Verifica se o processo ainda existe e se é o bot
                     if psutil.pid_exists(old_pid):
-                        logger.error(f"❌ Outra instância do bot já está rodando (PID: {old_pid})")
-                        return False
+                        try:
+                            proc = psutil.Process(old_pid)
+                            cmdline = proc.cmdline()
+                            if any('main.py' in cmd for cmd in cmdline):
+                                logger.error(f"❌ Outra instância do bot já está rodando (PID: {old_pid})")
+                                return False
+                            else:
+                                # Processo não é o bot, remove arquivo
+                                os.remove(self.lock_file)
+                        except psutil.Error:
+                            # Não foi possível acessar o processo, remove lock
+                            os.remove(self.lock_file)
                     else:
                         # Processo morto, remove arquivo
                         os.remove(self.lock_file)
