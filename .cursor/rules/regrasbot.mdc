@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+nao remova as funcionalidades existentes do sistema ao tentar corrigir um problema, nao use dados simulados ou ficticios, use apenas para testes.

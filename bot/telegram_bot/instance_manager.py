@@ -15,7 +15,12 @@ logger = logging.getLogger(__name__)
 class BotInstanceManager:
     """Gerenciador de instâncias do bot"""
     
-    def __init__(self, lock_file: str = "/tmp/lol_bot_v3.lock"):
+    def __init__(self, lock_file: str = None):
+        if lock_file is None:
+            # Usa diretório temporário apropriado para o sistema
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            lock_file = os.path.join(temp_dir, "lol_bot_v3.lock")
         self.lock_file = lock_file
         self.pid = os.getpid()
         
@@ -90,7 +95,9 @@ class BotInstanceManager:
                     continue
             
             # Remove arquivo de lock
-            lock_file = "/tmp/lol_bot_v3.lock"
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            lock_file = os.path.join(temp_dir, "lol_bot_v3.lock")
             if os.path.exists(lock_file):
                 os.remove(lock_file)
             
@@ -134,7 +141,9 @@ def stop_all_bots():
             continue
     
     # Remove arquivo de lock
-    lock_file = "/tmp/lol_bot_v3.lock"
+    import tempfile
+    temp_dir = tempfile.gettempdir()
+    lock_file = os.path.join(temp_dir, "lol_bot_v3.lock")
     if os.path.exists(lock_file):
         os.remove(lock_file)
         print("🗑️ Lock removido")

@@ -160,7 +160,7 @@ class SystemVerifier:
                 'start_monitoring',
                 'stop_monitoring', 
                 '_monitoring_loop',
-                '_scan_for_matches',
+                'force_scan',
                 '_generate_tip_for_match'
             ]
             
@@ -182,11 +182,12 @@ class SystemVerifier:
         print("🧪 TESTE 5: Sistema Telegram")
         
         try:
+            import os
             from bot.telegram_bot.alerts_system import TelegramAlertsSystem
             from bot.utils.constants import TELEGRAM_CONFIG
             
-            # Testa bot token
-            bot_token = TELEGRAM_CONFIG.get("bot_token", "")
+            # Testa bot token - usa variável de ambiente primeiro
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", TELEGRAM_CONFIG.get("bot_token", ""))
             if bot_token and bot_token != "BOT_TOKEN_HERE":
                 self.log_result("Bot Token", True, "Token configurado")
             else:
@@ -200,8 +201,8 @@ class SystemVerifier:
             telegram_methods = [
                 'send_professional_tip',
                 '_format_tip_message',
-                'add_user',
-                'get_user_stats'
+                'get_system_stats',
+                '_get_eligible_users_for_tip'
             ]
             
             for method in telegram_methods:
@@ -218,6 +219,7 @@ class SystemVerifier:
         print("🧪 TESTE 6: Schedule Manager (Orquestrador)")
         
         try:
+            import os
             from bot.systems.schedule_manager import ScheduleManager
             from bot.systems.tips_system import ProfessionalTipsSystem
             from bot.telegram_bot.alerts_system import TelegramAlertsSystem
@@ -243,7 +245,7 @@ class SystemVerifier:
                 prediction_system=prediction_system
             )
             
-            telegram_alerts = TelegramAlertsSystem(TELEGRAM_CONFIG["bot_token"])
+            telegram_alerts = TelegramAlertsSystem(os.getenv("TELEGRAM_BOT_TOKEN", TELEGRAM_CONFIG.get("bot_token", "")))
             
             # Inicializa Schedule Manager
             schedule_manager = ScheduleManager(
@@ -257,10 +259,10 @@ class SystemVerifier:
             
             # Verifica métodos de controle
             schedule_methods = [
-                'start_all_systems',
-                'stop_all_systems',
+                'start_scheduled_tasks',
+                'stop_scheduled_tasks',
                 'get_system_status',
-                'force_tips_scan'
+                'force_task_execution'
             ]
             
             for method in schedule_methods:
@@ -278,6 +280,7 @@ class SystemVerifier:
         
         try:
             # Simula inicialização completa do sistema
+            import os
             from bot.systems.schedule_manager import ScheduleManager
             from bot.systems.tips_system import ProfessionalTipsSystem
             from bot.telegram_bot.alerts_system import TelegramAlertsSystem
@@ -303,7 +306,7 @@ class SystemVerifier:
                 prediction_system=prediction_system
             )
             
-            telegram_alerts = TelegramAlertsSystem(TELEGRAM_CONFIG["bot_token"])
+            telegram_alerts = TelegramAlertsSystem(os.getenv("TELEGRAM_BOT_TOKEN", TELEGRAM_CONFIG.get("bot_token", "")))
             tips_system.telegram_alerts = telegram_alerts  # Conecta sistemas
             
             schedule_manager = ScheduleManager(

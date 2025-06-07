@@ -27,6 +27,12 @@ import signal
 from datetime import datetime
 from typing import List
 
+# Configura encoding para Windows
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+
 # Adiciona o diretório raiz ao path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
