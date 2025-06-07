@@ -8,7 +8,18 @@ import re
 import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
-from fuzzywuzzy import fuzz
+try:
+    from fuzzywuzzy import fuzz
+except ImportError:  # Fallback simples caso fuzzywuzzy não esteja instalado
+    from difflib import SequenceMatcher
+
+    class _FuzzWrapper:
+        @staticmethod
+        def ratio(a: str, b: str) -> float:
+            """Calcula similaridade aproximada usando difflib."""
+            return SequenceMatcher(None, a, b).ratio() * 100
+
+    fuzz = _FuzzWrapper()
 
 
 def normalize_team_name(team_name: str) -> str:
