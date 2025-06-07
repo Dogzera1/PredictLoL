@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Bot LoL V3 Ultra Avançado - Sistema Principal
-Versão com prevenção de conflitos de instância
+Versão com TODAS as APIs integradas
 """
 
 import os
@@ -112,50 +112,127 @@ signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 class BotLoLV3:
-    """Classe principal do Bot LoL V3 Ultra Avançado"""
+    """Classe principal do Bot LoL V3 Ultra Avançado com TODAS as APIs"""
     
     def __init__(self):
         # Adquire lock de instância única
         instance_manager.acquire_lock()
         
+        # Inicialização de componentes
         self.schedule_manager = None
-        self.bot_interface = None
         self.alerts_system = None
+        self.professional_tips_system = None
+        self.multi_api_client = None
+        self.pandascore_client = None
+        self.riot_client = None
+        self.prediction_system = None
+        self.game_analyzer = None
+        self.units_system = None
         self.is_running = False
         
-        main_logger.info("🤖 Bot LoL V3 Ultra Avançado - Inicializando...")
+        main_logger.info("🤖 Bot LoL V3 Ultra Avançado - Inicializando SISTEMA COMPLETO...")
         
     async def initialize_components(self):
-        """Inicializa todos os componentes do sistema"""
+        """Inicializa TODOS os componentes do sistema com APIs completas"""
         try:
-            main_logger.info("🔧 Inicializando componentes...")
-            
-            # Import dinâmico para evitar erros de import circular
-            from bot.telegram_bot.alerts_system import TelegramAlertsSystem
-            from bot.systems.schedule_manager import ScheduleManager
+            main_logger.info("🔧 Inicializando TODOS os componentes...")
             
             # 1. Sistema de alertas Telegram
-            main_logger.info("📱 Inicializando sistema de alertas...")
+            try:
+                from bot.telegram_bot.alerts_system import TelegramAlertsSystem
+                main_logger.info("📱 Inicializando sistema de alertas...")
+                
+                bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+                if not bot_token:
+                    raise ValueError("TELEGRAM_BOT_TOKEN não configurado")
+                
+                self.alerts_system = TelegramAlertsSystem(bot_token=bot_token)
+                await self.alerts_system.initialize()
+                
+                # CRÍTICO: Inicia o polling para receber comandos
+                await self.alerts_system.start_bot()
+                main_logger.info("✅ Telegram inicializado com polling ativo")
+            except Exception as e:
+                main_logger.error(f"❌ Erro Telegram: {e}")
+                raise
             
-            # Pega o token das variáveis de ambiente
-            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-            if not bot_token:
-                raise ValueError("TELEGRAM_BOT_TOKEN não configurado")
+            # 2. Sistema Multi-API (15+ APIs gratuitas)
+            try:
+                from bot.api_clients.multi_api_client import MultiAPIClient
+                main_logger.info("🌐 Inicializando Multi-API Client...")
+                
+                self.multi_api_client = MultiAPIClient()
+                main_logger.info("✅ Multi-API Client inicializado (15+ APIs gratuitas)")
+            except Exception as e:
+                main_logger.error(f"❌ Erro Multi-API: {e}")
+                raise
             
-            self.alerts_system = TelegramAlertsSystem(bot_token=bot_token)
-            await self.alerts_system.initialize()
+            # 3. Clientes APIs principais e sistemas de análise
+            try:
+                from bot.api_clients.pandascore_api_client import PandaScoreAPIClient
+                from bot.api_clients.riot_api_client import RiotAPIClient
+                from bot.core_logic.prediction_system import DynamicPredictionSystem
+                from bot.core_logic.game_analyzer import LoLGameAnalyzer
+                from bot.core_logic.units_system import ProfessionalUnitsSystem
+                
+                main_logger.info("🔧 Inicializando clientes APIs e sistemas ML...")
+                
+                self.pandascore_client = PandaScoreAPIClient()
+                self.riot_client = RiotAPIClient()
+                
+                # Sistemas de análise necessários para DynamicPredictionSystem
+                self.game_analyzer = LoLGameAnalyzer()
+                self.units_system = ProfessionalUnitsSystem()
+                self.prediction_system = DynamicPredictionSystem(
+                    game_analyzer=self.game_analyzer,
+                    units_system=self.units_system
+                )
+                
+                main_logger.info("✅ PandaScore + Riot APIs + ML Systems inicializados")
+            except Exception as e:
+                main_logger.error(f"❌ Erro clientes APIs: {e}")
+                raise
             
-            # 2. Schedule Manager (orquestrador principal)
-            main_logger.info("⏰ Inicializando gerenciador de cronograma...")
-            self.schedule_manager = ScheduleManager(
-                alerts_system=self.alerts_system
-            )
+            # 4. Sistema de Tips Profissionais
+            try:
+                from bot.systems.tips_system import ProfessionalTipsSystem
+                main_logger.info("💎 Inicializando Sistema de Tips Profissionais...")
+                
+                self.professional_tips_system = ProfessionalTipsSystem(
+                    pandascore_client=self.pandascore_client,
+                    riot_client=self.riot_client,
+                    prediction_system=self.prediction_system,
+                    telegram_alerts=self.alerts_system
+                )
+                main_logger.info("✅ Sistema de Tips Profissionais inicializado")
+            except Exception as e:
+                main_logger.error(f"❌ Erro Sistema de Tips: {e}")
+                raise
             
-            # 3. Interface do Bot simplificada (apenas o que é necessário)
-            main_logger.info("🎮 Bot interface integrada no ScheduleManager...")
-            self.bot_interface = self.alerts_system  # Usar o próprio alerts_system
+            # 5. Schedule Manager (orquestrador principal)
+            try:
+                from bot.systems.schedule_manager import ScheduleManager
+                main_logger.info("⏰ Inicializando Schedule Manager...")
+                
+                self.schedule_manager = ScheduleManager(
+                    tips_system=self.professional_tips_system,
+                    telegram_alerts=self.alerts_system,
+                    pandascore_client=self.pandascore_client,
+                    riot_client=self.riot_client
+                )
+                main_logger.info("✅ Schedule Manager inicializado")
+            except Exception as e:
+                main_logger.error(f"❌ Erro Schedule Manager: {e}")
+                raise
             
-            main_logger.info("✅ Todos os componentes inicializados com sucesso!")
+            main_logger.info("✅ TODOS OS COMPONENTES INICIALIZADOS COM SUCESSO!")
+            main_logger.info("🤖 Bot Telegram operacional")
+            main_logger.info("💎 Sistema de Tips automático ativo")
+            main_logger.info("🌐 Multi-API (15+ APIs gratuitas) funcionando")
+            main_logger.info("💰 PandaScore API (Money Line) ativo")
+            main_logger.info("🎮 Riot API oficial ativo")
+            main_logger.info("🧠 Sistemas ML/Algoritmos ativos")
+            main_logger.info("⏰ Automação completa ativa")
             
         except Exception as e:
             main_logger.error(f"❌ Erro na inicialização: {e}")
@@ -170,17 +247,15 @@ class BotLoLV3:
             await self.initialize_components()
             
             # Inicia sistemas
-            main_logger.info("🚀 Iniciando sistemas...")
+            main_logger.info("🚀 Iniciando TODOS os sistemas...")
             
             # 1. Inicia tarefas agendadas
             await self.schedule_manager.start_scheduled_tasks()
             
-            # 2. O alerts_system já gerencia o bot Telegram
-            main_logger.info("📱 Sistema Telegram ativo via AlertsSystem")
-            
-            main_logger.info("🎉 Bot LoL V3 Ultra Avançado iniciado com sucesso!")
-            main_logger.info("📊 Sistema de tips automático ativo")
-            main_logger.info("📱 Bot Telegram operacional")
+            main_logger.info("🎉 Bot LoL V3 Ultra Avançado COMPLETO iniciado com sucesso!")
+            main_logger.info("📊 Sistema de tips automático com TODAS as APIs ativo")
+            main_logger.info("📱 Bot Telegram com comandos operacional")
+            main_logger.info("💰 Money Line + ML ready para LTA Norte")
             
             # Aguarda até receber sinal de parada
             while self.is_running:
@@ -205,8 +280,26 @@ class BotLoLV3:
             if self.schedule_manager:
                 await self.schedule_manager.stop_scheduled_tasks()
                 
+            if self.professional_tips_system:
+                # Tips system não tem stop específico
+                pass
+            
             if self.alerts_system:
-                await self.alerts_system.cleanup()
+                # Limpeza do Telegram
+                if hasattr(self.alerts_system, 'cleanup_old_cache'):
+                    self.alerts_system.cleanup_old_cache()
+                    
+                # Para bot de forma segura
+                if hasattr(self.alerts_system, 'application') and self.alerts_system.application:
+                    if self.alerts_system.application.updater and self.alerts_system.application.updater.running:
+                        await self.alerts_system.application.updater.stop()
+                    if self.alerts_system.application.running:
+                        await self.alerts_system.application.stop()
+                    await self.alerts_system.application.shutdown()
+                    
+            if self.multi_api_client:
+                # Multi-API client cleanup
+                pass
             
             main_logger.info("✅ Bot parado com sucesso")
             
@@ -271,7 +364,7 @@ def run_bot():
 
 if __name__ == "__main__":
     # Verifica se é execução direta
-    main_logger.info("🎯 Bot LoL V3 Ultra Avançado - Iniciando...")
+    main_logger.info("🎯 Bot LoL V3 Ultra Avançado - Iniciando SISTEMA COMPLETO...")
     main_logger.info(f"   PID: {os.getpid()}")
     main_logger.info(f"   Ambiente: {os.getenv('ENVIRONMENT', 'development')}")
     
