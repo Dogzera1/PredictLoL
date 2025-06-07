@@ -57,6 +57,8 @@ class RailwayBot:
         self.pandascore_client = None
         self.riot_client = None
         self.prediction_system = None
+        self.game_analyzer = None
+        self.units_system = None
         
     async def initialize(self):
         """Inicialização completa do sistema"""
@@ -94,19 +96,28 @@ class RailwayBot:
                 logger.error(f"❌ Erro Multi-API: {e}")
                 raise
             
-            # 3. Inicialização de clientes APIs individuais  
+            # 3. Inicialização de clientes APIs e sistemas de análise
             try:
                 from bot.api_clients.pandascore_api_client import PandaScoreAPIClient
                 from bot.api_clients.riot_api_client import RiotAPIClient
-                from bot.core_logic.dynamic_prediction_system import DynamicPredictionSystem
+                from bot.core_logic.prediction_system import DynamicPredictionSystem
+                from bot.core_logic.game_analyzer import LoLGameAnalyzer
+                from bot.core_logic.units_system import ProfessionalUnitsSystem
                 
-                logger.info("🔧 Inicializando clientes APIs individuais...")
+                logger.info("🔧 Inicializando clientes APIs e sistemas...")
                 
                 self.pandascore_client = PandaScoreAPIClient()
                 self.riot_client = RiotAPIClient()
-                self.prediction_system = DynamicPredictionSystem()
                 
-                logger.info("✅ Clientes APIs individuais inicializados")
+                # Sistemas de análise necessários para DynamicPredictionSystem
+                self.game_analyzer = LoLGameAnalyzer()
+                self.units_system = ProfessionalUnitsSystem()
+                self.prediction_system = DynamicPredictionSystem(
+                    game_analyzer=self.game_analyzer,
+                    units_system=self.units_system
+                )
+                
+                logger.info("✅ Clientes APIs e sistemas de análise inicializados")
             except Exception as e:
                 logger.error(f"❌ Erro clientes APIs: {e}")
                 raise
