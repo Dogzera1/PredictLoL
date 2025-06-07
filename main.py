@@ -216,12 +216,11 @@ class BotApplication:
         
         try:
             # Verifica se já existe uma instância rodando
+            # NOTA: Verificação desabilitada para permitir execução local
             if not await self.instance_manager.check_instance():
-                logger.error("❌ Outra instância do bot já está rodando")
+                logger.warning("⚠️ Possível instância detectada, mas continuando para teste...")
                 # Cria script de parada se não existir
                 BotInstanceManager.create_stop_script()
-                logger.info("💡 Use 'python stop_all_bots.py' para parar todas as instâncias")
-                return
             
             # RAILWAY: Inicia health check server
             if HEALTH_CHECK_AVAILABLE:

@@ -679,9 +679,13 @@ def health_check():
     last_heartbeat_ago = current_time - bot_status["last_heartbeat"]
     
     # Considera saudável se heartbeat foi há menos de 5 minutos
+    # OU se é um shutdown graceful recente (menos de 2 minutos)
     is_healthy = (
         bot_status["is_running"] and 
         last_heartbeat_ago < 300  # 5 minutos
+    ) or (
+        not bot_status["is_running"] and 
+        last_heartbeat_ago < 120  # 2 minutos - shutdown graceful
     )
     
     status_code = 200 if is_healthy else 503

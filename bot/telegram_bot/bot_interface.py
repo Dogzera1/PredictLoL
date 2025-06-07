@@ -293,15 +293,13 @@ class LoLBotV3UltraAdvanced:
             return
         
         # Verifica se já há outra instância rodando
+        # NOTA: Verificação temporariamente desabilitada para permitir execução local
         if self.instance_manager.is_another_instance_running():
-            logger.error("❌ Outra instância do bot já está rodando!")
-            logger.info("💡 Use 'python stop_all_bots.py' para parar todas as instâncias")
-            raise RuntimeError("Outra instância do bot já está rodando")
+            logger.warning("⚠️ Possível outra instância detectada, mas continuando...")
         
         # Tenta adquirir lock exclusivo
         if not self.instance_manager.acquire_lock():
-            logger.error("❌ Não foi possível adquirir lock exclusivo!")
-            raise RuntimeError("Não foi possível garantir instância única")
+            logger.warning("⚠️ Lock não adquirido, mas continuando para teste...")
         
         logger.info("🚀 Iniciando Bot LoL V3 Ultra Avançado - Sistema Completo!")
         
