@@ -644,23 +644,23 @@ class TelegramAlertsSystem:
         """Handler do comando /start"""
         user = update.effective_user
         
-        welcome_message = f"""🚀 **Bem-vindo ao Bot LoL V3 Ultra Avançado!**
+        welcome_message = f"""🚀 Bem-vindo ao Bot LoL V3 Ultra Avançado!
 
 Olá, {user.first_name}! 
 
-Este bot envia **tips profissionais** para apostas em League of Legends baseadas em:
+Este bot envia tips profissionais para apostas em League of Legends baseadas em:
 • 🧠 Machine Learning + Algoritmos Heurísticos
 • 📊 Análise em tempo real de partidas
 • 💰 Expected Value calculado
 • 🎯 Gestão profissional de risco
 
-**Comandos disponíveis:**
+Comandos disponíveis:
 /subscribe - Configurar notificações
 /status - Ver status do sistema
 /mystats - Suas estatísticas
 /help - Ajuda completa
 
-🔥 **Subscreva-se para receber tips profissionais!**"""
+🔥 Subscreva-se para receber tips profissionais!"""
         
         # Registra usuário se novo
         if user.id not in self.users:
@@ -673,14 +673,14 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             logger.info(f"Novo usuário registrado: {user.first_name} ({user.id})")
         
         await update.message.reply_text(
-            self._escape_markdown_v2(welcome_message),
+            welcome_message,
             reply_markup=self._get_subscription_keyboard()
         )
 
     async def _handle_subscribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /subscribe"""
         await update.message.reply_text(
-            self._escape_markdown_v2("📋 **Escolha seu tipo de subscrição:**"),
+            "📋 Escolha seu tipo de subscrição:",
             reply_markup=self._get_subscription_keyboard()
         )
 
@@ -690,31 +690,27 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         
         if user_id in self.users:
             self.users[user_id].is_active = False
-            message = "❌ **Subscrição cancelada**\n\nVocê não receberá mais notificações.\nUse /subscribe para reativar."
+            message = "❌ Subscrição cancelada\n\nVocê não receberá mais notificações.\nUse /subscribe para reativar."
         else:
             message = "ℹ️ Você não está subscrito."
         
-        await update.message.reply_text(
-            self._escape_markdown_v2(message), 
-        )
+        await update.message.reply_text(message)
 
     async def _handle_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /status"""
-        status_message = f"""📊 **STATUS DO SISTEMA**
+        status_message = f"""📊 STATUS DO SISTEMA
 
-👥 **Usuários:** {len(self.users)} registrados
-✅ **Ativos:** {sum(1 for u in self.users.values() if u.is_active)}
-📨 **Tips enviadas:** {self.stats.tips_sent}
-📈 **Taxa de sucesso:** {self.stats.success_rate:.1f}%
-🚫 **Bloqueados:** {self.stats.blocked_users}
+👥 Usuários: {len(self.users)} registrados
+✅ Ativos: {sum(1 for u in self.users.values() if u.is_active)}
+📨 Tips enviadas: {self.stats.tips_sent}
+📈 Taxa de sucesso: {self.stats.success_rate:.1f}%
+🚫 Bloqueados: {self.stats.blocked_users}
 
-⏰ **Última tip:** {self._format_time_ago(self.stats.last_alert_time)}
+⏰ Última tip: {self._format_time_ago(self.stats.last_alert_time)}
 
-🔥 **Sistema operacional!**"""
+🔥 Sistema operacional!"""
         
-        await update.message.reply_text(
-            self._escape_markdown_v2(status_message), 
-        )
+        await update.message.reply_text(status_message)
 
     async def _handle_my_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /mystats"""
@@ -722,54 +718,50 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
         
         if user_id not in self.users:
             await update.message.reply_text(
-                self._escape_markdown_v2("ℹ️ Você não está registrado. Use /start primeiro."), 
+                "ℹ️ Você não está registrado. Use /start primeiro."
             )
             return
         
         user = self.users[user_id]
         
-        stats_message = f"""📊 **SUAS ESTATÍSTICAS**
+        stats_message = f"""📊 SUAS ESTATÍSTICAS
 
-👤 **Usuário:** {user.first_name}
-📅 **Membro desde:** {self._format_time_ago(user.joined_at)}
-📨 **Tips recebidas:** {user.tips_received}
-🔔 **Tipo:** {user.subscription_type.value}
-✅ **Status:** {"Ativo" if user.is_active else "Inativo"}
+👤 Usuário: {user.first_name}
+📅 Membro desde: {self._format_time_ago(user.joined_at)}
+📨 Tips recebidas: {user.tips_received}
+🔔 Tipo: {user.subscription_type.value}
+✅ Status: {"Ativo" if user.is_active else "Inativo"}
 
-⏰ **Última atividade:** {self._format_time_ago(user.last_active)}"""
+⏰ Última atividade: {self._format_time_ago(user.last_active)}"""
         
-        await update.message.reply_text(
-            self._escape_markdown_v2(stats_message), 
-        )
+        await update.message.reply_text(stats_message)
 
     async def _handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler do comando /help"""
-        help_text = """🆘 **Ajuda - Bot LoL V3**
+        help_text = """🆘 Ajuda - Bot LoL V3
 
-**👤 Comandos Pessoais:**
-• `/start` - Iniciar bot
-• `/subscribe` - Configurar alertas
-• `/unsubscribe` - Cancelar alertas
-• `/status` - Status do sistema
-• `/mystats` - Suas estatísticas
+👤 Comandos Pessoais:
+• /start - Iniciar bot
+• /subscribe - Configurar alertas
+• /unsubscribe - Cancelar alertas
+• /status - Status do sistema
+• /mystats - Suas estatísticas
 
-**👥 Comandos para Grupos:**
-• `/activate_group` - Ativar alertas no grupo (qualquer membro)
-• `/group_status` - Status do grupo
-• `/deactivate_group` - Desativar alertas (qualquer membro)
+👥 Comandos para Grupos:
+• /activate_group - Ativar alertas no grupo (qualquer membro)
+• /group_status - Status do grupo
+• /deactivate_group - Desativar alertas (qualquer membro)
 
-**📊 Tipos de Subscrição:**
+📊 Tipos de Subscrição:
 • 🔔 Todas as Tips
 • 💎 Alto Valor (EV > 10%)
 • 🎯 Alta Confiança (> 80%)
 • 👑 Premium (EV > 15% + Conf > 85%)
 
-🤖 **Bot LoL V3 Ultra Avançado**
+🤖 Bot LoL V3 Ultra Avançado
 ⚡ Sistema profissional de tips eSports"""
         
-        await update.message.reply_text(
-            self._escape_markdown_v2(help_text),
-        )
+        await update.message.reply_text(help_text)
 
     async def _handle_subscription_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handler para callbacks de subscrição"""
@@ -783,7 +775,7 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             subscription_type = SubscriptionType(query.data)
         except ValueError:
             await query.edit_message_text(
-                self._escape_markdown_v2("❌ **Tipo de subscrição inválido.**"), 
+                "❌ Tipo de subscrição inválido."
             )
             return
 
@@ -807,16 +799,16 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
             admin_ids=[user.id]
         )
         
-        confirmation_message = f"""✅ **Alertas de grupo configurados!**
+        confirmation_message = f"""✅ Alertas de grupo configurados!
 
-📋 **Grupo:** {chat.title}
-🔔 **Tipo:** {subscription_type.value}
-👤 **Configurado por:** {user.first_name}
+📋 Grupo: {chat.title}
+🔔 Tipo: {subscription_type.value}
+👤 Configurado por: {user.first_name}
 
 🎯 O grupo receberá tips conforme a subscrição selecionada."""
         
         await query.edit_message_text(
-            self._escape_markdown_v2(confirmation_message),
+            confirmation_message,
         )
 
     async def _handle_user_subscription(self, query, user, subscription_type: SubscriptionType) -> None:
@@ -833,15 +825,15 @@ Este bot envia **tips profissionais** para apostas em League of Legends baseadas
                 subscription_type=subscription_type
             )
         
-        confirmation_message = f"""✅ **Subscrição configurada!**
+        confirmation_message = f"""✅ Subscrição configurada!
 
-🔔 **Tipo:** {subscription_type.value}
-👤 **Usuário:** {user.first_name}
+🔔 Tipo: {subscription_type.value}
+👤 Usuário: {user.first_name}
 
 🎯 Você receberá tips conforme sua subscrição."""
         
         await query.edit_message_text(
-            self._escape_markdown_v2(confirmation_message),
+            confirmation_message,
         )
 
     def _get_subscription_keyboard(self) -> InlineKeyboardMarkup:
