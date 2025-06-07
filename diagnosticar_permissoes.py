@@ -25,7 +25,7 @@ async def diagnose_bot_permissions():
     
     try:
         # Token do bot
-        BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
+        BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o")
         
         if not BOT_TOKEN:
             print("❌ Token não encontrado!")

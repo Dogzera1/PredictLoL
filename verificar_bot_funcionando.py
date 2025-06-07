@@ -6,7 +6,7 @@ import asyncio
 import aiohttp
 import json
 
-BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
+BOT_TOKEN = "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o"
 USER_ID = 8012415611
 
 async def verificar_bot():

@@ -10,7 +10,7 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
+BOT_TOKEN = "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o"
 
 async def force_clear_bot_conflicts():
     """Força limpeza completa de conflitos"""

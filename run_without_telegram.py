@@ -24,7 +24,7 @@ from bot.utils.logger_config import get_logger
 # Configurações diretas
 PANDASCORE_API_KEY = "90jCQbmni5dVyZnvr6iF9XesBRVSb3rG1L47T5sjR1_4_t8_JqQ"
 RIOT_API_KEY = "RGAPI-7b5ce87e-4bb8-4d9d-b905-8df7d7b4f8c2"
-BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
+BOT_TOKEN = "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o"
 
 logger = get_logger(__name__)
 

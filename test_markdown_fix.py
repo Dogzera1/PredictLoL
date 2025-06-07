@@ -6,7 +6,7 @@ Verifica se o sistema de escape de caracteres funciona
 import asyncio
 import aiohttp
 
-BOT_TOKEN = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
+BOT_TOKEN = "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o"
 
 def escape_markdown_v2(text: str) -> str:
     """

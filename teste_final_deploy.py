@@ -11,7 +11,7 @@ async def test_final():
     # 1. Telegram
     try:
         from telegram import Bot
-        bot = Bot('7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0')
+        bot = Bot('7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o')
         me = await bot.get_me()
         print(f'✅ Telegram: @{me.username} funcional')
     except Exception as e:

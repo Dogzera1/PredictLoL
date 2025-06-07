@@ -50,7 +50,7 @@ git push -u origin main
 
 ```bash
 # TOKEN DO BOT (obtenha do @BotFather no Telegram)
-TELEGRAM_BOT_TOKEN=7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0
+TELEGRAM_BOT_TOKEN=7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o
 
 # SEU TELEGRAM ID (obtenha enviando /start para @userinfobot)
 TELEGRAM_ADMIN_USER_IDS=123456789

@@ -48,7 +48,7 @@ async def test_group_commands():
     
     try:
         # Configura token de teste
-        test_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0")
+        test_token = os.getenv("TELEGRAM_BOT_TOKEN", "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o")
         
         # Inicializa sistema
         alerts_system = TelegramAlertsSystem(test_token)

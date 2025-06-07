@@ -36,7 +36,7 @@ async def verificar_deploy_completo():
         # Verificar token do Telegram
         try:
             from telegram import Bot
-            bot_token = "7584060058:AAFux8K9JiQUpH27Mg_mlYJEYLL1J8THXY0"
+            bot_token = "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o"
             bot = Bot(token=bot_token)
             me = await bot.get_me()
             
