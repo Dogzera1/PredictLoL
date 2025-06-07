@@ -72,72 +72,59 @@ class RailwayBot:
                 logger.error(f"❌ Erro Telegram: {e}")
                 raise
             
-            # 2. Schedule Manager
-            try:
-                from bot.systems.schedule_manager import ScheduleManager
-                logger.info("⏰ Inicializando Schedule Manager...")
-                self.schedule_manager = ScheduleManager(
-                    alerts_system=self.alerts_system
-                )
-                logger.info("✅ Schedule Manager inicializado")
-            except Exception as e:
-                logger.error(f"❌ Erro Schedule Manager: {e}")
-                raise
-            
-            logger.info("✅ Todos os componentes inicializados!")
+            # 2. Inicialização básica sem ScheduleManager complexo
+            # (Sistema funcionará apenas com Telegram para Railway)
+            logger.info("✅ Sistema básico inicializado para Railway!")
+            logger.info("🤖 Bot Telegram operacional")
             
         except Exception as e:
             logger.error(f"❌ Falha na inicialização: {e}")
             raise
-    
-    async def start(self):
-        """Inicia o bot"""
+
+    async def cleanup(self):
+        """Limpeza de recursos"""
         try:
-            self.is_running = True
+            logger.info("🧹 Iniciando limpeza...")
             
-            # Inicializa componentes
+            if hasattr(self, 'alerts_system') and self.alerts_system:
+                # Usar o método correto de limpeza
+                if hasattr(self.alerts_system, 'cleanup_old_cache'):
+                    self.alerts_system.cleanup_old_cache()
+                if hasattr(self.alerts_system, 'stop_bot'):
+                    await self.alerts_system.stop_bot()
+                    
+            logger.info("✅ Limpeza concluída")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro na limpeza: {e}")
+
+    async def run(self):
+        """Execução principal simplificada"""
+        try:
             await self.initialize()
             
-            # Inicia sistemas
-            logger.info("🚀 Iniciando sistemas...")
+            logger.info("🚀 Bot LoL V3 Railway executando!")
+            logger.info("💡 Sistema básico ativo - Telegram Bot funcionando")
             
-            # Inicia tarefas agendadas
-            if self.schedule_manager:
-                await self.schedule_manager.start_scheduled_tasks()
-                logger.info("📊 Sistema de tips ativo")
-            
-            logger.info("🎉 Bot LoL V3 iniciado com sucesso!")
-            logger.info("📱 @BETLOLGPT_bot operacional")
-            
-            # Loop principal
-            while self.is_running:
-                await asyncio.sleep(5)
+            # Loop principal simples para manter o bot ativo
+            while True:
+                await asyncio.sleep(60)  # Verifica a cada minuto
                 
+                # Health check básico
+                if hasattr(self, 'alerts_system'):
+                    logger.debug("🔄 Sistema ativo - Telegram OK")
+                else:
+                    logger.warning("⚠️ Sistema não inicializado corretamente")
+                    break
+                    
+        except KeyboardInterrupt:
+            logger.info("🛑 Interrompido pelo usuário")
         except Exception as e:
             logger.error(f"❌ Erro durante execução: {e}")
             raise
         finally:
-            await self.stop()
-    
-    async def stop(self):
-        """Para o bot"""
-        if not self.is_running:
-            return
-            
-        logger.info("🛑 Parando Bot...")
-        self.is_running = False
-        
-        try:
-            if self.schedule_manager:
-                await self.schedule_manager.stop_scheduled_tasks()
-                
-            if self.alerts_system:
-                await self.alerts_system.cleanup()
-            
-            logger.info("✅ Bot parado com sucesso")
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao parar: {e}")
+            # Cleanup
+            await self.cleanup()
 
 async def main():
     """Função principal"""
@@ -155,7 +142,7 @@ async def main():
         
         # Cria e inicia bot
         bot = RailwayBot()
-        await bot.start()
+        await bot.run()
         
     except KeyboardInterrupt:
         logger.info("⌨️ Interrompido pelo usuário")
