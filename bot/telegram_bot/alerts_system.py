@@ -453,40 +453,8 @@ class TelegramAlertsSystem:
     def _format_tip_message(self, tip: ProfessionalTip) -> str:
         """Formata tip para Telegram (texto simples)"""
         try:
-            # Determina emoji do risco
-            risk_emojis = {
-                "Risco Muito Alto": "🔥🔥🔥",
-                "Risco Alto": "🔥🔥",
-                "Risco Médio-Alto": "🔥",
-                "Risco Médio": "📊",
-                "Risco Baixo": "🎯",
-                "Risco Mínimo": "💡"
-            }
-            
-            risk_emoji = risk_emojis.get(tip.risk_level, "📊")
-            
-            # Formata EV com cor
-            ev_icon = "📈" if tip.ev_percentage > 15 else "📊" if tip.ev_percentage > 5 else "📉"
-            
-            message = f"""🚀 TIP PROFISSIONAL LoL 🚀
-
-🎮 {tip.team_a} vs {tip.team_b}
-🏆 Liga: {tip.league}
-⚡ Tip: {tip.tip_on_team}
-💰 Odds: {tip.odds}
-{risk_emoji} Unidades: {tip.units} ({tip.risk_level})
-⏰ Tempo: {tip.game_time_at_tip}
-
-📊 Análise:
-{ev_icon} EV: +{tip.ev_percentage:.1f}%
-🎯 Confiança: {tip.confidence_percentage:.0f}%
-🤖 Fonte: {tip.prediction_source}
-
-⭐ Qualidade: {int(tip.data_quality_score * 100)}%
-
-🔥 Bot LoL V3 Ultra Avançado"""
-
-            return message
+            # CORREÇÃO: Usa o método format_telegram_message da tip que inclui informação do mapa
+            return tip.format_telegram_message()
             
         except Exception as e:
             logger.error(f"Erro ao formatar tip: {e}")
