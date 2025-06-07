@@ -24,8 +24,11 @@ import os
 import sys
 import asyncio
 import signal
+import atexit
+import time
 from datetime import datetime
 from typing import List
+from pathlib import Path
 
 # Configura encoding para Windows
 if sys.platform == "win32":
@@ -74,12 +77,92 @@ try:
     from bot.api_clients.pandascore_api_client import PandaScoreAPIClient
     from bot.api_clients.riot_api_client import RiotAPIClient
     from bot.core_logic import DynamicPredictionSystem, LoLGameAnalyzer, ProfessionalUnitsSystem
-    from bot.utils.constants import PANDASCORE_API_KEY, TELEGRAM_CONFIG
+    from bot.utils.constants import PANDASCORE_API_KEY, TELEGRAM_CONFIG, TELEGRAM_ADMIN_USER_IDS
     from bot.telegram_bot.instance_manager import BotInstanceManager
 except ImportError as e:
     logger.error(f"❌ Erro crítico ao importar módulos: {e}")
     sys.exit(1)
 
+# Configurações de ambiente
+os.environ.setdefault('TZ', 'America/Sao_Paulo')
+
+# Adiciona o diretório do bot ao path
+BOT_DIR = Path(__file__).parent
+sys.path.insert(0, str(BOT_DIR))
+
+# Arquivo de lock para prevenir múltiplas instâncias
+LOCK_FILE = BOT_DIR / "bot.lock"
+
+class BotInstanceManager:
+    """Gerenciador para prevenir múltiplas instâncias do bot"""
+    
+    def __init__(self):
+        self.lock_acquired = False
+        
+    def acquire_lock(self):
+        """Adquire lock de instância única"""
+        try:
+            if LOCK_FILE.exists():
+                # Verifica se o processo ainda existe
+                try:
+                    with open(LOCK_FILE, 'r') as f:
+                        old_pid = int(f.read().strip())
+                    
+                    # Tenta verificar se processo existe (Windows/Linux)
+                    if os.name == 'nt':  # Windows
+                        import subprocess
+                        result = subprocess.run(['tasklist', '/FI', f'PID eq {old_pid}'], 
+                                              capture_output=True, text=True)
+                        if str(old_pid) not in result.stdout:
+                            # Processo morto, remove lock antigo
+                            LOCK_FILE.unlink()
+                        else:
+                            raise RuntimeError(f"Bot já rodando com PID {old_pid}")
+                    else:  # Linux/Unix
+                        os.kill(old_pid, 0)  # Verifica se processo existe
+                        raise RuntimeError(f"Bot já rodando com PID {old_pid}")
+                        
+                except (OSError, ValueError):
+                    # Processo não existe, remove lock antigo
+                    LOCK_FILE.unlink()
+            
+            # Cria novo lock
+            with open(LOCK_FILE, 'w') as f:
+                f.write(str(os.getpid()))
+            
+            self.lock_acquired = True
+            logger.info(f"🔒 Lock de instância adquirido: PID {os.getpid()}")
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao adquirir lock: {e}")
+            raise
+    
+    def release_lock(self):
+        """Libera lock de instância"""
+        if self.lock_acquired and LOCK_FILE.exists():
+            try:
+                LOCK_FILE.unlink()
+                logger.info("🔓 Lock de instância liberado")
+            except Exception as e:
+                logger.error(f"❌ Erro ao liberar lock: {e}")
+
+# Instância global do gerenciador
+instance_manager = BotInstanceManager()
+
+def cleanup_on_exit():
+    """Cleanup ao sair"""
+    instance_manager.release_lock()
+
+def signal_handler(signum, frame):
+    """Handler para sinais de término"""
+    logger.info(f"📡 Recebido sinal {signum}, terminando...")
+    cleanup_on_exit()
+    sys.exit(0)
+
+# Registra handlers de cleanup
+atexit.register(cleanup_on_exit)
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 class BotApplication:
     """
@@ -437,18 +520,6 @@ class BotApplication:
         print("="*70)
 
 
-def setup_signal_handlers(app: BotApplication) -> None:
-    """Configura handlers de sinal para shutdown graceful"""
-    def signal_handler(signum, frame):
-        logger.info(f"Signal {signum} recebido, iniciando shutdown...")
-        asyncio.create_task(app.shutdown())
-        sys.exit(0)
-    
-    if sys.platform != "win32":
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-
-
 async def main() -> None:
     """Função principal"""
     try:
@@ -461,12 +532,12 @@ async def main() -> None:
         
         # Cria e executa aplicação
         app = BotApplication()
-        setup_signal_handlers(app)
-        
         await app.run_bot()
         
+    except KeyboardInterrupt:
+        print("\n🛑 Aplicação interrompida pelo usuário")
     except Exception as e:
-        logger.error(f"❌ Erro fatal na aplicação: {e}")
+        print(f"\n❌ Erro fatal: {e}")
         sys.exit(1)
 
 
