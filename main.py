@@ -128,6 +128,7 @@ class BotLoLV3:
         self.multi_api_client = None
         self.pandascore_client = None
         self.riot_client = None
+        self.lolesports_client = None
         self.prediction_system = None
         self.game_analyzer = None
         self.units_system = None
@@ -174,6 +175,7 @@ class BotLoLV3:
             try:
                 from bot.api_clients.pandascore_api_client import PandaScoreAPIClient
                 from bot.api_clients.riot_api_client import RiotAPIClient
+                from bot.api_clients.lolesports_api_client import LolesportsAPIClient
                 from bot.core_logic.prediction_system import DynamicPredictionSystem
                 from bot.core_logic.game_analyzer import LoLGameAnalyzer
                 from bot.core_logic.units_system import ProfessionalUnitsSystem
@@ -182,6 +184,7 @@ class BotLoLV3:
                 
                 self.pandascore_client = PandaScoreAPIClient()
                 self.riot_client = RiotAPIClient()
+                self.lolesports_client = LolesportsAPIClient()
                 
                 # Sistemas de análise necessários para DynamicPredictionSystem
                 self.game_analyzer = LoLGameAnalyzer()
@@ -191,7 +194,7 @@ class BotLoLV3:
                     units_system=self.units_system
                 )
                 
-                main_logger.info("✅ PandaScore + Riot APIs + ML Systems inicializados")
+                main_logger.info("✅ PandaScore + Riot + Lolesports APIs + ML Systems inicializados")
             except Exception as e:
                 main_logger.error(f"❌ Erro clientes APIs: {e}")
                 raise
@@ -221,7 +224,8 @@ class BotLoLV3:
                     tips_system=self.professional_tips_system,
                     telegram_alerts=self.alerts_system,
                     pandascore_client=self.pandascore_client,
-                    riot_client=self.riot_client
+                    riot_client=self.riot_client,
+                    lolesports_client=self.lolesports_client
                 )
                 main_logger.info("✅ Schedule Manager inicializado")
             except Exception as e:
@@ -234,6 +238,7 @@ class BotLoLV3:
             main_logger.info("🌐 Multi-API (15+ APIs gratuitas) funcionando")
             main_logger.info("💰 PandaScore API (Money Line) ativo")
             main_logger.info("🎮 Riot API oficial ativo")
+            main_logger.info("⚡ Lolesports API (dados em tempo real) ativo")
             main_logger.info("🧠 Sistemas ML/Algoritmos ativos")
             main_logger.info("⏰ Automação completa ativa")
             
@@ -259,6 +264,7 @@ class BotLoLV3:
             main_logger.info("📊 Sistema de tips automático com TODAS as APIs ativo")
             main_logger.info("📱 Bot Telegram com comandos operacional")
             main_logger.info("💰 Money Line + ML ready para LTA Norte")
+            main_logger.info("⚡ Dados em tempo real do Lolesports disponíveis")
             
             # Aguarda até receber sinal de parada
             while self.is_running:
@@ -286,6 +292,9 @@ class BotLoLV3:
             if self.professional_tips_system:
                 # Tips system não tem stop específico
                 pass
+            
+            if self.lolesports_client:
+                await self.lolesports_client.close()
             
             if self.alerts_system:
                 # Limpeza do Telegram
@@ -317,58 +326,41 @@ async def main():
     try:
         # Detecta ambiente
         is_railway = bool(os.getenv("RAILWAY_ENVIRONMENT_ID"))
-        is_production = os.getenv("ENVIRONMENT") == "production"
+        main_logger.info(f"🌍 Ambiente: {'Railway' if is_railway else 'Local'}")
         
-        main_logger.info("🔍 Detectando ambiente...")
-        main_logger.info(f"   Railway: {'✅' if is_railway else '❌'}")
-        main_logger.info(f"   Produção: {'✅' if is_production else '❌'}")
-        
-        # Validações usando variáveis de ambiente diretamente
-        telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        admin_ids = os.getenv("TELEGRAM_ADMIN_USER_IDS", "")
-        
-        if not telegram_token:
-            raise ValueError("❌ TELEGRAM_BOT_TOKEN não configurado!")
-            
-        if not admin_ids:
-            main_logger.warning("⚠️ TELEGRAM_ADMIN_USER_IDS não encontrado, usando padrão")
-        
-        main_logger.info("✅ Configurações validadas")
-        main_logger.info(f"🤖 Token: {telegram_token[:10]}...")
-        main_logger.info(f"👑 Admin IDs: {admin_ids}")
+        # Health check em thread separada
+        if is_railway:
+            health_thread = threading.Thread(target=start_health_server, daemon=True)
+            health_thread.start()
+            main_logger.info("🏥 Health check server iniciado em thread separada")
         
         # Cria e inicia bot
         bot = BotLoLV3()
         await bot.start()
         
     except KeyboardInterrupt:
-        main_logger.info("⌨️  Interrompido pelo usuário")
+        main_logger.info("⌨️ Interrupção por teclado")
     except Exception as e:
-        main_logger.error(f"💥 Erro fatal: {e}")
-        sys.exit(1)
+        main_logger.error(f"❌ Erro na função main: {e}")
+        raise
+    finally:
+        main_logger.info("🛑 Finalizando main()")
 
 def run_bot():
-    """Executa o bot com prevenção de conflitos"""
+    """Função de entrada - executa bot com tratamento de erros robusto"""
     try:
-        # Inicia health check server em thread separada
-        health_thread = threading.Thread(target=start_health_server, daemon=True)
-        health_thread.start()
-        
-        # Configura política de eventos para Windows
+        # Configura event loop para Windows se necessário
         if os.name == 'nt':
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         
-        # Executa bot
+        # Executa função principal
         asyncio.run(main())
         
+    except KeyboardInterrupt:
+        main_logger.info("⌨️ Bot interrompido pelo usuário")
     except Exception as e:
-        main_logger.error(f"💥 Erro na execução: {e}")
-        sys.exit(1)
+        main_logger.error(f"❌ Erro fatal: {e}")
+        raise
 
 if __name__ == "__main__":
-    # Verifica se é execução direta
-    main_logger.info("🎯 Bot LoL V3 Ultra Avançado - Iniciando SISTEMA COMPLETO...")
-    main_logger.info(f"   PID: {os.getpid()}")
-    main_logger.info(f"   Ambiente: {os.getenv('ENVIRONMENT', 'development')}")
-    
-    run_bot() 
+    run_bot()

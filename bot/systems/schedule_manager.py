@@ -102,7 +102,8 @@ class ScheduleManager:
         tips_system: "ProfessionalTipsSystem",
         telegram_alerts: TelegramAlertsSystem,
         pandascore_client: PandaScoreAPIClient,
-        riot_client: RiotAPIClient
+        riot_client: RiotAPIClient,
+        lolesports_client=None
     ):
         """
         Inicializa o gerenciador de cronograma
@@ -112,11 +113,13 @@ class ScheduleManager:
             telegram_alerts: Sistema de alertas Telegram
             pandascore_client: Cliente do PandaScore API
             riot_client: Cliente da Riot API
+            lolesports_client: Cliente da Lolesports API (opcional)
         """
         self.tips_system = tips_system
         self.telegram_alerts = telegram_alerts
         self.pandascore_client = pandascore_client
         self.riot_client = riot_client
+        self.lolesports_client = lolesports_client
         
         # Estado do sistema
         self.is_running = False
@@ -145,7 +148,7 @@ class ScheduleManager:
             "uptime_hours": 0.0
         }
         
-        logger.info("ScheduleManager inicializado com sucesso")
+        logger.info(f"ScheduleManager inicializado com {'Lolesports API' if lolesports_client else 'APIs padrão'}")
 
     async def start_scheduled_tasks(self) -> None:
         """Inicia todas as tarefas agendadas"""
@@ -324,20 +327,52 @@ class ScheduleManager:
             self._schedule_next_run(task)
 
     async def _monitor_live_matches_task(self) -> None:
-        """Tarefa de monitoramento de partidas ao vivo"""
+        """Tarefa de monitoramento de partidas ao vivo com dados em tempo real"""
         try:
             logger.info("🔍 Executando monitoramento de partidas...")
             
-            # Força um scan completo no sistema de tips
-            scan_result = await self.tips_system.force_scan()
+            # Monitoramento com dados em tempo real do Lolesports
+            live_data = {}
+            if self.lolesports_client:
+                try:
+                    # Busca partidas ao vivo na API do Lolesports
+                    live_matches = await self.lolesports_client.get_live_matches()
+                    if live_matches:
+                        logger.info(f"⚡ {len(live_matches)} partidas ao vivo detectadas via Lolesports API")
+                        live_data = {
+                            "lolesports_matches": live_matches,
+                            "realtime_data": True
+                        }
+                        
+                        # Formatar partidas para o sistema de predição
+                        formatted_matches = []
+                        for match in live_matches:
+                            formatted = self.lolesports_client.format_match_for_prediction(match)
+                            if formatted:
+                                formatted_matches.append(formatted)
+                        
+                        live_data["formatted_matches"] = formatted_matches
+                        logger.info(f"✅ {len(formatted_matches)} partidas formatadas para análise")
+                    
+                except Exception as e:
+                    logger.warning(f"Erro ao buscar dados do Lolesports: {e}")
+                    live_data["lolesports_error"] = str(e)
+            
+            # Força um scan completo no sistema de tips (com dados do Lolesports se disponível)
+            scan_result = await self.tips_system.force_scan(live_data=live_data)
             
             # Atualiza estatísticas
             if scan_result.get("tip_generated", False):
                 self.stats["tips_generated"] += 1
                 self.health.last_tip_time = time.time()
             
+            # Log detalhado dos resultados
+            lolesports_info = ""
+            if live_data.get("realtime_data"):
+                lolesports_info = f" + {len(live_data.get('formatted_matches', []))} tempo real"
+            
             logger.info(
-                f"✅ Scan completo: {scan_result['live_matches_found']} partidas, "
+                f"✅ Scan completo: {scan_result['live_matches_found']} partidas{lolesports_info}, "
                 f"tip gerada: {'Sim' if scan_result.get('tip_generated') else 'Não'}"
             )
             
