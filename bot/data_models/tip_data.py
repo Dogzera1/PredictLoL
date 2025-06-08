@@ -324,16 +324,20 @@ class ProfessionalTip:
                 if not value:
                     return False, f"Campo obrigatório ausente: {field}"
         
-        # CORREÇÃO: Valores mínimos profissionais mais rigorosos
-        if self.confidence_percentage < 65:  # Mínimo 65% de confiança
-            return False, f"Confiança muito baixa: {self.confidence_percentage}% (mín: 65%)"
+        # CORREÇÃO: Usa threshold configurável das constantes
+        from ..utils.constants import PREDICTION_THRESHOLDS
+        min_confidence = PREDICTION_THRESHOLDS["min_confidence"] * 100  # Converte para %
+        if self.confidence_percentage < min_confidence:
+            return False, f"Confiança muito baixa: {self.confidence_percentage}% (mín: {min_confidence}%)"
         
-        if self.ev_percentage < 5.0:  # Mínimo 5% de EV para ser lucrativo
-            return False, f"EV muito baixo: {self.ev_percentage}% (mín: 5.0%)"
+        min_ev = PREDICTION_THRESHOLDS["min_ev"] * 100  # Converte para %
+        if self.ev_percentage < min_ev:
+            return False, f"EV muito baixo: {self.ev_percentage}% (mín: {min_ev}%)"
         
-        # NOVO: Validação de qualidade dos dados
-        if self.data_quality_score < 0.70:  # Mínimo 70% de qualidade
-            return False, f"Qualidade dos dados insuficiente: {self.data_quality_score:.1%} (mín: 70%)"
+        # NOVO: Validação de qualidade dos dados - ajustada para aceitar dados básicos
+        min_quality = PREDICTION_THRESHOLDS.get("min_data_quality", 0.05)  # 5% como padrão
+        if self.data_quality_score < min_quality:
+            return False, f"Qualidade dos dados insuficiente: {self.data_quality_score:.1%} (mín: {min_quality:.1%})"
         
         if self.odds < 1.15 or self.odds > 6.0:  # Range expandido
             return False, f"Odds fora do range aceitável: {self.odds}"

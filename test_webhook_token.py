@@ -6,10 +6,11 @@ Substitua TOKEN_AQUI pelo token válido
 
 import requests
 import time
+import os
 
 def test_activate_group():
     # SUBSTITUA PELO TOKEN CORRETO
-    bot_token = "TOKEN_AQUI"
+    bot_token = "7584060058:AAG0_htf_kVuV_JUzNgMJMuRUOVnJGmeu0o"
     
     # 1. Primeiro, configura webhook
     webhook_url = "https://predictlol-production.up.railway.app/webhook"

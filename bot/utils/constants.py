@@ -404,7 +404,7 @@ SUPPORTED_LEAGUES = {
 # Thresholds para sistema de predição - OTIMIZADOS para odds altas e valor
 PREDICTION_THRESHOLDS = {
     "min_confidence": 0.45,          # Reduzido para permitir mais tips  
-    "min_ev": 0.5,                   # EV mínimo para aceitar apostas
+    "min_ev": 0.03,                  # EV mínimo 3% para aceitar apostas
     "min_odds": 1.50,                # Odds mínima 1.5x conforme solicitado
     "max_odds": 8.00,                # Aumentado para incluir odds altas valiosas
     "min_game_time": 0,              # Permitir desde o draft/início
