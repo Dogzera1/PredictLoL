@@ -1167,6 +1167,59 @@ class ProfessionalTipsSystem:
             current_game = self._get_game_number_in_series(match)
             logger.debug(f"🔍 Validando se Game {current_game} está ativo")
             
+            # 🚨 BLOQUEIO CRÍTICO URGENTE: Análise de games finalizados via raw_data
+            if hasattr(match, 'raw_data') and match.raw_data:
+                games = match.raw_data.get('games', [])
+                if games:
+                    finished_count = 0
+                    running_game = None
+                    
+                    for game in games:
+                        status = str(game.get('status', '')).lower()
+                        game_number = game.get('number', 0)
+                        
+                        if status in ['finished', 'ended', 'closed']:
+                            finished_count += 1
+                        elif status in ['running', 'live', 'in_progress']:
+                            running_game = game_number
+                    
+                    logger.warning(f"🔍 ANÁLISE CRÍTICA: {finished_count} games finalizados, game rodando: {running_game}, detectado: {current_game}")
+                    
+                    # 🚨 BLOQUEIO CRÍTICO: Séries com 4+ games finalizados = FINALIZANDO
+                    if finished_count >= 4:
+                        logger.warning(f"❌ BLOQUEIO SÉRIE CRÍTICA: {finished_count} games finalizados - SÉRIE QUASE/JÁ FINALIZADA")
+                        return False
+                    
+                    # BLOQUEIO 1: Game detectado já está finalizado
+                    if current_game <= finished_count:
+                        logger.warning(f"❌ BLOQUEIO CRÍTICO: Game {current_game} já finalizado ({finished_count} games finalizados)")
+                        return False
+                    
+                    # BLOQUEIO 2: Há game específico rodando e não é o detectado
+                    if running_game and running_game != current_game:
+                        logger.warning(f"❌ BLOQUEIO: Game {running_game} está rodando, não Game {current_game}")
+                        return False
+            
+            # 🚨 BLOQUEIO TEMPORAL CRÍTICO: >3h com Game baixo = SUSPEITO
+            if hasattr(match, 'begin_at') and match.begin_at:
+                try:
+                    import datetime
+                    if isinstance(match.begin_at, str):
+                        begin_time = datetime.datetime.fromisoformat(match.begin_at.replace('Z', '+00:00'))
+                    else:
+                        begin_time = match.begin_at
+                    
+                    time_diff = datetime.datetime.now(datetime.timezone.utc) - begin_time
+                    hours_elapsed = time_diff.total_seconds() / 3600
+                    
+                    # BLOQUEIO RÍGIDO: >3h e Game 1-2 = ALTAMENTE SUSPEITO
+                    if hours_elapsed > 3.0 and current_game <= 2:
+                        logger.warning(f"❌ BLOQUEIO TEMPORAL CRÍTICO: {hours_elapsed:.1f}h elapsed mas detectando Game {current_game} - REJEITANDO TIP")
+                        return False
+                        
+                except Exception as e:
+                    logger.debug(f"Erro análise temporal: {e}")
+            
             # 🆘 VALIDAÇÃO DE EMERGÊNCIA: Impede tips para games tardios sem dados válidos
             # Se detectamos Game 4+ mas não temos dados consistentes da série, é suspeito
             if current_game >= 4:
