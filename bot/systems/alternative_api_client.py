@@ -46,9 +46,9 @@ class AlternativeAPIClient:
         Tenta múltiplas APIs em ordem de prioridade
         """
         methods = [
-            ("Live Client Data API", self._get_live_client_data),
+            ("Riot Esports GraphQL", self._get_lol_esports_data),  # PRIORIDADE 1: Melhor API
             ("Riot Esports API", self._get_esports_data),
-            ("LoL Esports API", self._get_lol_esports_data),
+            ("Live Client Data API", self._get_live_client_data),
             ("Game Stats Scraping", self._scrape_game_stats)
         ]
         
@@ -166,20 +166,26 @@ class AlternativeAPIClient:
         return None
     
     async def _get_lol_esports_data(self, match_data) -> Optional[CompositionData]:
-        """Tenta obter dados da LoL Esports API oficial"""
+        """MELHORADO: Riot Esports GraphQL API - Dados precisos de draft em tempo real"""
         try:
-            # API endpoint público
+            # API endpoint oficial com X-API-Key do site lolesports.com
             url = 'https://esports-api.lolesports.com/persisted/gw/getLive'
-            params = {'hl': 'en-US'}
+            params = {'hl': 'pt-BR'}
             
-            async with self.session.get(url, params=params) as response:
+            # Headers com X-API-Key extraída do site oficial
+            headers = {
+                "x-api-key": "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+            
+            async with self.session.get(url, params=params, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
                     
                     events = data.get('data', {}).get('schedule', {}).get('events', [])
                     
                     for event in events:
-                        if event.get('state') == 'inProgress':
+                        if event.get('state') in ['inProgress', 'completed']:
                             # Verifica se é o match correto
                             teams = event.get('match', {}).get('teams', [])
                             
@@ -187,25 +193,239 @@ class AlternativeAPIClient:
                                 team1_name = teams[0].get('name', '')
                                 team2_name = teams[1].get('name', '')
                                 
-                                # Compara com match_data
+                                # Compara com match_data (melhor matching)
                                 if (hasattr(match_data, 'team1_name') and 
                                     hasattr(match_data, 'team2_name')):
                                     
-                                    if (team1_name.lower() in match_data.team1_name.lower() or
-                                        team2_name.lower() in match_data.team2_name.lower()):
+                                    team1_target = match_data.team1_name.lower().strip()
+                                    team2_target = match_data.team2_name.lower().strip()
+                                    team1_api = team1_name.lower().strip()
+                                    team2_api = team2_name.lower().strip()
+                                    
+                                    # Verifica correspondência (ordem pode variar)
+                                    if ((team1_target in team1_api or team1_api in team1_target) and
+                                        (team2_target in team2_api or team2_api in team2_target)) or \
+                                       ((team1_target in team2_api or team2_api in team1_target) and
+                                        (team2_target in team1_api or team1_api in team2_target)):
                                         
-                                        # Tenta extrair composições dos games
+                                        logger.info(f"✅ PARTIDA ENCONTRADA: {team1_api} vs {team2_api}")
+                                        
+                                        # Extrai composições dos games
                                         games = event.get('match', {}).get('games', [])
                                         
                                         for game in games:
-                                            if game.get('state') == 'inProgress':
-                                                # Busca dados de draft
-                                                draft_data = await self._get_game_draft_data(game.get('id'))
-                                                if draft_data:
-                                                    return draft_data
+                                            if game.get('state') in ['inProgress', 'completed']:
+                                                # Obtém dados detalhados do game
+                                                game_id = game.get('id')
+                                                if game_id:
+                                                    detailed_comp = await self._get_game_draft_details(game_id, headers)
+                                                    if detailed_comp:
+                                                        return detailed_comp
+                                                
+                                                # Fallback: extrai do que está disponível
+                                                team1_comp, team2_comp = await self._extract_compositions_from_game(game)
+                                                
+                                                if len(team1_comp) == 5 and len(team2_comp) == 5:
+                                                    return CompositionData(
+                                                        team1_composition=team1_comp,
+                                                        team2_composition=team2_comp,
+                                                        source='riot_esports_graphql',
+                                                        draft_complete=True,
+                                                        confidence=0.95
+                                                    )
+                else:
+                    logger.warning(f"⚠️ Riot Esports API retornou status: {response.status}")
                     
         except Exception as e:
-            logger.debug(f"LoL Esports API error: {e}")
+            logger.debug(f"Riot Esports GraphQL API error: {e}")
+        
+        return None
+    
+    async def _get_game_draft_details(self, game_id: str, headers: dict) -> Optional[CompositionData]:
+        """Obtém detalhes específicos do draft via getGameDetails"""
+        try:
+            url = 'https://esports-api.lolesports.com/persisted/gw/getGameDetails'
+            params = {'id': game_id}
+            
+            async with self.session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    game_data = data.get('data', {}).get('game', {})
+                    
+                    teams = game_data.get('teams', [])
+                    if len(teams) >= 2:
+                        team1_comp = self._extract_team_composition(teams[0])
+                        team2_comp = self._extract_team_composition(teams[1])
+                        
+                        if len(team1_comp) == 5 and len(team2_comp) == 5:
+                            logger.info(f"✅ DRAFT COMPLETO via getGameDetails: {len(team1_comp + team2_comp)}/10 champions")
+                            return CompositionData(
+                                team1_composition=team1_comp,
+                                team2_composition=team2_comp,
+                                source='riot_esports_details',
+                                draft_complete=True,
+                                confidence=0.98
+                            )
+                        
+        except Exception as e:
+            logger.debug(f"Game details error: {e}")
+        
+        return None
+    
+    def _extract_team_composition(self, team_data: dict) -> List[str]:
+        """Extrai composição de um time da estrutura da API"""
+        composition = []
+        
+        # Busca participantes
+        participants = team_data.get('participants', [])
+        for participant in participants:
+            # Tenta diferentes campos para o campeão
+            champion = (participant.get('championId') or 
+                       participant.get('champion') or 
+                       participant.get('championName'))
+            
+            if champion:
+                # Se é ID numérico, converte para nome
+                if isinstance(champion, int):
+                    champion_name = self._champion_id_to_name(champion)
+                else:
+                    champion_name = str(champion)
+                
+                if champion_name and champion_name not in composition:
+                    composition.append(champion_name)
+        
+        return composition
+    
+    async def _extract_compositions_from_game(self, game: dict) -> Tuple[List[str], List[str]]:
+        """Extrai composições de ambos os times do game"""
+        team1_comp = []
+        team2_comp = []
+        
+        teams = game.get('teams', [])
+        if len(teams) >= 2:
+            team1_comp = self._extract_team_composition(teams[0])
+            team2_comp = self._extract_team_composition(teams[1])
+        
+        return team1_comp, team2_comp
+    
+    def _champion_id_to_name(self, champion_id: int) -> str:
+        """Converte ID do campeão para nome usando mapeamento básico"""
+        # Mapeamento dos IDs mais comuns (expandir conforme necessário)
+        champion_map = {
+            1: "Annie", 2: "Olaf", 3: "Galio", 4: "TwistedFate", 5: "XinZhao",
+            6: "Urgot", 7: "LeBlanc", 8: "Vladimir", 9: "Fiddlesticks", 10: "Kayle",
+            11: "MasterYi", 12: "Alistar", 13: "Ryze", 14: "Sion", 15: "Sivir",
+            16: "Soraka", 17: "Teemo", 18: "Tristana", 19: "Warwick", 20: "Nunu",
+            21: "MissFortune", 22: "Ashe", 23: "Tryndamere", 24: "Jax", 25: "Morgana",
+            26: "Zilean", 27: "Singed", 28: "Evelynn", 29: "Twitch", 30: "Karthus",
+            31: "Chogath", 32: "Amumu", 33: "Rammus", 34: "Anivia", 35: "Shaco",
+            36: "DrMundo", 37: "Sona", 38: "Kassadin", 39: "Irelia", 40: "Janna",
+            41: "Gangplank", 42: "Corki", 43: "Karma", 44: "Taric", 45: "Veigar",
+            48: "Trundle", 50: "Swain", 51: "Caitlyn", 53: "Blitzcrank", 54: "Malphite",
+            55: "Katarina", 56: "Nocturne", 57: "Maokai", 58: "Renekton", 59: "JarvanIV",
+            60: "Elise", 61: "Orianna", 62: "Wukong", 63: "Brand", 64: "LeeSin",
+            67: "Vayne", 68: "Rumble", 69: "Cassiopeia", 72: "Skarner", 74: "Heimerdinger",
+            75: "Nasus", 76: "Nidalee", 77: "Udyr", 78: "Poppy", 79: "Gragas",
+            80: "Pantheon", 81: "Ezreal", 82: "Mordekaiser", 83: "Yorick", 84: "Akali",
+            85: "Kennen", 86: "Garen", 89: "Leona", 90: "Malzahar", 91: "Talon",
+            92: "Riven", 96: "KogMaw", 98: "Shen", 99: "Lux", 101: "Xerath",
+            102: "Shyvana", 103: "Ahri", 104: "Graves", 105: "Fizz", 106: "Volibear",
+            107: "Rengar", 110: "Varus", 111: "Nautilus", 112: "Viktor", 113: "Sejuani",
+            114: "Fiora", 115: "Ziggs", 117: "Lulu", 119: "Draven", 120: "Hecarim",
+            121: "Khazix", 122: "Darius", 126: "Jayce", 127: "Lissandra", 131: "Diana",
+            133: "Quinn", 134: "Syndra", 136: "AurelionSol", 141: "Kayn", 142: "Zoe",
+            143: "Zyra", 145: "Kaisa", 147: "Seraphine", 150: "Gnar", 154: "Zac",
+            157: "Yasuo", 161: "Velkoz", 163: "Taliyah", 164: "Camille", 166: "Akshan",
+            200: "Belveth", 201: "Braum", 202: "Jhin", 203: "Kindred", 221: "Zeri",
+            222: "Jinx", 223: "TahmKench", 234: "Viego", 235: "Senna", 236: "Lucian",
+            238: "Zed", 240: "Kled", 245: "Ekko", 246: "Qiyana", 254: "Vi",
+            266: "Aatrox", 267: "Nami", 268: "Azir", 350: "Yuumi", 360: "Samira",
+            412: "Thresh", 420: "Illaoi", 421: "RekSai", 427: "Ivern", 429: "Kalista",
+            432: "Bard", 516: "Ornn", 517: "Sylas", 518: "Neeko", 523: "Aphelios",
+            526: "Rell", 555: "Pyke", 711: "Vex", 777: "Yone", 875: "Sett",
+            876: "Lillia", 887: "Gwen", 888: "Renata", 895: "Nilah", 897: "Ksante",
+            901: "Smolder", 902: "Ambessa", 910: "Hwei", 950: "Naafiri"
+        }
+        
+        return champion_map.get(champion_id, f"Champion_{champion_id}")
+    
+    def _match_teams_esports(self, api_teams, match_data):
+        """Verifica se os times da API correspondem ao match_data com matching melhorado"""
+        if not (hasattr(match_data, 'team1_name') and hasattr(match_data, 'team2_name')):
+            return False
+        
+        team1_target = match_data.team1_name.lower().strip()
+        team2_target = match_data.team2_name.lower().strip()
+        team1_api = api_teams[0].get('name', '').lower().strip()
+        team2_api = api_teams[1].get('name', '').lower().strip()
+        
+        # Verifica correspondência (ordem pode variar)
+        return ((team1_target in team1_api or team1_api in team1_target) and
+                (team2_target in team2_api or team2_api in team2_target)) or \
+               ((team1_target in team2_api or team2_api in team1_target) and
+                (team2_target in team1_api or team1_api in team2_target))
+    
+    async def _extract_game_compositions_esports(self, game, headers):
+        """Extrai composições de um game específico da Riot Esports API"""
+        try:
+            # Tenta dados detalhados primeiro via getGameDetails
+            game_id = game.get('id')
+            if game_id:
+                detailed = await self._get_detailed_compositions_esports(game_id, headers)
+                if detailed:
+                    return detailed
+            
+            # Fallback: dados básicos do game
+            teams = game.get('teams', [])
+            if len(teams) >= 2:
+                team1_comp = self._extract_team_composition(teams[0])
+                team2_comp = self._extract_team_composition(teams[1])
+                
+                if len(team1_comp) >= 3 and len(team2_comp) >= 3:  # Pelo menos dados parciais
+                    return CompositionData(
+                        team1_composition=team1_comp,
+                        team2_composition=team2_comp,
+                        source='riot_esports_graphql',
+                        draft_complete=(len(team1_comp) == 5 and len(team2_comp) == 5),
+                        confidence=0.95
+                    )
+        except Exception as e:
+            logger.debug(f"Error extracting esports compositions: {e}")
+        
+        return None
+    
+    async def _get_detailed_compositions_esports(self, game_id: str, headers: dict) -> Optional[CompositionData]:
+        """Obtém composições detalhadas via getGameDetails"""
+        try:
+            url = 'https://esports-api.lolesports.com/persisted/gw/getGameDetails'
+            params = {'id': game_id}
+            
+            async with self.session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    game_data = data.get('data', {}).get('game', {})
+                    
+                    teams = game_data.get('teams', [])
+                    if len(teams) >= 2:
+                        team1_comp = self._extract_team_composition(teams[0])
+                        team2_comp = self._extract_team_composition(teams[1])
+                        
+                        if len(team1_comp) >= 3 and len(team2_comp) >= 3:
+                            logger.info(f"✅ COMPOSIÇÕES DETALHADAS: T1={len(team1_comp)}, T2={len(team2_comp)}")
+                            return CompositionData(
+                                team1_composition=team1_comp,
+                                team2_composition=team2_comp,
+                                source='riot_esports_details',
+                                draft_complete=(len(team1_comp) == 5 and len(team2_comp) == 5),
+                                confidence=0.98
+                            )
+                elif response.status == 404:
+                    logger.debug(f"Game {game_id} não encontrado em getGameDetails")
+                else:
+                    logger.debug(f"getGameDetails retornou {response.status} para game {game_id}")
+                    
+        except Exception as e:
+            logger.debug(f"Detailed compositions error: {e}")
         
         return None
     
