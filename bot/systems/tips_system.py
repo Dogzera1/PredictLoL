@@ -1016,7 +1016,8 @@ class ProfessionalTipsSystem:
         """
         DETECÇÃO CORRIGIDA DO MAPA ATUAL NA SÉRIE
         
-        ✅ RESOLVE: Tips mostrando "Game 1" quando está no "Game 4"
+        ✅ RESOLVE: Tips mostrando "Game 1" quando está no "Game 5"
+        ✅ CORREÇÃO DE EMERGÊNCIA: Quando API não retorna dados completos
         """
         try:
             debug_info = f"🔍 DETECTANDO GAME: {match.team1_name} vs {match.team2_name}"
@@ -1091,7 +1092,8 @@ class ProfessionalTipsSystem:
                                 logger.debug(f"   ✅ {finished_count} finalizados = Game {next_game}")
                                 return next_game
             
-            # PRIORIDADE 3: Análise temporal
+            # 🆘 PRIORIDADE 3: DETECÇÃO DE EMERGÊNCIA - Análise temporal avançada
+            # (Usado quando API não retorna dados completos da série)
             if hasattr(match, 'begin_at') and match.begin_at:
                 try:
                     import datetime
@@ -1103,16 +1105,26 @@ class ProfessionalTipsSystem:
                     time_diff = datetime.datetime.now(datetime.timezone.utc) - begin_time
                     hours_elapsed = time_diff.total_seconds() / 3600
                     
-                    if hours_elapsed > 2.5:
+                    logger.debug(f"   ⏰ Tempo decorrido: {hours_elapsed:.2f}h")
+                    
+                    # CORREÇÃO CRÍTICA: Estimativa precisa baseada em tempo real
+                    if hours_elapsed > 3.5:  # >3.5h = Game 5
+                        logger.debug(f"   🎯 Tempo >3.5h = Game 5")
+                        return 5
+                    elif hours_elapsed > 2.8:  # >2.8h = Game 4
+                        logger.debug(f"   🎯 Tempo >2.8h = Game 4")
                         return 4
-                    elif hours_elapsed > 1.8:
+                    elif hours_elapsed > 2.0:  # >2h = Game 3
+                        logger.debug(f"   🎯 Tempo >2h = Game 3")
                         return 3
-                    elif hours_elapsed > 1.0:
+                    elif hours_elapsed > 1.0:  # >1h = Game 2
+                        logger.debug(f"   🎯 Tempo >1h = Game 2")
                         return 2
                     else:
+                        logger.debug(f"   🎯 Tempo <1h = Game 1")
                         return 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"   ❌ Erro análise temporal: {e}")
             
             # PRIORIDADE 4: Padrões no match_id
             match_id_str = str(match.match_id).lower()
@@ -1149,15 +1161,36 @@ class ProfessionalTipsSystem:
         """
         VALIDAÇÃO CRÍTICA: Verifica se o mapa atual ainda está ativo para tips
         
-        Previne tips para mapas já finalizados
+        🚨 PREVINE TIPS PARA MAPAS JÁ FINALIZADOS
         """
         try:
+            current_game = self._get_game_number_in_series(match)
+            logger.debug(f"🔍 Validando se Game {current_game} está ativo")
+            
+            # 🆘 VALIDAÇÃO DE EMERGÊNCIA: Impede tips para games tardios sem dados válidos
+            # Se detectamos Game 4+ mas não temos dados consistentes da série, é suspeito
+            if current_game >= 4:
+                if hasattr(match, 'serie') and match.serie:
+                    serie_opponents = match.serie.get('opponents', [])
+                    if len(serie_opponents) == 0:
+                        logger.warning(f"❌ EMERGÊNCIA: Game {current_game} detectado mas sem dados de série - BLOQUEANDO para evitar tip em jogo finalizado")
+                        return False
+            
             # 1. Verifica se o status indica que o jogo atual terminou
             if match.status:
                 finished_status = ['finished', 'ended', 'closed', 'completed', 'done']
                 if match.status.lower() in finished_status:
-                    logger.debug(f"Game finalizado pelo status: {match.status}")
+                    logger.warning(f"❌ Game finalizado pelo status: {match.status}")
                     return False
+            
+            # 🆘 VALIDAÇÃO DE EMERGÊNCIA: Impede tips para games tardios sem dados válidos
+            # Se detectamos Game 4+ mas não temos dados consistentes da série, é suspeito
+            if current_game >= 4:
+                if hasattr(match, 'serie') and match.serie:
+                    serie_opponents = match.serie.get('opponents', [])
+                    if len(serie_opponents) == 0:
+                        logger.warning(f"❌ EMERGÊNCIA: Game {current_game} detectado mas sem dados de série - BLOQUEANDO para evitar tip em jogo finalizado")
+                        return False
             
             # 2. Analisa informações da série para ver se o game atual terminou
             if hasattr(match, 'serie') and match.serie:
