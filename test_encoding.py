@@ -1,1 +1,0 @@
-print(" UTF-8 OK\)
