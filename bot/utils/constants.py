@@ -183,15 +183,20 @@ RIOT_HEADERS = {
     "x-api-key": RIOT_API_KEY
 }
 
-# Configurações do Telegram
+# Configurações do Telegram - ATUALIZADAS COM VARIÁVEIS DO RAILWAY
+import os
+
+# IDs dos administradores do Railway
+TELEGRAM_ADMIN_USER_IDS = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611").split(",")
+
 TELEGRAM_CONFIG = {
-    "bot_token": "",  # Token deve vir das variáveis de ambiente
+    "bot_token": os.getenv("TELEGRAM_BOT_TOKEN", "8143188638:AAEJVEIo91k7nvkPZH6eGeet5ONnkH5jfzI"),
     "parse_mode": "MarkdownV2",
     "disable_web_page_preview": True,
     "max_message_length": 4096,
     "rate_limit_per_user": 10,  # mensagens por hora por usuário
     "cache_duration_minutes": 5,
-    "admin_user_ids": ["8012415611"]  # ID do admin como padrão
+    "admin_user_ids": TELEGRAM_ADMIN_USER_IDS  # IDs dos admins do Railway
 }
 
 # Template melhorado para tips do Telegram - EXPERIÊNCIA PREMIUM
@@ -437,17 +442,4 @@ USE_ONLY_REAL_DATA = True  # Sistema trabalha apenas com dados reais, sem mocks/
 REQUIRE_LIVE_ODDS = True   # Exige odds reais para gerar tips
 MIN_DATA_QUALITY_THRESHOLD = 0.8  # Qualidade mínima de dados para aceitar
 
-# Configurações do Telegram - Variáveis de ambiente
-import os
-
-# Token do bot Telegram (vem das variáveis de ambiente)
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-
-# IDs dos administradores (vem das variáveis de ambiente)
-TELEGRAM_ADMIN_USER_IDS = os.getenv("TELEGRAM_ADMIN_USER_IDS", "8012415611")
-
-# Configuração final do Telegram com fallbacks
-TELEGRAM_CONFIG.update({
-    "bot_token": TELEGRAM_BOT_TOKEN,
-    "admin_user_ids": TELEGRAM_ADMIN_USER_IDS.split(",") if TELEGRAM_ADMIN_USER_IDS else ["8012415611"]
-})
+# Configuração final do Telegram já definida acima com as variáveis do Railway

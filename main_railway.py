@@ -70,10 +70,12 @@ class RailwayBot:
                 from bot.telegram_bot.alerts_system import TelegramAlertsSystem
                 logger.info("📱 Inicializando Telegram...")
                 
-                # Pega o token das variáveis de ambiente
-                bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+                # Pega o token das variáveis de ambiente do Railway
+                bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "8143188638:AAEJVEIo91k7nvkPZH6eGeet5ONnkH5jfzI")
                 if not bot_token:
                     raise ValueError("TELEGRAM_BOT_TOKEN não configurado")
+                
+                logger.info(f"📱 Token configurado: {bot_token[:20]}...{bot_token[-10:]}")
                 
                 self.alerts_system = TelegramAlertsSystem(bot_token=bot_token)
                 await self.alerts_system.initialize()
