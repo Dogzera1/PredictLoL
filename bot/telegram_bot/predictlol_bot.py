@@ -61,6 +61,11 @@ class PredictLoLTelegramBot:
         self.app.add_handler(CommandHandler("tracker", self._tracker_command))
         self.app.add_handler(CommandHandler("dashboard", self._dashboard_command))
         
+        # Novos comandos de configuração
+        self.app.add_handler(CommandHandler("config_bankroll", self._config_bankroll_command))
+        self.app.add_handler(CommandHandler("tracker_full", self._tracker_full_command))
+        self.app.add_handler(CommandHandler("simular_aposta", self._simular_aposta_command))
+        
         # Previsões pós-draft
         self.app.add_handler(CommandHandler("prever", self._prever_command))
         
@@ -154,27 +159,36 @@ Use /menu para ver todas as opções ou /help para ajuda detalhada.
         help_text = """
 🔧 **Comandos Disponíveis:**
 
-**💰 Gestão de Bankroll:**
+**💰 Configuração de Bankroll:**
+• `/config_bankroll <valor>` - Configurar bankroll inicial
 • `/bankroll` - Status do bankroll atual
-• `/apostar <valor> <odds> <descrição>` - Registrar aposta
+• `/simular_aposta <confiança> <odds>` - Simular cálculo
 
 **📊 Análise de Value:**
 • `/analisar <time1> vs <time2>` - Análise completa de match
 • `/prever <time1> vs <time2>` - Previsão pós-draft
 
-**📈 Performance:**
-• `/tracker` - Dashboard de performance
-• `/dashboard` - Estatísticas detalhadas
+**📈 Performance Tracking:**
+• `/tracker` - Dashboard resumido
+• `/tracker_full` - Dashboard completo com gráficos
+• `/dashboard` - Alias para tracker
 
-**🎮 Previsões:**
-• `/prever <match>` - Análise de composição pós-draft
+**💸 Registro de Apostas:**
+• `/apostar <valor> <odds> <descrição>` - Registrar aposta
 
 **⚙️ Geral:**
-• `/menu` - Menu principal
+• `/menu` - Menu principal interativo
 • `/help` - Esta ajuda
 
-**Exemplo de uso:**
-`/apostar 50 1.85 T1 vs Gen.G - T1 vencer`
+**🎯 Exemplos de Uso:**
+```
+/config_bankroll 1500
+/simular_aposta 75 1.85
+/apostar 50 1.85 T1 vs Gen.G - T1 vencer
+/tracker_full
+```
+
+**Sistema Kelly Criterion + Risk Management ativo!**
         """
         
         await update.message.reply_text(help_text, parse_mode='Markdown')
@@ -404,6 +418,278 @@ Use `/apostar` se encontrar value!
     async def _dashboard_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Comando /dashboard"""
         await self._tracker_command(update, context)
+    
+    async def _config_bankroll_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando /config_bankroll - Configurar bankroll inicial"""
+        args = context.args
+        
+        if not args:
+            current_bankroll = self.personal_betting.bankroll_manager.settings.current_bankroll if self.personal_betting else 1000.0
+            
+            help_text = f"""
+💰 **Configurar Bankroll**
+
+**Bankroll Atual:** R$ {current_bankroll:.2f}
+
+**Como usar:**
+`/config_bankroll <valor>`
+
+**Exemplos:**
+• `/config_bankroll 500` - Define R$ 500
+• `/config_bankroll 2000` - Define R$ 2000
+• `/config_bankroll 1500` - Define R$ 1500
+
+**Configurações disponíveis:**
+• Valor inicial do bankroll
+• Limites de segurança automáticos
+• Sistema Kelly Criterion ativo
+
+**Próximo passo:** Use `/simular_aposta` para testar
+            """
+            
+            await update.message.reply_text(help_text, parse_mode='Markdown')
+            return
+        
+        try:
+            valor = float(args[0])
+            
+            if valor < 50:
+                await update.message.reply_text("❌ Valor mínimo: R$ 50.00")
+                return
+            
+            if valor > 100000:
+                await update.message.reply_text("❌ Valor máximo: R$ 100.000.00")
+                return
+            
+            # Configurar bankroll
+            if self.personal_betting:
+                result = self.personal_betting.bankroll_manager.setup_bankroll(valor)
+                
+                if result['success']:
+                    config_text = f"""
+✅ **Bankroll Configurado!**
+
+**Novo Bankroll:** R$ {valor:.2f}
+
+**Limites Automáticos:**
+• Limite Diário: R$ {result['daily_limit']:.2f} (10% do bankroll)
+• Máximo por Aposta: R$ {result['max_bet']:.2f} (5% do bankroll)
+• Sistema Kelly Criterion: Ativo
+
+**Configurações de Risco:**
+• Nível: Médio (padrão)
+• Stop Loss: 20% do bankroll
+• Auto Compound: Ativo
+
+**Próximos comandos:**
+• `/bankroll` - Ver status completo
+• `/simular_aposta 60 1.85` - Simular aposta
+• `/tracker` - Acompanhar performance
+                    """
+                    
+                    keyboard = [
+                        [InlineKeyboardButton("💰 Ver Status", callback_data="bankroll_menu")],
+                        [InlineKeyboardButton("🧮 Simular Aposta", callback_data="simulate_bet")]
+                    ]
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    
+                    await update.message.reply_text(
+                        config_text,
+                        parse_mode='Markdown',
+                        reply_markup=reply_markup
+                    )
+                else:
+                    await update.message.reply_text(f"❌ Erro: {result.get('error', 'Erro desconhecido')}")
+            else:
+                await update.message.reply_text("❌ Sistema não disponível")
+                
+        except ValueError:
+            await update.message.reply_text("❌ Valor inválido. Use números como: `/config_bankroll 1000`")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Erro: {e}")
+    
+    async def _simular_aposta_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando /simular_aposta - Simular cálculo de aposta"""
+        args = context.args
+        
+        if len(args) < 2:
+            help_text = """
+🧮 **Simular Aposta**
+
+**Uso:** `/simular_aposta <confiança> <odds> [sua_probabilidade]`
+
+**Exemplos:**
+• `/simular_aposta 75 1.85` - 75% confiança, odds 1.85
+• `/simular_aposta 80 2.20 0.55` - Com probabilidade específica
+• `/simular_aposta 65 1.65` - Aposta conservadora
+
+**Parâmetros:**
+• **Confiança:** 50-95% (sua confiança no resultado)
+• **Odds:** 1.10-10.00 (odds da casa de apostas)
+• **Probabilidade:** 0.1-0.9 (opcional, calculada automaticamente)
+
+**O sistema calculará:**
+• Tamanho ideal da aposta (Kelly Criterion)
+• Expected Value (EV)
+• Lucro potencial
+• Nível de risco
+            """
+            
+            await update.message.reply_text(help_text, parse_mode='Markdown')
+            return
+        
+        try:
+            confidence = float(args[0])
+            odds = float(args[1])
+            
+            # Probabilidade: se fornecida usar, senão calcular baseado na confiança
+            if len(args) >= 3:
+                your_probability = float(args[2])
+            else:
+                # Conversão simples de confiança para probabilidade
+                your_probability = confidence / 100.0
+            
+            # Validações
+            if confidence < 50 or confidence > 95:
+                await update.message.reply_text("❌ Confiança deve estar entre 50% e 95%")
+                return
+            
+            if odds < 1.1 or odds > 10.0:
+                await update.message.reply_text("❌ Odds devem estar entre 1.10 e 10.00")
+                return
+            
+            if your_probability < 0.1 or your_probability > 0.9:
+                await update.message.reply_text("❌ Probabilidade deve estar entre 0.1 e 0.9")
+                return
+            
+            # Calcular tamanho da aposta
+            if self.personal_betting:
+                calculation = self.personal_betting.bankroll_manager.calculate_bet_size(
+                    confidence=confidence,
+                    odds=odds,
+                    your_probability=your_probability,
+                    league="Simulação",
+                    reasoning="Teste de simulação"
+                )
+                
+                if calculation.get('recommended'):
+                    result_text = f"""
+🧮 **Simulação de Aposta**
+
+**Parâmetros:**
+• Confiança: {confidence:.1f}%
+• Odds: {odds:.2f}
+• Sua Probabilidade: {your_probability:.1f}%
+
+**💰 CÁLCULOS KELLY CRITERION:**
+• Tamanho Recomendado: R$ {calculation['bet_amount']:.2f}
+• Percentual do Bankroll: {calculation['percentage_bankroll']:.2f}%
+• Kelly Fraction: {calculation['kelly_fraction']:.4f}
+
+**📊 PROJEÇÕES:**
+• Expected Value: {calculation['ev_percentage']:.2f}%
+• Retorno Potencial: R$ {calculation['potential_return']:.2f}
+• Lucro Potencial: R$ {calculation['potential_profit']:.2f}
+• Nível de Risco: {calculation['risk_level'].title()}
+
+**⚠️ AVISOS:**
+{chr(10).join(f"• {warning}" for warning in calculation.get('warnings', []))}
+
+**Para apostar de verdade:**
+`/apostar {calculation['bet_amount']:.0f} {odds} Time vs Oponente - Descrição`
+                    """
+                else:
+                    result_text = f"""
+❌ **Aposta NÃO Recomendada**
+
+**Motivo:** {calculation.get('reason', 'Critérios não atendidos')}
+
+**Dicas:**
+• Aumente sua confiança (mín. 60%)
+• Procure odds com melhor value
+• Verifique o Expected Value (mín. 3%)
+
+**Tente novamente com parâmetros diferentes!**
+                    """
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Nova Simulação", callback_data="new_simulation")],
+                    [InlineKeyboardButton("💰 Ver Bankroll", callback_data="bankroll_menu")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    result_text,
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_text("❌ Sistema não disponível")
+                
+        except ValueError:
+            await update.message.reply_text("❌ Valores inválidos. Use números como: `/simular_aposta 75 1.85`")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Erro: {e}")
+    
+    async def _tracker_full_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando /tracker_full - Dashboard completo do tracker"""
+        if not self.personal_betting:
+            await update.message.reply_text("❌ Sistema não disponível")
+            return
+        
+        try:
+            # Gerar dashboard completo
+            dashboard = self.personal_betting.betting_tracker.generate_dashboard()
+            
+            # Telegram tem limite de 4096 caracteres, vamos dividir
+            if len(dashboard) > 4000:
+                # Dividir em partes
+                parts = []
+                lines = dashboard.split('\n')
+                current_part = ""
+                
+                for line in lines:
+                    if len(current_part + line + '\n') > 3800:
+                        parts.append(current_part)
+                        current_part = line + '\n'
+                    else:
+                        current_part += line + '\n'
+                
+                if current_part:
+                    parts.append(current_part)
+                
+                # Enviar primeira parte com botões
+                keyboard = [
+                    [InlineKeyboardButton("📊 Parte 2", callback_data="tracker_part_2")],
+                    [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tracker")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    f"```\n{parts[0]}\n```\n**Parte 1 de {len(parts)}**",
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+                
+                # Salvar outras partes para callbacks (simplificado)
+                self._temp_tracker_parts = parts
+                
+            else:
+                keyboard = [
+                    [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tracker")],
+                    [InlineKeyboardButton("📊 Resumo", callback_data="show_tracker")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    f"```\n{dashboard}\n```",
+                    parse_mode='Markdown',
+                    reply_markup=reply_markup
+                )
+                
+        except Exception as e:
+            logger.error(f"Erro no tracker completo: {e}")
+            await update.message.reply_text(f"❌ Erro: {e}")
     
     async def _prever_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Comando /prever - Previsões pós-draft"""
