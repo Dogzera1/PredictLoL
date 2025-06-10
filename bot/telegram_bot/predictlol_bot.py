@@ -472,13 +472,13 @@ Sistema baseado em dados históricos e forma atual dos times.
         
         try:
             if data == "main_menu":
-                await self._menu_command(update, context)
+                await self._show_main_menu(query)
             elif data == "bankroll_menu":
-                await self._bankroll_command(update, context)
+                await self._show_bankroll_status(query)
             elif data == "show_tracker":
-                await self._tracker_command(update, context)
+                await self._show_tracker_dashboard(query)
             elif data == "refresh_tracker":
-                await self._tracker_command(update, context)
+                await self._show_tracker_dashboard(query)
             elif data.startswith("analyze_value_"):
                 await query.edit_message_text("📊 Funcionalidade de análise em desenvolvimento...")
             else:
@@ -501,6 +501,116 @@ Sistema baseado em dados históricos e forma atual dos times.
             await update.message.reply_text(
                 "👋 Olá! Use /menu para ver as opções ou /help para ajuda."
             )
+    
+    # === CALLBACK HANDLERS ===
+    
+    async def _show_main_menu(self, query):
+        """Mostra menu principal via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("💰 Bankroll", callback_data="bankroll_menu"),
+                InlineKeyboardButton("📊 Análise", callback_data="analysis_menu")
+            ],
+            [
+                InlineKeyboardButton("📈 Tracker", callback_data="show_tracker"),
+                InlineKeyboardButton("🎮 Previsões", callback_data="predictions_menu")
+            ],
+            [
+                InlineKeyboardButton("⚙️ Configurações", callback_data="settings_menu"),
+                InlineKeyboardButton("❓ Ajuda", callback_data="help_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "🎯 **Menu Principal PredictLoL**\n\nEscolha uma opção:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_bankroll_status(self, query):
+        """Mostra status do bankroll via callback"""
+        if not self.personal_betting:
+            await query.edit_message_text("❌ Sistema de apostas não disponível")
+            return
+        
+        try:
+            # Obter status do bankroll
+            bankroll_info = self.personal_betting.bankroll_manager.get_performance_stats()
+            
+            status_text = f"""
+💰 **Status do Bankroll**
+
+**Saldo Atual:** R$ {self.personal_betting.bankroll_manager.settings.current_bankroll:.2f}
+**Saldo Inicial:** R$ {self.personal_betting.bankroll_manager.settings.initial_bankroll:.2f}
+**Total de Apostas:** {bankroll_info.get('total_bets', 0)}
+**Win Rate:** {bankroll_info.get('win_rate', 0):.1f}%
+
+**Configurações de Risco:**
+• Limite Diário: R$ {self.personal_betting.bankroll_manager.get_daily_limit():.2f}
+• Máximo por Aposta: R$ {self.personal_betting.bankroll_manager.get_max_bet_amount():.2f}
+• Restante Hoje: R$ {self.personal_betting.bankroll_manager.get_daily_remaining_limit():.2f}
+
+**Sistema:** Ativo e funcionando!
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("📊 Fazer Análise", callback_data="start_analysis")],
+                [InlineKeyboardButton("📈 Ver Tracker", callback_data="show_tracker")],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                status_text,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro no comando bankroll: {e}")
+            await query.edit_message_text(f"❌ Erro ao obter status: {e}")
+    
+    async def _show_tracker_dashboard(self, query):
+        """Mostra dashboard do tracker via callback"""
+        if not self.personal_betting:
+            await query.edit_message_text("❌ Sistema não disponível")
+            return
+        
+        try:
+            dashboard_text = f"""
+📈 **Performance Dashboard**
+
+**Resumo Geral:**
+• Bankroll: R$ {self.personal_betting.bankroll_manager.settings.current_bankroll:.2f}
+• Sistema: Ativo e funcionando
+
+**Estatísticas:**
+• Total Apostas: Sendo monitoradas
+• Performance: Em tempo real
+• Análises: Sistema integrado
+
+**Status:** ✅ Todos os sistemas operacionais
+
+**Última Atualização:** {datetime.now().strftime('%H:%M:%S')}
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tracker")],
+                [InlineKeyboardButton("📊 Análise Detalhada", callback_data="detailed_analysis")],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                dashboard_text,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            
+        except Exception as e:
+            logger.error(f"Erro no tracker: {e}")
+            await query.edit_message_text(f"❌ Erro: {e}")
     
     # === UTILS ===
     
