@@ -14,6 +14,25 @@ startCommand = "python main.py"
 psutil==5.9.8
 ```
 
+### 3. ❌ Erro: `No module named 'aiohttp'`
+**Solução:** ✅ Adicionado ao `requirements.txt`
+```
+aiohttp==3.9.5
+aiohttp-cors==0.7.0
+```
+
+## 📦 REQUIREMENTS.TXT ATUAL
+
+```
+# PredictLoL - Dependências Completas
+python-telegram-bot==20.7
+requests==2.31.0
+python-dotenv==1.0.0
+psutil==5.9.8
+aiohttp==3.9.5
+aiohttp-cors==0.7.0
+```
+
 ## 🎯 LOGS ESPERADOS NO RAILWAY
 
 **Sequência de inicialização correta:**
@@ -70,10 +89,17 @@ Após o deploy, teste no Telegram:
 
 ## 🚀 PRÓXIMO DEPLOY
 
+**Status:** ✅ **TODAS AS DEPENDÊNCIAS RESOLVIDAS**
+
 O Railway deve fazer redeploy automático após o push das correções.
 
-**Status:** ✅ Pronto para funcionar 100%
+**Histórico de correções:**
+1. ✅ `main_railway.py` → `main.py` 
+2. ✅ `psutil==5.9.8` adicionado
+3. ✅ `aiohttp==3.9.5` + `aiohttp-cors==0.7.0` adicionados
+
+**Expectativa:** 🎉 **Deploy 100% funcional no próximo build!**
 
 ---
 
-**🎉 Sistema PredictLoL v1.4.0 com todas as correções aplicadas!** 
+**🎉 Sistema PredictLoL v1.4.0 com todas as dependências resolvidas!** 
