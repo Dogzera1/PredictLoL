@@ -1,0 +1,44 @@
+{
+  "sessions": [
+    {
+      "id": "session_1749516579",
+      "name": "Teste Simples",
+      "start_time": "2025-06-09T21:49:39.309082",
+      "end_time": "2025-06-09T21:49:39.311908",
+      "bets_placed": [],
+      "starting_bankroll": 1000.0,
+      "ending_bankroll": 1000.0,
+      "session_profit": 0.0,
+      "bets_count": 0,
+      "wins": 0,
+      "active": false
+    },
+    {
+      "id": "session_1749516699",
+      "name": "Final LCK Spring - T1 vs Gen.G",
+      "start_time": "2025-06-09T21:51:39.244114",
+      "end_time": "2025-06-09T21:51:39.253500",
+      "bets_placed": [],
+      "starting_bankroll": 2000.0,
+      "ending_bankroll": 2128.0,
+      "session_profit": 128.0,
+      "bets_count": 0,
+      "wins": 0,
+      "active": false
+    }
+  ],
+  "daily_snapshots": [
+    {
+      "date": "2025-06-09",
+      "bankroll": 2128.0,
+      "daily_bets": 9,
+      "daily_profit": 278.0,
+      "daily_win_rate": 100.0,
+      "cumulative_roi": 77.22222222222223
+    }
+  ],
+  "performance_history": [],
+  "streaks": [],
+  "league_stats": {},
+  "monthly_summary": {}
+}

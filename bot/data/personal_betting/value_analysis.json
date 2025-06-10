@@ -1,0 +1,661 @@
+{
+  "analyses": [
+    {
+      "id": "analysis_1749515754",
+      "date": "2025-06-09T21:35:54.838088",
+      "league": "LCK",
+      "team1": {
+        "name": "T1",
+        "recent_form": "8W-2L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 9,
+        "individual_skill": 9,
+        "teamwork_level": 8,
+        "coaching_impact": 9,
+        "motivation_level": 8,
+        "notes": "Dominando o meta atual, Faker em grande forma"
+      },
+      "team2": {
+        "name": "Gen.G",
+        "recent_form": "6W-4L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 7,
+        "individual_skill": 8,
+        "teamwork_level": 7,
+        "coaching_impact": 7,
+        "motivation_level": 6,
+        "notes": "Inconsistentes recentemente, problemas no late game"
+      },
+      "importance_level": 8,
+      "patch_impact": "Neutral",
+      "historical_h2h": "Even",
+      "your_probability_team1": 0.7,
+      "confidence_level": 85,
+      "reasoning": "T1 adaptou melhor ao patch atual, Gen.G instável",
+      "market_odds": {
+        "bet365": {
+          "team1": 1.75,
+          "team2": 2.1
+        },
+        "betfair": {
+          "team1": 1.8,
+          "team2": 2.05
+        },
+        "pinnacle": {
+          "team1": 1.78,
+          "team2": 2.08
+        }
+      },
+      "expected_values": {
+        "bet365": {
+          "team1": 22.499999999999986,
+          "team2": -36.999999999999986
+        },
+        "betfair": {
+          "team1": 26.0,
+          "team2": -38.5
+        },
+        "pinnacle": {
+          "team1": 24.6,
+          "team2": -37.59999999999999
+        }
+      },
+      "best_value_bet": "betfair_team1",
+      "analysis_quality": "good",
+      "value_rating": "exceptional"
+    },
+    {
+      "id": "analysis_1749515845",
+      "date": "2025-06-09T21:37:25.582194",
+      "league": "LCK",
+      "team1": {
+        "name": "T1",
+        "recent_form": "9W-1L",
+        "key_players_status": "Full roster - Zeus/Oner/Faker/Gumayusi/Keria",
+        "meta_adaptation": 9,
+        "individual_skill": 9,
+        "teamwork_level": 9,
+        "coaching_impact": 8,
+        "motivation_level": 9,
+        "notes": "Dominando completamente o LCK, adaptação perfeita ao patch 14.24. Faker em forma excepcional."
+      },
+      "team2": {
+        "name": "Gen.G",
+        "recent_form": "6W-4L",
+        "key_players_status": "Full roster - Kiin/Canyon/Chovy/Peyz/Lehends",
+        "meta_adaptation": 6,
+        "individual_skill": 8,
+        "teamwork_level": 6,
+        "coaching_impact": 7,
+        "motivation_level": 6,
+        "notes": "Inconsistentes após mudanças no coaching staff. Problemas de coordenação no late game."
+      },
+      "importance_level": 9,
+      "patch_impact": "Patch favorece T1 - forte no late game",
+      "historical_h2h": "T1 7-3 vs Gen.G (últimas 10 partidas)",
+      "your_probability_team1": 0.75,
+      "confidence_level": 88,
+      "reasoning": "T1 dominando completamente o LCK. Gen.G inconsistente após mudanças no coaching. Meta atual favorece estilo de jogo do T1.",
+      "market_odds": {
+        "bet365": {
+          "team1": 1.6,
+          "team2": 2.4
+        },
+        "betfair": {
+          "team1": 1.65,
+          "team2": 2.35
+        },
+        "pinnacle": {
+          "team1": 1.62,
+          "team2": 2.38
+        },
+        "betano": {
+          "team1": 1.58,
+          "team2": 2.45
+        }
+      },
+      "expected_values": {
+        "bet365": {
+          "team1": 20.000000000000018,
+          "team2": -40.0
+        },
+        "betfair": {
+          "team1": 23.749999999999982,
+          "team2": -41.25
+        },
+        "pinnacle": {
+          "team1": 21.500000000000007,
+          "team2": -40.5
+        },
+        "betano": {
+          "team1": 18.500000000000007,
+          "team2": -38.74999999999999
+        }
+      },
+      "best_value_bet": "betfair_team1",
+      "analysis_quality": "good",
+      "value_rating": "exceptional"
+    },
+    {
+      "id": "analysis_1749515845",
+      "date": "2025-06-09T21:37:25.586272",
+      "league": "LCK",
+      "team1": {
+        "name": "DRX",
+        "recent_form": "7W-3L",
+        "key_players_status": "Full roster - Kingen/Croco/Zeka/Deft/BeryL",
+        "meta_adaptation": 7,
+        "individual_skill": 7,
+        "teamwork_level": 8,
+        "coaching_impact": 8,
+        "motivation_level": 7,
+        "notes": "Time bem estruturado, joga limpo e consistente. Deft ainda em boa forma."
+      },
+      "team2": {
+        "name": "KT Rolster",
+        "recent_form": "4W-6L",
+        "key_players_status": "Sub jungle - PerfecT substituindo Cuzz",
+        "meta_adaptation": 5,
+        "individual_skill": 6,
+        "teamwork_level": 5,
+        "coaching_impact": 6,
+        "motivation_level": 5,
+        "notes": "Muitas mudanças no roster. PerfecT ainda se adaptando, comunicação comprometida."
+      },
+      "importance_level": 6,
+      "patch_impact": "Neutro para ambos os times",
+      "historical_h2h": "DRX 6-4 vs KT (últimas 10 partidas)",
+      "your_probability_team1": 0.58,
+      "confidence_level": 72,
+      "reasoning": "DRX mais consistente e estável. KT com problemas internos após mudança no jungle. Mercado subestimando edge do DRX.",
+      "market_odds": {
+        "bet365": {
+          "team1": 1.9,
+          "team2": 1.95
+        },
+        "betfair": {
+          "team1": 1.95,
+          "team2": 1.9
+        },
+        "pinnacle": {
+          "team1": 1.92,
+          "team2": 1.93
+        },
+        "betano": {
+          "team1": 1.88,
+          "team2": 1.97
+        }
+      },
+      "expected_values": {
+        "bet365": {
+          "team1": 10.199999999999987,
+          "team2": -18.099999999999994
+        },
+        "betfair": {
+          "team1": 13.100000000000001,
+          "team2": -20.199999999999996
+        },
+        "pinnacle": {
+          "team1": 11.359999999999992,
+          "team2": -18.93999999999999
+        },
+        "betano": {
+          "team1": 9.039999999999981,
+          "team2": -17.259999999999998
+        }
+      },
+      "best_value_bet": "betfair_team1",
+      "analysis_quality": "moderate",
+      "value_rating": "excellent"
+    },
+    {
+      "id": "analysis_1749515845",
+      "date": "2025-06-09T21:37:25.588461",
+      "league": "LCK",
+      "team1": {
+        "name": "Gen.G",
+        "recent_form": "6W-4L",
+        "key_players_status": "Full roster - Kiin/Canyon/Chovy/Peyz/Lehends",
+        "meta_adaptation": 6,
+        "individual_skill": 8,
+        "teamwork_level": 6,
+        "coaching_impact": 7,
+        "motivation_level": 6,
+        "notes": "Inconsistentes após mudanças no coaching staff. Problemas de coordenação no late game."
+      },
+      "team2": {
+        "name": "DRX",
+        "recent_form": "7W-3L",
+        "key_players_status": "Full roster - Kingen/Croco/Zeka/Deft/BeryL",
+        "meta_adaptation": 7,
+        "individual_skill": 7,
+        "teamwork_level": 8,
+        "coaching_impact": 8,
+        "motivation_level": 7,
+        "notes": "Time bem estruturado, joga limpo e consistente. Deft ainda em boa forma."
+      },
+      "importance_level": 7,
+      "patch_impact": "Favorece ligeiramente DRX",
+      "historical_h2h": "Even 5-5 (últimas 10 partidas)",
+      "your_probability_team1": 0.45,
+      "confidence_level": 65,
+      "reasoning": "Gen.G overvalued pelo mercado baseado em reputação. DRX tem melhor form recente e consistência. Valor no underdog.",
+      "market_odds": {
+        "bet365": {
+          "team1": 1.75,
+          "team2": 2.1
+        },
+        "betfair": {
+          "team1": 1.8,
+          "team2": 2.05
+        },
+        "pinnacle": {
+          "team1": 1.77,
+          "team2": 2.08
+        }
+      },
+      "expected_values": {
+        "bet365": {
+          "team1": -21.250000000000004,
+          "team2": 15.500000000000025
+        },
+        "betfair": {
+          "team1": -18.999999999999993,
+          "team2": 12.749999999999995
+        },
+        "pinnacle": {
+          "team1": -20.35,
+          "team2": 14.400000000000013
+        }
+      },
+      "best_value_bet": "bet365_team2",
+      "analysis_quality": "moderate",
+      "value_rating": "exceptional"
+    },
+    {
+      "id": "analysis_1749515845",
+      "date": "2025-06-09T21:37:25.617635",
+      "league": "LEC",
+      "team1": {
+        "name": "Fnatic",
+        "recent_form": "7W-3L",
+        "key_players_status": "Full roster disponível",
+        "meta_adaptation": 7,
+        "individual_skill": 7,
+        "teamwork_level": 8,
+        "coaching_impact": 8,
+        "motivation_level": 7,
+        "notes": "Boa adaptação ao meta, Razork em forma"
+      },
+      "team2": {
+        "name": "G2 Esports",
+        "recent_form": "8W-2L",
+        "key_players_status": "Full roster disponível",
+        "meta_adaptation": 8,
+        "individual_skill": 9,
+        "teamwork_level": 7,
+        "coaching_impact": 7,
+        "motivation_level": 8,
+        "notes": "Caps carregando o time, bot lane inconsistente"
+      },
+      "importance_level": 6,
+      "patch_impact": "Neutral",
+      "historical_h2h": "Even",
+      "your_probability_team1": 0.52,
+      "confidence_level": 78,
+      "reasoning": "Fnatic com melhor teamwork e coach. G2 dependente do Caps. Meta atual favorece estilo Fnatic. Mercado overvaluing G2.",
+      "market_odds": {
+        "bet365": {
+          "team1": 2.1,
+          "team2": 1.75
+        },
+        "betfair": {
+          "team1": 2.15,
+          "team2": 1.72
+        },
+        "pinnacle": {
+          "team1": 2.12,
+          "team2": 1.74
+        }
+      },
+      "expected_values": {
+        "bet365": {
+          "team1": 9.200000000000008,
+          "team2": -16.000000000000004
+        },
+        "betfair": {
+          "team1": 11.799999999999988,
+          "team2": -17.44
+        },
+        "pinnacle": {
+          "team1": 10.240000000000006,
+          "team2": -16.480000000000004
+        }
+      },
+      "best_value_bet": "betfair_team1",
+      "analysis_quality": "good",
+      "value_rating": "excellent"
+    },
+    {
+      "id": "analysis_1749516667",
+      "date": "2025-06-09T21:51:07.059820",
+      "league": "LCK",
+      "team1": {
+        "name": "T1",
+        "recent_form": "8W-2L",
+        "key_players_status": "Full roster - Faker em ótima forma",
+        "meta_adaptation": 9,
+        "individual_skill": 10,
+        "teamwork_level": 9,
+        "coaching_impact": 8,
+        "motivation_level": 10,
+        "notes": "T1 dominante na split, Faker jogando em alto nível"
+      },
+      "team2": {
+        "name": "Gen.G",
+        "recent_form": "6W-4L",
+        "key_players_status": "Chovy com problema no punho",
+        "meta_adaptation": 7,
+        "individual_skill": 8,
+        "teamwork_level": 7,
+        "coaching_impact": 7,
+        "motivation_level": 8,
+        "notes": "Gen.G inconsistente, dependente do Chovy"
+      },
+      "importance_level": 10,
+      "patch_impact": "Favorece T1 - meta de teamfight",
+      "historical_h2h": "T1 6-2 nos últimos confrontos",
+      "your_probability_team1": 0.75,
+      "confidence_level": 85,
+      "reasoning": "\n        T1 claramente superior:\n        - Faker em forma excepcional\n        - Teamwork superior demonstrado na split\n        - Histórico positivo contra Gen.G\n        - Gen.G dependente demais do Chovy\n        - Pressão da final favorece experiência do T1\n        ",
+      "market_odds": {
+        "bet365": {
+          "team1": 1.75,
+          "team2": 2.15
+        },
+        "pinnacle": {
+          "team1": 1.78,
+          "team2": 2.08
+        },
+        "betfair": {
+          "team1": 1.8,
+          "team2": 2.05
+        }
+      },
+      "expected_values": {
+        "bet365": {
+          "team1": 31.25,
+          "team2": -46.25
+        },
+        "pinnacle": {
+          "team1": 33.5,
+          "team2": -48.0
+        },
+        "betfair": {
+          "team1": 35.00000000000001,
+          "team2": -48.75000000000001
+        }
+      },
+      "best_value_bet": "betfair_team1",
+      "analysis_quality": "good",
+      "value_rating": "exceptional"
+    },
+    {
+      "id": "analysis_1749516699",
+      "date": "2025-06-09T21:51:39.236796",
+      "league": "LCK",
+      "team1": {
+        "name": "T1",
+        "recent_form": "8W-2L",
+        "key_players_status": "Full roster - Faker em ótima forma",
+        "meta_adaptation": 9,
+        "individual_skill": 10,
+        "teamwork_level": 9,
+        "coaching_impact": 8,
+        "motivation_level": 10,
+        "notes": "T1 dominante na split, Faker jogando em alto nível"
+      },
+      "team2": {
+        "name": "Gen.G",
+        "recent_form": "6W-4L",
+        "key_players_status": "Chovy com problema no punho",
+        "meta_adaptation": 7,
+        "individual_skill": 8,
+        "teamwork_level": 7,
+        "coaching_impact": 7,
+        "motivation_level": 8,
+        "notes": "Gen.G inconsistente, dependente do Chovy"
+      },
+      "importance_level": 10,
+      "patch_impact": "Favorece T1 - meta de teamfight",
+      "historical_h2h": "T1 6-2 nos últimos confrontos",
+      "your_probability_team1": 0.75,
+      "confidence_level": 85,
+      "reasoning": "\n        T1 claramente superior:\n        - Faker em forma excepcional\n        - Teamwork superior demonstrado na split\n        - Histórico positivo contra Gen.G\n        - Gen.G dependente demais do Chovy\n        - Pressão da final favorece experiência do T1\n        ",
+      "market_odds": {
+        "bet365": {
+          "team1": 1.75,
+          "team2": 2.15
+        },
+        "pinnacle": {
+          "team1": 1.78,
+          "team2": 2.08
+        },
+        "betfair": {
+          "team1": 1.8,
+          "team2": 2.05
+        }
+      },
+      "expected_values": {
+        "bet365": {
+          "team1": 31.25,
+          "team2": -46.25
+        },
+        "pinnacle": {
+          "team1": 33.5,
+          "team2": -48.0
+        },
+        "betfair": {
+          "team1": 35.00000000000001,
+          "team2": -48.75000000000001
+        }
+      },
+      "best_value_bet": "betfair_team1",
+      "analysis_quality": "good",
+      "value_rating": "exceptional"
+    },
+    {
+      "id": "analysis_1749517607",
+      "date": "2025-06-09T22:06:47.012618",
+      "league": "LCK",
+      "team1": {
+        "name": "T1",
+        "recent_form": "5W-0L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 9,
+        "individual_skill": 9,
+        "teamwork_level": 8,
+        "coaching_impact": 8,
+        "motivation_level": 9,
+        "notes": ""
+      },
+      "team2": {
+        "name": "Gen.G",
+        "recent_form": "2W-3L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 7,
+        "individual_skill": 8,
+        "teamwork_level": 7,
+        "coaching_impact": 7,
+        "motivation_level": 6,
+        "notes": ""
+      },
+      "importance_level": 9,
+      "patch_impact": "Neutral",
+      "historical_h2h": "Even",
+      "your_probability_team1": 0.75,
+      "confidence_level": 85,
+      "reasoning": "T1 em forma excelente, Gen.G instável",
+      "market_odds": {
+        "betfair": {
+          "team1": 1.4,
+          "team2": 3.2
+        },
+        "bet365": {
+          "team1": 1.35,
+          "team2": 3.5
+        },
+        "pinnacle": {
+          "team1": 1.42,
+          "team2": 3.0
+        }
+      },
+      "expected_values": {
+        "betfair": {
+          "team1": 4.999999999999982,
+          "team2": -19.999999999999996
+        },
+        "bet365": {
+          "team1": 1.2500000000000178,
+          "team2": -12.5
+        },
+        "pinnacle": {
+          "team1": 6.499999999999995,
+          "team2": -25.0
+        }
+      },
+      "best_value_bet": "pinnacle_team1",
+      "analysis_quality": "good",
+      "value_rating": "good"
+    },
+    {
+      "id": "analysis_1749517669",
+      "date": "2025-06-09T22:07:49.277602",
+      "league": "LCK",
+      "team1": {
+        "name": "T1",
+        "recent_form": "5W-0L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 9,
+        "individual_skill": 9,
+        "teamwork_level": 8,
+        "coaching_impact": 8,
+        "motivation_level": 9,
+        "notes": ""
+      },
+      "team2": {
+        "name": "Gen.G",
+        "recent_form": "2W-3L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 7,
+        "individual_skill": 8,
+        "teamwork_level": 7,
+        "coaching_impact": 7,
+        "motivation_level": 6,
+        "notes": ""
+      },
+      "importance_level": 9,
+      "patch_impact": "Neutral",
+      "historical_h2h": "Even",
+      "your_probability_team1": 0.75,
+      "confidence_level": 85,
+      "reasoning": "T1 em forma excelente, Gen.G instável",
+      "market_odds": {
+        "betfair": {
+          "team1": 1.4,
+          "team2": 3.2
+        },
+        "bet365": {
+          "team1": 1.35,
+          "team2": 3.5
+        },
+        "pinnacle": {
+          "team1": 1.42,
+          "team2": 3.0
+        }
+      },
+      "expected_values": {
+        "betfair": {
+          "team1": 4.999999999999982,
+          "team2": -19.999999999999996
+        },
+        "bet365": {
+          "team1": 1.2500000000000178,
+          "team2": -12.5
+        },
+        "pinnacle": {
+          "team1": 6.499999999999995,
+          "team2": -25.0
+        }
+      },
+      "best_value_bet": "pinnacle_team1",
+      "analysis_quality": "good",
+      "value_rating": "good"
+    },
+    {
+      "id": "analysis_1749517688",
+      "date": "2025-06-09T22:08:08.667782",
+      "league": "LCK",
+      "team1": {
+        "name": "T1",
+        "recent_form": "5W-0L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 9,
+        "individual_skill": 9,
+        "teamwork_level": 8,
+        "coaching_impact": 8,
+        "motivation_level": 9,
+        "notes": ""
+      },
+      "team2": {
+        "name": "Gen.G",
+        "recent_form": "2W-3L",
+        "key_players_status": "Full roster",
+        "meta_adaptation": 7,
+        "individual_skill": 8,
+        "teamwork_level": 7,
+        "coaching_impact": 7,
+        "motivation_level": 6,
+        "notes": ""
+      },
+      "importance_level": 9,
+      "patch_impact": "Neutral",
+      "historical_h2h": "Even",
+      "your_probability_team1": 0.75,
+      "confidence_level": 85,
+      "reasoning": "T1 em forma excelente, Gen.G instável",
+      "market_odds": {
+        "betfair": {
+          "team1": 1.4,
+          "team2": 3.2
+        },
+        "bet365": {
+          "team1": 1.35,
+          "team2": 3.5
+        },
+        "pinnacle": {
+          "team1": 1.42,
+          "team2": 3.0
+        }
+      },
+      "expected_values": {
+        "betfair": {
+          "team1": 4.999999999999982,
+          "team2": -19.999999999999996
+        },
+        "bet365": {
+          "team1": 1.2500000000000178,
+          "team2": -12.5
+        },
+        "pinnacle": {
+          "team1": 6.499999999999995,
+          "team2": -25.0
+        }
+      },
+      "best_value_bet": "pinnacle_team1",
+      "analysis_quality": "good",
+      "value_rating": "good"
+    }
+  ],
+  "last_updated": "2025-06-09T22:08:08.667874"
+}
