@@ -1,199 +1,153 @@
-# 🔥 Bot LoL V3 Ultra Avançado
+# PredictLoL - Sistema Integrado de Apostas e Previsões
 
-**Sistema profissional de tips para League of Legends com machine learning e análise ao vivo**
+Sistema completo para auxílio em apostas pessoais de League of Legends, com análise de value bets, gestão de bankroll e previsões pós-draft.
 
-## 🎯 Visão Geral
+## 🎯 Funcionalidades
 
-Bot de Telegram especializado em tips de **Moneyline (ML)** para League of Legends, utilizando:
-- 📊 **Sistema de unidades profissional** (0.5-5.0 unidades)
-- 🤖 **Machine Learning** + fallback algorítmico
-- 📡 **APIs oficiais** (Riot Games + The Odds API)
-- 🌍 **Cobertura global** (LPL, LCK, LEC, LCS, CBLOL, etc.)
-- ⚡ **Monitoramento ao vivo** 24/7
-- 📈 **Expected Value** calculado com odds reais
+### 💰 Sistema de Apostas Pessoais
+- **Bankroll Manager**: Gestão financeira com Kelly Criterion
+- **Value Analyzer**: Análise manual de value bets
+- **Betting Tracker**: Dashboard de performance visual
+- **Pre-Game Analyzer**: Análise automatizada com dados históricos
 
-## ✨ Características Principais
+### 🤖 Bot Telegram Integrado
+- Interface completa via Telegram
+- Comandos para análise de partidas
+- Registro e tracking de apostas
+- Dashboard em tempo real
 
-### 🎮 Tips Profissionais
-- ✅ **Critério rigoroso**: Confiança ≥ 70%, EV ≥ 5%
-- ✅ **Timing perfeito**: Baseado em eventos cruciais
-- ✅ **Análise completa**: Draft + estatísticas + tempo real
-- ✅ **Sistema de unidades**: Padrão de grupos profissionais
+### 🎮 Previsões Pós-Draft
+- Análise de composições de times
+- Probabilidades baseadas em dados históricos
+- Recomendações de apostas
 
-### 📊 Análise Avançada
-- 🐉 **Eventos cruciais**: Dragões, Barão, Torres, Teamfights
-- 💰 **Diferença de ouro**: Monitoramento em tempo real
-- 🏆 **Controle de objetivos**: Análise de map control
-- ⏱️ **Timing score**: Early/Mid/Late game advantages
+## 🚀 Como Usar
 
-### 🌐 Cobertura Global
-- **16 endpoints** da API da Riot Games
-- **Todas as principais ligas**: LPL, LCK, LEC, LCS, CBLOL
-- **Anti-duplicatas**: Sistema inteligente de deduplicação
-- **Múltiplos idiomas**: en-US, pt-BR, zh-CN, ko-KR, etc.
+### Comandos do Bot Telegram
 
-## 🚀 Instalação e Configuração
+#### Comandos Principais
+- `/start` - Iniciar o bot
+- `/help` - Lista de comandos
+- `/menu` - Menu principal
 
-### 1. Clone o repositório
-```bash
-git clone https://github.com/seu-usuario/lol_bot_v3_ultra_advanced.git
-cd lol_bot_v3_ultra_advanced
+#### Gestão de Bankroll
+- `/bankroll` - Status do bankroll atual
+- `/apostar <valor> <odds> <descrição>` - Registrar aposta
+
+#### Análises
+- `/analisar <time1> vs <time2>` - Análise completa de match
+- `/prever <time1> vs <time2>` - Previsão pós-draft
+
+#### Performance
+- `/tracker` - Dashboard de performance
+- `/dashboard` - Estatísticas detalhadas
+
+### Exemplo de Uso
+```
+/apostar 50 1.85 T1 vs Gen.G - T1 vencer
+/analisar T1 vs Gen.G
+/prever T1 vs Gen.G
+/tracker
 ```
 
-### 2. Crie um ambiente virtual
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou
-venv\Scripts\activate     # Windows
-```
+## 🔧 Instalação
 
-### 3. Instale as dependências
+### Dependências
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure as variáveis de ambiente
+### Variáveis de Ambiente
 ```bash
-# Copie o arquivo template
-cp .env.template .env
-
-# Edite o arquivo .env com suas chaves:
-# - RIOT_API_KEY: Sua chave da API da Riot Games
-# - THE_ODDS_API_KEY: Sua chave da The Odds API
-# - TELEGRAM_BOT_TOKEN: Token do seu bot do Telegram
-# - ADMIN_TELEGRAM_USER_ID: Seu ID de usuário do Telegram
+TELEGRAM_BOT_TOKEN=seu_token_aqui
 ```
 
-### 5. Execute o bot
+### Executar
 ```bash
 python main.py
 ```
 
-## 📋 Comandos Disponíveis
+## 📊 Componentes do Sistema
 
-### 🎮 Comandos Principais
-- `/start` - Boas-vindas e menu principal
-- `/menu` - Menu interativo completo
-- `/tips` - Tips profissionais recentes
-- `/livematches` - Partidas ao vivo com análises
-- `/schedule` - Cronograma de partidas futuras
+### 1. Personal Bankroll Manager
+- Kelly Criterion para sizing otimizado
+- Controle de risco por níveis
+- Limites diários e por aposta
+- Tracking de ROI e win rate
 
-### 💰 Gestão e Análise
-- `/predictions` - Sistema de predições ML
-- `/units` - Informações sobre sistema de unidades
-- `/performance` - Estatísticas e ROI
-- `/history` - Histórico de tips
-- `/odds` - Resumo de odds atuais
+### 2. Manual Value Analyzer
+- Análise detalhada de times
+- Comparação entre casas de apostas
+- Cálculo de Expected Value
+- Identificação de value bets
 
-### ⚙️ Configurações
-- `/alerts` - Configurar alertas automáticos
-- `/filtrarligas` - Filtrar ligas de interesse
-- `/timesfavoritos` - Definir times favoritos
-- `/statuslol` - Status geral do sistema
+### 3. Betting Tracker
+- Dashboard visual em tempo real
+- Gráficos ASCII de evolução
+- Análise de streaks
+- Métricas de performance
 
-### 🔧 Admin (apenas administradores)
-- `/forcescan` - Força scan manual de partidas
-- `/monitoring` - Status do sistema de monitoramento
+### 4. Pre-Game Analyzer
+- Base de dados de 20+ times
+- Análise automatizada de probabilidades
+- Fatores contextuais (forma, H2H, patch)
+- Recomendações baseadas em confiança
 
-## 🏗️ Arquitetura do Sistema
+## 🎯 Características
 
-```
-bot/
-├── api_clients/           # Integração com APIs externas
-│   ├── riot_api_client.py    # Cliente da API da Riot Games
-│   └── the_odds_api_client.py # Cliente da The Odds API
-│
-├── core_logic/            # Lógica principal de análise
-│   ├── game_analyzer.py      # Análise de eventos cruciais
-│   ├── prediction_system.py  # Sistema de predição ML
-│   └── units_system.py       # Sistema de unidades profissional
-│
-├── telegram_bot/          # Interface do Telegram
-│   ├── bot_interface.py      # Comandos e handlers
-│   ├── alerts_system.py      # Sistema de alertas automáticos
-│   └── user_preferences.py   # Preferências do usuário
-│
-├── systems/               # Sistemas operacionais
-│   ├── tips_system.py        # Motor principal de tips
-│   └── schedule_manager.py   # Gerenciamento de cronograma
-│
-├── utils/                 # Utilitários compartilhados
-│   ├── constants.py          # Constantes globais
-│   ├── helpers.py            # Funções auxiliares
-│   └── logger_config.py      # Configuração de logs
-│
-└── web/                   # Interface web (health check)
-    └── app.py                # Rotas Flask
-```
+### Gestão de Risco
+- 5 níveis de risco (minimal, low, medium, high, extreme)
+- Kelly Criterion para sizing
+- Limites automáticos de proteção
+- Controle de drawdown
 
-## 🔄 Fluxo Operacional
+### Análise Profissional
+- 10 critérios de avaliação por time
+- Comparação entre múltiplas casas
+- Expected Value mínimo configurável
+- Análise contextual completa
 
-O sistema executa um ciclo principal a cada **3 minutos**:
+### Interface Intuitiva
+- Bot Telegram responsivo
+- Menus interativos
+- Feedback em tempo real
+- Comandos simples e diretos
 
-1. **Busca partidas ao vivo** de 16 endpoints globais
-2. **Filtra partidas em andamento** e remove duplicatas
-3. **Valida dados completos** (draft, stats, timing)
-4. **Executa predição ML/algorítmica** (confiança + probabilidade)
-5. **Busca odds reais** de casas de apostas
-6. **Calcula Expected Value** (fórmula EV)
-7. **Valida critérios profissionais** (EV ≥ 5%, confiança ≥ 70%)
-8. **Calcula unidades** (sistema 0.5-5.0)
-9. **Gera tip formatada** com template profissional
-10. **Envia alertas** para grupos registrados
-11. **Registra histórico** para análise de performance
+## 📈 Deploy no Railway
 
-## 📊 Sistema de Unidades
+### Configuração
+1. Conectar repositório ao Railway
+2. Configurar variável `TELEGRAM_BOT_TOKEN`
+3. Deploy automático
 
-O bot utiliza o **sistema profissional de unidades**:
+### Health Check
+- Endpoint `/health` disponível
+- Monitoramento automático
+- Logs detalhados
 
-- **1 unidade = 1% do bankroll**
-- **Escala**: 0.5 a 5.0 unidades
-- **Critérios**:
-  - 90%+ confiança + 15%+ EV = **5.0 unidades** (Risco Muito Alto)
-  - 85%+ confiança + 12%+ EV = **4.0 unidades** (Risco Alto)
-  - 80%+ confiança + 10%+ EV = **3.0 unidades** (Risco Alto)
-  - 75%+ confiança + 8%+ EV = **2.5 unidades** (Risco Médio-Alto)
-  - 70%+ confiança + 6%+ EV = **2.0 unidades** (Risco Médio)
-  - 65%+ confiança + 5%+ EV = **1.0 unidades** (Risco Baixo)
+## 🔒 Segurança
 
-## 🔧 Health Check
+- Dados locais em JSON
+- Sem conexão com APIs de apostas
+- Sistema de análise independente
+- Controle total do usuário
 
-O sistema inclui um servidor Flask para monitoramento:
+## 📝 Versão
 
-- **`/health`** - Status completo do sistema
-- **`/ping`** - Teste básico de conectividade
-- **`/`** - Informações gerais
+**v1.4.0** - Sistema Completo Integrado
+- ✅ 4 componentes funcionais
+- ✅ Bot Telegram completo
+- ✅ Deploy Railway pronto
+- ✅ Interface limpa e focada
 
-## 📈 Critérios de Qualidade
+## 🎮 Foco
 
-Uma tip é considerada **profissional** quando atende:
-
-- ✅ **Confiança**: ≥ 70%
-- ✅ **Expected Value**: ≥ 5%
-- ✅ **Odds range**: 1.30 - 3.50
-- ✅ **Dados completos**: Draft + stats + timing
-- ✅ **Liga reconhecida**: Tier 1/2/3
-- ✅ **Timing adequado**: Não muito cedo/tarde
-
-## 🤝 Contribuição
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -am 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
-
-## 🆘 Suporte
-
-- 📧 **Email**: seu-email@example.com
-- 💬 **Telegram**: @seu_usuario
-- 🐛 **Issues**: [GitHub Issues](https://github.com/seu-usuario/lol_bot_v3_ultra_advanced/issues)
+Sistema desenvolvido especificamente para:
+- Apostas pessoais em League of Legends
+- Análise manual de value bets
+- Gestão profissional de bankroll
+- Previsões pós-draft de composições
 
 ---
 
-**⚡ Desenvolvido para profissionais que levam apostas esportivas a sério** 
+**Desenvolvido para auxílio em apostas pessoais. Use com responsabilidade.**

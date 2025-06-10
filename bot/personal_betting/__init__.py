@@ -9,6 +9,29 @@ from .value_analyzer import ManualValueAnalyzer, create_default_analyzer
 from .betting_tracker import BettingTracker, create_default_tracker
 from .pre_game_analyzer import PreGameAnalyzer, create_default_pre_game_analyzer
 
+class PersonalBettingSystem:
+    """Sistema integrado de apostas pessoais"""
+    
+    def __init__(self, initial_bankroll: float = 1000.0):
+        self.bankroll_manager = create_default_manager(initial_bankroll)
+        self.value_analyzer = create_default_analyzer()
+        self.betting_tracker = create_default_tracker()
+        self.pre_game_analyzer = create_default_pre_game_analyzer()
+        self.version = "1.4.0"
+    
+    def get_status(self):
+        """Retorna status do sistema"""
+        return {
+            'version': self.version,
+            'bankroll': self.bankroll_manager.settings.current_bankroll,
+            'components': {
+                'bankroll_manager': 'active',
+                'value_analyzer': 'active', 
+                'betting_tracker': 'active',
+                'pre_game_analyzer': 'active'
+            }
+        }
+
 __all__ = [
     'PersonalBankrollManager',
     'create_default_manager',
@@ -17,7 +40,8 @@ __all__ = [
     'BettingTracker',
     'create_default_tracker',
     'PreGameAnalyzer',
-    'create_default_pre_game_analyzer'
+    'create_default_pre_game_analyzer',
+    'PersonalBettingSystem'
 ]
 
 def create_integrated_betting_system(initial_bankroll: float = 1000.0):
@@ -31,10 +55,7 @@ def create_integrated_betting_system(initial_bankroll: float = 1000.0):
     bankroll_manager = create_default_manager(initial_bankroll)
     value_analyzer = create_default_analyzer()
     betting_tracker = create_default_tracker()
-    pre_game_analyzer = create_default_pre_game_analyzer(
-        bankroll_manager=bankroll_manager,
-        value_analyzer=value_analyzer
-    )
+    pre_game_analyzer = create_default_pre_game_analyzer()
     
     # Sistema integrado
     system = {
