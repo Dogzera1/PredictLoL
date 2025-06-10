@@ -406,22 +406,27 @@ SUPPORTED_LEAGUES = {
     "LoL", "League of Legends", "Esports", "Gaming", "Electronic Sports"
 }
 
-# Thresholds para sistema de predição - OTIMIZADOS para odds altas e valor
+# Thresholds para sistema de predição - OTIMIZADOS PARA COMPOSIÇÕES PÓS-DRAFT
 PREDICTION_THRESHOLDS = {
-    "min_confidence": 0.45,          # Reduzido para permitir mais tips  
-    "min_ev": 0.03,                  # EV mínimo 3% para aceitar apostas
-    "min_odds": 1.50,                # Odds mínima 1.5x conforme solicitado
-    "max_odds": 8.00,                # Aumentado para incluir odds altas valiosas
-    "min_game_time": 0,              # Permitir desde o draft/início
-    "min_data_quality": 0.05,        # Aceitar dados básicos
+    "min_confidence": 0.35,          # REDUZIDO: Composições podem ter valor mesmo com menor confiança  
+    "min_ev": 0.01,                  # REDUZIDO: EV mínimo 1% para aceitar tips baseadas em análise
+    "min_odds": 1.40,                # REDUZIDO: Aceitar odds menores para análises sólidas
+    "max_odds": 10.00,               # AUMENTADO: Permitir odds muito altas com valor
+    "min_game_time": 0,              # PERMITIR: Tips desde draft completo (tempo 0)
+    "min_data_quality": 0.30,        # AJUSTADO: Aceitar qualidade razoável para composições
     "cache_time_minutes": 10,        # Cache de predições
-    "ml_confidence_threshold": 0.45,  # Threshold ML
+    "ml_confidence_threshold": 0.35,  # REDUZIDO: Threshold ML para composições
     "hybrid_weight_ml": 0.6,         # Peso do ML no método híbrido
     "hybrid_weight_algo": 0.4,       # Peso dos algoritmos no híbrido
     # Configurações específicas para odds altas
-    "high_odds_threshold": 4.0,      # Odds consideradas "altas"
-    "high_odds_min_ev": 3.0,         # EV mínimo para odds altas (3%)
-    "high_odds_confidence_penalty": 0.1  # Redução de confiança para odds altas
+    "high_odds_threshold": 3.5,      # REDUZIDO: Odds altas começam em 3.5x
+    "high_odds_min_ev": 2.0,         # REDUZIDO: EV mínimo para odds altas (2%)
+    "high_odds_confidence_penalty": 0.05,  # REDUZIDO: Penalidade menor para odds altas
+    # NOVOS: Configurações específicas para análise de composições
+    "composition_min_confidence": 0.30,    # Confiança mínima para tips baseadas em composições
+    "composition_bonus_ev": 0.02,          # Bônus de EV para tips com análise de composição sólida
+    "draft_complete_bonus": 0.05,          # Bônus de confiança para tips pós-draft completo
+    "post_draft_timing_window": 300        # Janela de 5 minutos pós-draft para tips prioritárias
 }
 
 # Pesos para modelo ML simulado

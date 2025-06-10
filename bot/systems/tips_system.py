@@ -369,10 +369,9 @@ class ProfessionalTipsSystem:
             return False
         
         # 3. NOVO: Verificação de draft completo - APENAS TIPS APÓS DRAFT FECHADO
-        # Temporariamente desabilitado para corrigir erro de sintaxe
-        # # if not await self._is_draft_complete(match):
-        #     # logger.debug(f"Draft incompleto - aguardando fechamento do draft: {match.match_id}")
-        #     return False
+        if not await self._is_draft_complete(match):
+            logger.debug(f"Draft incompleto - aguardando fechamento do draft: {match.match_id}")
+            return False
         
         # 4. Tempo de jogo - AJUSTADO para tips pós-draft (0-2 minutos após draft)
         game_minutes = match.get_game_time_minutes()
@@ -383,10 +382,9 @@ class ProfessionalTipsSystem:
             return False
         
         # Se tem tempo 0 mas draft completo, é o momento ideal para tip
-        # Temporariamente desabilitado para corrigir erro de sintaxe
-        # # if game_minutes == 0.0 and await self._is_draft_complete(match):
-        #     # logger.debug(f"Momento ideal: draft completo, jogo começando")
-        #     return True
+        if game_minutes == 0.0 and await self._is_draft_complete(match):
+            logger.debug(f"Momento ideal: draft completo, jogo começando")
+            return True
         
         # 5. Qualidade dos dados - CRITÉRIOS RIGOROSOS PARA TIPS PROFISSIONAIS
         data_quality = match.calculate_data_quality()

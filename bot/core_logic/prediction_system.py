@@ -172,7 +172,14 @@ class DynamicPredictionSystem:
             game_analysis = await self.game_analyzer.analyze_live_match(match_data)
             
             # **NOVO: Análise de composições**
-            composition_analysis = await self._analyze_team_compositions(match_data)
+            try:
+                composition_analysis = await self._analyze_team_compositions(match_data)
+                # Garante que sempre há um score, mesmo básico
+                if composition_analysis.get("composition_score", 0) == 0:
+                    composition_analysis["composition_score"] = 5.0  # Score neutro padrão
+            except Exception as e:
+                logger.warning(f"Erro na análise de composições: {e}")
+                composition_analysis = {"composition_score": 5.0, "error": str(e)}
             
             # **NOVO: Análise de patch/meta**
             patch_analysis = await self._analyze_patch_impact(match_data)
@@ -297,13 +304,29 @@ class DynamicPredictionSystem:
             # Calcula expected value
             ev_percentage = self._calculate_expected_value(predicted_probability, predicted_odds)
             
-            # Validação inicial de critérios
+            # NOVO: Analisa composições se disponível
+            try:
+                composition_analysis = await self._analyze_team_compositions(match_data)
+                # Garante que sempre há um score
+                if composition_analysis.get("composition_score", 0) == 0:
+                    composition_analysis["composition_score"] = 5.0  # Score neutro padrão
+                has_composition_analysis = composition_analysis.get("composition_score", 0) >= 5.0
+                composition_quality = composition_analysis.get("composition_score", 5.0)
+            except Exception as e:
+                logger.warning(f"Erro na análise de composições: {e}")
+                composition_analysis = {"composition_score": 5.0}
+                has_composition_analysis = True
+                composition_quality = 5.0
+            
+            # Validação inicial de critérios (APRIMORADA COM COMPOSIÇÕES)
             validation_result = self._validate_tip_criteria(
                 confidence=predicted_probability,
                 ev_percentage=ev_percentage,
                 odds=predicted_odds,
                 game_time=match_data.game_time_seconds,
-                data_quality=prediction_result.data_quality
+                data_quality=prediction_result.data_quality,
+                has_composition_analysis=has_composition_analysis,
+                composition_quality=composition_quality
             )
             
             if not validation_result["is_valid"]:
@@ -858,19 +881,42 @@ class DynamicPredictionSystem:
         ev_percentage: float, 
         odds: float,
         game_time: int,
-        data_quality: float
+        data_quality: float,
+        has_composition_analysis: bool = False,
+        composition_quality: float = 0.0
     ) -> Dict[str, Any]:
-        """Valida se tip atende aos critérios mínimos - APRIMORADO para odds altas"""
+        """Valida se tip atende aos critérios mínimos - OTIMIZADO PARA COMPOSIÇÕES PÓS-DRAFT"""
         
         # Importa thresholds das constantes
         from ..utils.constants import PREDICTION_THRESHOLDS
         
         # Detecta se são odds altas
-        is_high_odds = odds >= PREDICTION_THRESHOLDS.get("high_odds_threshold", 4.0)
+        is_high_odds = odds >= PREDICTION_THRESHOLDS.get("high_odds_threshold", 3.5)
         
-        # Critérios padrão
-        meets_confidence = confidence >= PREDICTION_THRESHOLDS["min_confidence"]
-        meets_ev = ev_percentage >= PREDICTION_THRESHOLDS["min_ev"]
+        # NOVA LÓGICA: Bônus para análise de composições pós-draft
+        is_post_draft = game_time <= PREDICTION_THRESHOLDS.get("post_draft_timing_window", 300)
+        composition_bonus = 0.0
+        
+        if has_composition_analysis and composition_quality > 6.0:  # Score > 6.0/10 é bom
+            composition_bonus = PREDICTION_THRESHOLDS.get("composition_bonus_ev", 0.02)
+            logger.info(f"🎮 BÔNUS COMPOSIÇÃO: +{composition_bonus:.1%} EV por análise sólida")
+        
+        if is_post_draft:
+            draft_bonus = PREDICTION_THRESHOLDS.get("draft_complete_bonus", 0.05)
+            confidence += draft_bonus
+            logger.info(f"📋 BÔNUS PÓS-DRAFT: +{draft_bonus:.1%} confiança")
+        
+        # Aplica bônus de composição ao EV
+        adjusted_ev = ev_percentage + (composition_bonus * 100)  # Converte para percentual
+        
+        # Critérios base (ajustados para composições)
+        base_confidence_threshold = PREDICTION_THRESHOLDS["min_confidence"]
+        if has_composition_analysis:
+            base_confidence_threshold = PREDICTION_THRESHOLDS.get("composition_min_confidence", 0.30)
+            logger.info(f"🎯 THRESHOLD COMPOSIÇÃO: Confiança mínima {base_confidence_threshold:.1%}")
+        
+        meets_confidence = confidence >= base_confidence_threshold
+        meets_ev = adjusted_ev >= PREDICTION_THRESHOLDS["min_ev"]
         meets_odds = PREDICTION_THRESHOLDS["min_odds"] <= odds <= PREDICTION_THRESHOLDS["max_odds"]
         meets_timing = game_time >= PREDICTION_THRESHOLDS["min_game_time"]
         meets_quality = data_quality >= PREDICTION_THRESHOLDS["min_data_quality"]
