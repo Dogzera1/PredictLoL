@@ -65,13 +65,12 @@ class PredictLoLBot:
         try:
             await self.initialize()
             
-            # Inicia bot Telegram
+            # Bot Telegram usa run_polling diretamente
             if self.telegram_bot:
+                logger.info("🤖 Iniciando Bot Telegram...")
+                self.is_running = True
+                # O bot irá rodar com run_polling que é bloqueante, então precisa ser chamado diretamente
                 await self.telegram_bot.start()
-                logger.info("🤖 Bot Telegram iniciado e funcionando")
-            
-            self.is_running = True
-            logger.info("🎯 PredictLoL System ATIVO e funcionando!")
             
         except Exception as e:
             logger.error(f"❌ Erro ao iniciar sistema: {e}")

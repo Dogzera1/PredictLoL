@@ -91,17 +91,13 @@ class PredictLoLTelegramBot:
             return
         
         try:
-            await self.app.initialize()
-            await self.app.start()
-            
-            # Inicia polling com configurações seguras
-            await self.app.updater.start_polling(
+            # Usar run_polling ao invés de start_polling para versão 20.x
+            await self.app.run_polling(
                 poll_interval=2.0,
                 timeout=10,
                 read_timeout=10,
                 write_timeout=10,
-                connect_timeout=10,
-                pool_timeout=10
+                connect_timeout=10
             )
             
             self.is_running = True
@@ -117,8 +113,6 @@ class PredictLoLTelegramBot:
             return
         
         try:
-            if self.app and self.app.updater:
-                await self.app.updater.stop()
             if self.app:
                 await self.app.stop()
                 await self.app.shutdown()
