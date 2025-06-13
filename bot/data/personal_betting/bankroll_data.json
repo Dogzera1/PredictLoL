@@ -1,7 +1,7 @@
 {
   "settings": {
-    "initial_bankroll": 1000.0,
-    "current_bankroll": 1000.0,
+    "initial_bankroll": 1500.0,
+    "current_bankroll": 1500.0,
     "daily_limit_percentage": 15.0,
     "max_bet_percentage": 8.0,
     "kelly_multiplier": 0.3,
@@ -184,5 +184,5 @@
       "notes": ""
     }
   ],
-  "last_updated": "2025-06-09T22:34:56.284798"
+  "last_updated": "2025-06-12T22:37:27.702239"
 }

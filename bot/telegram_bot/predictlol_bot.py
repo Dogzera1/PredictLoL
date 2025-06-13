@@ -143,8 +143,15 @@ Use /menu para ver todas as opções ou /help para ajuda detalhada.
         
         keyboard = [
             [InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")],
-            [InlineKeyboardButton("💰 Bankroll", callback_data="bankroll_menu")],
-            [InlineKeyboardButton("🎮 Análise", callback_data="analysis_menu")]
+            [
+                InlineKeyboardButton("💰 Bankroll", callback_data="bankroll_menu"),
+                InlineKeyboardButton("🎮 Análise", callback_data="analysis_menu")
+            ],
+            [
+                InlineKeyboardButton("📈 Tracker", callback_data="tracker_menu"),
+                InlineKeyboardButton("🔧 Ferramentas", callback_data="tools_menu")
+            ],
+            [InlineKeyboardButton("❓ Ajuda", callback_data="help_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -191,28 +198,48 @@ Use /menu para ver todas as opções ou /help para ajuda detalhada.
 **Sistema Kelly Criterion + Risk Management ativo!**
         """
         
-        await update.message.reply_text(help_text, parse_mode='Markdown')
-    
-    async def _menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Comando /menu"""
         keyboard = [
             [
-                InlineKeyboardButton("💰 Bankroll", callback_data="bankroll_menu"),
-                InlineKeyboardButton("📊 Análise", callback_data="analysis_menu")
+                InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu"),
+                InlineKeyboardButton("🎯 Começar", callback_data="quick_start")
             ],
             [
-                InlineKeyboardButton("📈 Tracker", callback_data="tracker_menu"),
-                InlineKeyboardButton("🎮 Previsões", callback_data="predictions_menu")
-            ],
-            [
-                InlineKeyboardButton("⚙️ Configurações", callback_data="settings_menu"),
-                InlineKeyboardButton("❓ Ajuda", callback_data="help_menu")
+                InlineKeyboardButton("💰 Configurar Bankroll", callback_data="config_bankroll"),
+                InlineKeyboardButton("🎮 Análise Rápida", callback_data="quick_analysis")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            "🎯 **Menu Principal PredictLoL**\n\nEscolha uma opção:",
+            help_text, 
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Comando /menu"""
+        keyboard = [
+            [
+                InlineKeyboardButton("💰 Bankroll & Configuração", callback_data="bankroll_menu"),
+                InlineKeyboardButton("📊 Análise de Matches", callback_data="analysis_menu")
+            ],
+            [
+                InlineKeyboardButton("📈 Performance Tracker", callback_data="tracker_menu"),
+                InlineKeyboardButton("💸 Gestão de Apostas", callback_data="betting_menu")
+            ],
+            [
+                InlineKeyboardButton("🎮 Previsões Pós-Draft", callback_data="predictions_menu"),
+                InlineKeyboardButton("🔧 Ferramentas", callback_data="tools_menu")
+            ],
+            [
+                InlineKeyboardButton("❓ Ajuda", callback_data="help_menu"),
+                InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            "🎯 **Menu Principal PredictLoL**\n\nEscolha uma categoria:",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
@@ -246,8 +273,15 @@ Use /menu para ver todas as opções ou /help para ajuda detalhada.
             """
             
             keyboard = [
-                [InlineKeyboardButton("📊 Fazer Análise", callback_data="start_analysis")],
-                [InlineKeyboardButton("📈 Ver Tracker", callback_data="show_tracker")]
+                [
+                    InlineKeyboardButton("⚙️ Configurar", callback_data="config_bankroll"),
+                    InlineKeyboardButton("🎲 Simular", callback_data="simulate_bet")
+                ],
+                [
+                    InlineKeyboardButton("📊 Análise", callback_data="quick_analysis"),
+                    InlineKeyboardButton("📈 Tracker", callback_data="show_tracker")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -309,8 +343,14 @@ Use `/apostar` se encontrar value!
             """
             
             keyboard = [
-                [InlineKeyboardButton("💰 Calcular Aposta", callback_data=f"calc_{team1}")],
-                [InlineKeyboardButton("🎯 Nova Análise", callback_data="new_analysis")]
+                [
+                    InlineKeyboardButton("💰 Calcular Aposta", callback_data=f"calc_{team1}"),
+                    InlineKeyboardButton("🎯 Nova Análise", callback_data="quick_analysis")
+                ],
+                [
+                    InlineKeyboardButton("💸 Registrar Aposta", callback_data="register_bet"),
+                    InlineKeyboardButton("📊 Menu Principal", callback_data="main_menu")
+                ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -400,8 +440,15 @@ Use `/apostar` se encontrar value!
             """
             
             keyboard = [
-                [InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tracker")],
-                [InlineKeyboardButton("📊 Análise Detalhada", callback_data="detailed_analysis")]
+                [
+                    InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tracker"),
+                    InlineKeyboardButton("📈 Tracker Completo", callback_data="tracker_full")
+                ],
+                [
+                    InlineKeyboardButton("💰 Ver Bankroll", callback_data="bankroll_menu"),
+                    InlineKeyboardButton("📊 Nova Análise", callback_data="quick_analysis")
+                ],
+                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -757,16 +804,180 @@ Sistema baseado em dados históricos e forma atual dos times.
         data = query.data
         
         try:
+            # Menu principal
             if data == "main_menu":
                 await self._show_main_menu(query)
+            elif data == "refresh_menu":
+                await self._show_main_menu(query)
+                
+            # Menus de categoria
             elif data == "bankroll_menu":
+                await self._show_bankroll_menu(query)
+            elif data == "analysis_menu":
+                await self._show_analysis_menu(query)
+            elif data == "tracker_menu":
+                await self._show_tracker_menu(query)
+            elif data == "betting_menu":
+                await self._show_betting_menu(query)
+            elif data == "predictions_menu":
+                await self._show_predictions_menu(query)
+            elif data == "tools_menu":
+                await self._show_tools_menu(query)
+            elif data == "help_menu":
+                await self._show_help_menu(query)
+                
+            # Ações específicas do bankroll
+            elif data == "show_bankroll_status":
                 await self._show_bankroll_status(query)
+            elif data == "config_bankroll":
+                await query.edit_message_text(
+                    "💰 **Configurar Bankroll**\n\n"
+                    "Use o comando: `/config_bankroll <valor>`\n\n"
+                    "Exemplo: `/config_bankroll 1500`",
+                    parse_mode='Markdown'
+                )
+            elif data == "simulate_bet":
+                await query.edit_message_text(
+                    "🎲 **Simulador de Aposta**\n\n"
+                    "Use o comando: `/simular_aposta <confiança> <odds>`\n\n"
+                    "Exemplo: `/simular_aposta 75 1.85`",
+                    parse_mode='Markdown'
+                )
+                
+            # Ações do tracker
             elif data == "show_tracker":
                 await self._show_tracker_dashboard(query)
             elif data == "refresh_tracker":
                 await self._show_tracker_dashboard(query)
+            elif data == "tracker_full":
+                await query.edit_message_text(
+                    "📈 **Tracker Completo**\n\n"
+                    "Use o comando: `/tracker_full`\n\n"
+                    "Isso mostrará dashboard completo com gráficos.",
+                    parse_mode='Markdown'
+                )
+                
+            # Ações de análise
+            elif data == "quick_analysis":
+                await query.edit_message_text(
+                    "⚡ **Análise Rápida**\n\n"
+                    "Use o comando: `/analisar <time1> vs <time2>`\n\n"
+                    "Exemplo: `/analisar T1 vs Gen.G`",
+                    parse_mode='Markdown'
+                )
+            elif data == "post_draft_prediction":
+                await query.edit_message_text(
+                    "🎮 **Previsão Pós-Draft**\n\n"
+                    "Use o comando: `/prever <time1> vs <time2>`\n\n"
+                    "Exemplo: `/prever T1 vs Gen.G`",
+                    parse_mode='Markdown'
+                )
+                
+            # Ações de apostas
+            elif data == "register_bet":
+                await query.edit_message_text(
+                    "💸 **Registrar Aposta**\n\n"
+                    "Use o comando: `/apostar <valor> <odds> <descrição>`\n\n"
+                    "Exemplo: `/apostar 50 1.85 T1 vs Gen.G - T1 vencer`",
+                    parse_mode='Markdown'
+                )
+            elif data == "betting_dashboard":
+                await query.edit_message_text(
+                    "📊 **Dashboard de Apostas**\n\n"
+                    "Use o comando: `/dashboard`\n\n"
+                    "Mostra resumo completo das suas apostas.",
+                    parse_mode='Markdown'
+                )
+            elif data == "betting_history":
+                await query.edit_message_text("📋 Histórico de apostas em desenvolvimento...")
+            elif data == "betting_stats":
+                await query.edit_message_text("💹 Estatísticas de ROI em desenvolvimento...")
+                
+            # Ações de ferramentas
+            elif data == "kelly_calculator":
+                await query.edit_message_text(
+                    "🧮 **Calculadora Kelly**\n\n"
+                    "Use o comando: `/simular_aposta <confiança> <odds>`\n\n"
+                    "Exemplo: `/simular_aposta 75 1.85`",
+                    parse_mode='Markdown'
+                )
+            elif data == "odds_converter":
+                await query.edit_message_text("💱 Conversor de odds em desenvolvimento...")
+            elif data == "ev_comparator":
+                await query.edit_message_text("📊 Comparador de EV em desenvolvimento...")
+            elif data == "stake_calculator":
+                await query.edit_message_text("🎯 Calculadora de stake em desenvolvimento...")
+            elif data == "betting_simulator":
+                await query.edit_message_text("📈 Simulador de apostas em desenvolvimento...")
+            elif data == "value_finder":
+                await query.edit_message_text("🔍 Localizador de value em desenvolvimento...")
+                
+            # Ações de análise expandidas
+            elif data == "full_analysis":
+                await query.edit_message_text(
+                    "📈 **Análise Completa**\n\n"
+                    "Use o comando: `/analisar <time1> vs <time2>`\n\n"
+                    "Exemplo: `/analisar T1 vs Gen.G`",
+                    parse_mode='Markdown'
+                )
+            elif data == "value_analysis":
+                await query.edit_message_text("💰 Análise de value em desenvolvimento...")
+            elif data == "odds_comparison":
+                await query.edit_message_text("🔍 Comparação de odds em desenvolvimento...")
+                
+            # Ações do tracker expandidas
+            elif data == "tracker_charts":
+                await query.edit_message_text("📉 Gráficos do tracker em desenvolvimento...")
+            elif data == "tracker_report":
+                await query.edit_message_text("📋 Relatório do tracker em desenvolvimento...")
+                
+            # Ações de previsões expandidas
+            elif data == "composition_analysis":
+                await query.edit_message_text("📊 Análise de composição em desenvolvimento...")
+            elif data == "head_to_head":
+                await query.edit_message_text("⚔️ Análise head-to-head em desenvolvimento...")
+            elif data == "trends_analysis":
+                await query.edit_message_text("📈 Análise de tendências em desenvolvimento...")
+                
+            # Ações de ajuda
+            elif data == "help_commands":
+                await query.edit_message_text(
+                    "📚 **Lista de Comandos**\n\n"
+                    "Use `/help` para ver todos os comandos disponíveis.\n\n"
+                    "Comandos principais:\n"
+                    "• `/menu` - Menu interativo\n"
+                    "• `/bankroll` - Status do bankroll\n"
+                    "• `/analisar` - Análise de matches\n"
+                    "• `/apostar` - Registrar aposta\n"
+                    "• `/tracker` - Performance dashboard",
+                    parse_mode='Markdown'
+                )
+            elif data == "help_usage":
+                await query.edit_message_text("❓ Guia de uso em desenvolvimento...")
+            elif data == "help_strategies":
+                await query.edit_message_text("🎯 Guia de estratégias em desenvolvimento...")
+            elif data == "help_setup":
+                await query.edit_message_text("⚙️ Guia de configuração em desenvolvimento...")
+            elif data == "help_support":
+                await query.edit_message_text("🆘 Suporte técnico em desenvolvimento...")
+            elif data == "quick_start":
+                await query.edit_message_text(
+                    "🎯 **Início Rápido**\n\n"
+                    "1. Configure seu bankroll: `/config_bankroll 1500`\n"
+                    "2. Analise um match: `/analisar T1 vs Gen.G`\n"
+                    "3. Registre uma aposta: `/apostar 50 1.85 descrição`\n"
+                    "4. Acompanhe performance: `/tracker`\n\n"
+                    "Use `/menu` para acesso completo!",
+                    parse_mode='Markdown'
+                )
+                
+            # Callbacks específicos de análise
             elif data.startswith("analyze_value_"):
                 await query.edit_message_text("📊 Funcionalidade de análise em desenvolvimento...")
+            elif data.startswith("full_analysis_"):
+                await query.edit_message_text("📈 Análise completa em desenvolvimento...")
+                
+            # Callback genérico
             else:
                 await query.edit_message_text("🔧 Funcionalidade em desenvolvimento...")
                 
@@ -794,26 +1005,53 @@ Sistema baseado em dados históricos e forma atual dos times.
         """Mostra menu principal via callback"""
         keyboard = [
             [
-                InlineKeyboardButton("💰 Bankroll", callback_data="bankroll_menu"),
-                InlineKeyboardButton("📊 Análise", callback_data="analysis_menu")
+                InlineKeyboardButton("💰 Bankroll & Configuração", callback_data="bankroll_menu"),
+                InlineKeyboardButton("📊 Análise de Matches", callback_data="analysis_menu")
             ],
             [
-                InlineKeyboardButton("📈 Tracker", callback_data="show_tracker"),
-                InlineKeyboardButton("🎮 Previsões", callback_data="predictions_menu")
+                InlineKeyboardButton("📈 Performance Tracker", callback_data="tracker_menu"),
+                InlineKeyboardButton("💸 Gestão de Apostas", callback_data="betting_menu")
             ],
             [
-                InlineKeyboardButton("⚙️ Configurações", callback_data="settings_menu"),
-                InlineKeyboardButton("❓ Ajuda", callback_data="help_menu")
+                InlineKeyboardButton("🎮 Previsões Pós-Draft", callback_data="predictions_menu"),
+                InlineKeyboardButton("🔧 Ferramentas", callback_data="tools_menu")
+            ],
+            [
+                InlineKeyboardButton("❓ Ajuda", callback_data="help_menu"),
+                InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_menu")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "🎯 **Menu Principal PredictLoL**\n\nEscolha uma opção:",
+            "🎯 **Menu Principal PredictLoL**\n\nEscolha uma categoria:",
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
     
+    async def _show_bankroll_menu(self, query):
+        """Mostra menu do bankroll via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("💰 Status do Bankroll", callback_data="show_bankroll_status"),
+                InlineKeyboardButton("⚙️ Configurar Bankroll", callback_data="config_bankroll")
+            ],
+            [
+                InlineKeyboardButton("🎲 Simulador de Aposta", callback_data="simulate_bet"),
+                InlineKeyboardButton("📊 Calcular Kelly", callback_data="kelly_calculator")
+            ],
+            [
+                InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "💰 **Menu Bankroll & Configuração**\n\nEscolha uma opção:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+
     async def _show_bankroll_status(self, query):
         """Mostra status do bankroll via callback"""
         if not self.personal_betting:
@@ -841,9 +1079,9 @@ Sistema baseado em dados históricos e forma atual dos times.
             """
             
             keyboard = [
-                [InlineKeyboardButton("📊 Fazer Análise", callback_data="start_analysis")],
-                [InlineKeyboardButton("📈 Ver Tracker", callback_data="show_tracker")],
-                [InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")]
+                [InlineKeyboardButton("⚙️ Configurar", callback_data="config_bankroll")],
+                [InlineKeyboardButton("🎲 Simular Aposta", callback_data="simulate_bet")],
+                [InlineKeyboardButton("🔙 Menu Bankroll", callback_data="bankroll_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -856,6 +1094,150 @@ Sistema baseado em dados históricos e forma atual dos times.
         except Exception as e:
             logger.error(f"Erro no comando bankroll: {e}")
             await query.edit_message_text(f"❌ Erro ao obter status: {e}")
+    
+    async def _show_analysis_menu(self, query):
+        """Mostra menu de análise via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("⚡ Análise Rápida", callback_data="quick_analysis"),
+                InlineKeyboardButton("📈 Análise Completa", callback_data="full_analysis")
+            ],
+            [
+                InlineKeyboardButton("💰 Análise de Value", callback_data="value_analysis"),
+                InlineKeyboardButton("🔍 Comparar Odds", callback_data="odds_comparison")
+            ],
+            [
+                InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "📊 **Menu Análise de Matches**\n\nEscolha o tipo de análise:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_tracker_menu(self, query):
+        """Mostra menu do tracker via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("📊 Dashboard Simples", callback_data="show_tracker"),
+                InlineKeyboardButton("📈 Dashboard Completo", callback_data="tracker_full")
+            ],
+            [
+                InlineKeyboardButton("📉 Gráficos", callback_data="tracker_charts"),
+                InlineKeyboardButton("📋 Relatório", callback_data="tracker_report")
+            ],
+            [
+                InlineKeyboardButton("🔄 Atualizar", callback_data="refresh_tracker"),
+                InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "📈 **Menu Performance Tracker**\n\nEscolha uma opção:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_betting_menu(self, query):
+        """Mostra menu de apostas via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("💸 Registrar Aposta", callback_data="register_bet"),
+                InlineKeyboardButton("📊 Dashboard", callback_data="betting_dashboard")
+            ],
+            [
+                InlineKeyboardButton("📋 Histórico de Apostas", callback_data="betting_history"),
+                InlineKeyboardButton("💹 ROI & Estatísticas", callback_data="betting_stats")
+            ],
+            [
+                InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "💸 **Menu Gestão de Apostas**\n\nEscolha uma opção:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_predictions_menu(self, query):
+        """Mostra menu de previsões via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("🎮 Previsão Pós-Draft", callback_data="post_draft_prediction"),
+                InlineKeyboardButton("📊 Análise de Composição", callback_data="composition_analysis")
+            ],
+            [
+                InlineKeyboardButton("⚔️ Head-to-Head", callback_data="head_to_head"),
+                InlineKeyboardButton("📈 Tendências", callback_data="trends_analysis")
+            ],
+            [
+                InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "🎮 **Menu Previsões Pós-Draft**\n\nEscolha uma opção:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_tools_menu(self, query):
+        """Mostra menu de ferramentas via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("🧮 Calculadora Kelly", callback_data="kelly_calculator"),
+                InlineKeyboardButton("💱 Conversor de Odds", callback_data="odds_converter")
+            ],
+            [
+                InlineKeyboardButton("📊 Comparador EV", callback_data="ev_comparator"),
+                InlineKeyboardButton("🎯 Stake Calculator", callback_data="stake_calculator")
+            ],
+            [
+                InlineKeyboardButton("📈 Simulador", callback_data="betting_simulator"),
+                InlineKeyboardButton("🔍 Value Finder", callback_data="value_finder")
+            ],
+            [
+                InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "🔧 **Menu Ferramentas**\n\nEscolha uma ferramenta:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+    
+    async def _show_help_menu(self, query):
+        """Mostra menu de ajuda via callback"""
+        keyboard = [
+            [
+                InlineKeyboardButton("📚 Comandos", callback_data="help_commands"),
+                InlineKeyboardButton("❓ Como Usar", callback_data="help_usage")
+            ],
+            [
+                InlineKeyboardButton("🎯 Estratégias", callback_data="help_strategies"),
+                InlineKeyboardButton("⚙️ Configuração", callback_data="help_setup")
+            ],
+            [
+                InlineKeyboardButton("🆘 Suporte", callback_data="help_support"),
+                InlineKeyboardButton("🔙 Menu Principal", callback_data="main_menu")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            "❓ **Menu de Ajuda**\n\nEscolha um tópico:",
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
     
     async def _show_tracker_dashboard(self, query):
         """Mostra dashboard do tracker via callback"""
