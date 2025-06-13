@@ -1602,6 +1602,89 @@
       "value_opportunities": [],
       "recommended_bet": "JDG",
       "reasoning": "\nAnálise automatizada recomenda JDG:\n• Probabilidade calculada: 55.1%\n• Confiança: 72.5%\n• Fatores principais: \n"
+    },
+    {
+      "id": "pregame_1749779191",
+      "date": "2025-06-12T22:46:31.980284",
+      "team1": "T1",
+      "team2": "Gen.G",
+      "league": "LCK",
+      "team1_stats": {
+        "name": "T1",
+        "league": "LCK",
+        "wins": 18,
+        "losses": 2,
+        "avg_game_duration": 37.0,
+        "avg_kills_per_game": 22.2,
+        "avg_deaths_per_game": 12.6,
+        "kill_death_ratio": 1.34,
+        "early_game_strength": 0.66,
+        "late_game_strength": 0.67,
+        "teamfight_rating": 0.76,
+        "macro_rating": 0.75,
+        "last_5_games": [
+          "W",
+          "W",
+          "W",
+          "W",
+          "W"
+        ],
+        "form_trend": "improving",
+        "roster_stability": 0.9,
+        "patch_adaptation": 0.67
+      },
+      "team2_stats": {
+        "name": "Gen.G",
+        "league": "LCK",
+        "wins": 15,
+        "losses": 5,
+        "avg_game_duration": 35.5,
+        "avg_kills_per_game": 21.0,
+        "avg_deaths_per_game": 13.5,
+        "kill_death_ratio": 1.25,
+        "early_game_strength": 0.6000000000000001,
+        "late_game_strength": 0.625,
+        "teamfight_rating": 0.7000000000000001,
+        "macro_rating": 0.675,
+        "last_5_games": [
+          "L",
+          "L",
+          "L",
+          "L",
+          "L"
+        ],
+        "form_trend": "declining",
+        "roster_stability": 0.9,
+        "patch_adaptation": 0.625
+      },
+      "head_to_head": {
+        "team1": "T1",
+        "team2": "Gen.G",
+        "team1_wins": 6,
+        "team2_wins": 0,
+        "total_games": 6,
+        "avg_game_duration": 31.333333333333332,
+        "last_meeting_date": "2025-06-09T22:01:25.429754",
+        "recent_trend": "team1_favored"
+      },
+      "patch_impact": "Patch tem impacto neutro - ambos os times se adaptam similarmente",
+      "match_importance": "regular",
+      "team1_win_probability": 0.7508088235294118,
+      "team2_win_probability": 0.2491911764705882,
+      "confidence_level": 0.8500000000000001,
+      "prediction_quality": "excellent",
+      "key_factors": [
+        "T1 em forma muito superior recentemente",
+        "T1 domina o H2H (6-0)",
+        "T1 melhorando enquanto Gen.G declina"
+      ],
+      "risk_factors": [],
+      "value_opportunities": [
+        "Time 1 com alta probabilidade (75.1%) e boa confiança",
+        "Alta confiança na análise - boa oportunidade"
+      ],
+      "recommended_bet": "T1",
+      "reasoning": "\nAnálise automatizada recomenda T1:\n• Probabilidade calculada: 75.1%\n• Confiança: 85.0%\n• Fatores principais: T1 em forma muito superior recentemente, T1 domina o H2H (6-0)\n"
     }
   ]
 }

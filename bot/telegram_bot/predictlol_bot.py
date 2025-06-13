@@ -15,6 +15,8 @@ from telegram.ext import (
     MessageHandler, filters, ContextTypes
 )
 
+from ..services.real_analysis_service import RealAnalysisService
+
 logger = logging.getLogger(__name__)
 
 class PredictLoLTelegramBot:
@@ -26,6 +28,9 @@ class PredictLoLTelegramBot:
         self.app = None
         self.is_running = False
         
+        # Serviço de análise real
+        self.analysis_service = None
+        
         # Usuários autorizados (você pode adicionar mais)
         self.authorized_users = set()
         
@@ -36,6 +41,9 @@ class PredictLoLTelegramBot:
         try:
             # Criar aplicação
             self.app = Application.builder().token(self.token).build()
+            
+            # Inicializar serviço de análise
+            self.analysis_service = RealAnalysisService()
             
             # Registrar handlers
             await self._register_handlers()
@@ -296,14 +304,15 @@ Use /menu para ver todas as opções ou /help para ajuda detalhada.
             await update.message.reply_text(f"❌ Erro ao obter status: {e}")
     
     async def _analisar_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Comando /analisar"""
+        """Comando /analisar - Agora usa dados reais da API"""
         args = context.args
         
         if not args:
             await update.message.reply_text(
                 "📊 **Análise de Match**\n\n"
                 "Use: `/analisar T1 vs Gen.G`\n"
-                "ou: `/analisar T1 Gen.G`",
+                "ou: `/analisar T1 Gen.G`\n\n"
+                "🔍 **Sistema usa dados reais da API LoL Esports**",
                 parse_mode='Markdown'
             )
             return
@@ -322,25 +331,49 @@ Use /menu para ver todas as opções ou /help para ajuda detalhada.
         team1, team2 = teams[0], teams[1]
         
         try:
-            await update.message.reply_text(f"🔍 Analisando {team1} vs {team2}...")
+            await update.message.reply_text(f"🔍 Analisando {team1} vs {team2} com dados reais...")
             
-            # Análise simulada (você pode conectar com o value analyzer real)
-            result_text = f"""
-📊 **Análise: {team1} vs {team2}**
+            # Usar serviço de análise real
+            async with self.analysis_service as service:
+                analysis = await service.analyze_match(team1, team2)
+            
+            if analysis["success"]:
+                # Análise com dados reais
+                team1_data = analysis["team1"]
+                team2_data = analysis["team2"]
+                
+                result_text = f"""
+📊 **Análise: {team1_data['name']} vs {team2_data['name']}**
 
-**Probabilidades Estimadas:**
-• {team1}: 65.0%
-• {team2}: 35.0%
+**Probabilidades (Dados Reais):**
+• {team1_data['name']}: {team1_data['probability']}%
+• {team2_data['name']}: {team2_data['probability']}%
 
 **Odds Sugeridas:**
-• {team1}: 1.80-1.85 (valor ideal)
-• {team2}: 2.20-2.50 (risco alto)
+• {team1_data['name']}: {team1_data['odds_range'][0]:.2f}-{team1_data['odds_range'][1]:.2f}
+• {team2_data['name']}: {team2_data['odds_range'][0]:.2f}-{team2_data['odds_range'][1]:.2f}
 
-**Recomendação:** Monitorar odds de {team1}
-**Confiança:** 75% (boa para análise)
+**Recomendação:** {analysis['recommendation']}
+**Confiança:** {analysis['confidence']}%
 
-Use `/apostar` se encontrar value!
-            """
+**Fonte:** {analysis['data_source'].upper()} ✅
+                """
+            else:
+                # Fallback quando dados não estão disponíveis
+                result_text = f"""
+📊 **Análise: {team1} vs {team2}**
+
+⚠️ **{analysis['analysis_details']['reason']}**
+
+**Probabilidades (Estimativa):**
+• {team1}: {analysis['team1']['probability']}%
+• {team2}: {analysis['team2']['probability']}%
+
+**Recomendação:** {analysis['recommendation']}
+**Sugestão:** {analysis['analysis_details']['suggestion']}
+
+**Fonte:** FALLBACK (dados limitados)
+                """
             
             keyboard = [
                 [
@@ -739,13 +772,14 @@ Use `/apostar` se encontrar value!
             await update.message.reply_text(f"❌ Erro: {e}")
     
     async def _prever_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Comando /prever - Previsões pós-draft"""
+        """Comando /prever - Previsões pós-draft com dados reais"""
         args = context.args
         
         if not args:
             await update.message.reply_text(
                 "🎮 **Previsão Pós-Draft**\n\n"
-                "Use: `/prever T1 vs Gen.G`",
+                "Use: `/prever T1 vs Gen.G`\n\n"
+                "🔍 **Sistema usa dados reais da API LoL Esports**",
                 parse_mode='Markdown'
             )
             return
@@ -760,23 +794,50 @@ Use `/apostar` se encontrar value!
         team1, team2 = teams[0], teams[1]
         
         try:
-            await update.message.reply_text(f"🔍 Gerando previsão para {team1} vs {team2}...")
+            await update.message.reply_text(f"🔍 Gerando previsão pós-draft para {team1} vs {team2}...")
             
-            result_text = f"""
-🎮 **Previsão: {team1} vs {team2}**
+            # Usar serviço de análise real para previsão pós-draft
+            async with self.analysis_service as service:
+                prediction = await service.predict_post_draft(team1, team2)
+            
+            if prediction["success"]:
+                # Previsão com dados reais
+                team1_data = prediction["team1"]
+                team2_data = prediction["team2"]
+                
+                result_text = f"""
+🎮 **Previsão: {team1_data['name']} vs {team2_data['name']}**
 
-**Probabilidades:**
-• {team1}: 72.5%
-• {team2}: 27.5%
+**Probabilidades (Dados Reais):**
+• {team1_data['name']}: {team1_data['probability']}%
+• {team2_data['name']}: {team2_data['probability']}%
 
-**Confiança:** 80.0%
-**Qualidade:** 8/10
+**Confiança:** {prediction['confidence']}%
+**Tipo:** {prediction.get('prediction_type', 'post_draft').upper()}
 
 **Análise:**
-Sistema baseado em dados históricos e forma atual dos times.
+{prediction['recommendation']}
 
-**Recomendação:** {team1} favorito - odds acima de 1.75 representam value
-            """
+**Fonte:** {prediction['data_source'].upper()} ✅
+                """
+            else:
+                # Fallback quando dados não estão disponíveis
+                result_text = f"""
+🎮 **Previsão: {team1} vs {team2}**
+
+⚠️ **{prediction['analysis_details']['reason']}**
+
+**Probabilidades (Estimativa):**
+• {team1}: {prediction['team1']['probability']}%
+• {team2}: {prediction['team2']['probability']}%
+
+**Confiança:** {prediction['confidence']}%
+
+**Recomendação:** {prediction['recommendation']}
+**Sugestão:** {prediction['analysis_details']['suggestion']}
+
+**Fonte:** FALLBACK (dados limitados)
+                """
             
             keyboard = [
                 [InlineKeyboardButton("📊 Análise Completa", callback_data=f"full_analysis_{team1}_{team2}")],
