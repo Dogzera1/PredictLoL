@@ -1,0 +1,11 @@
+# Force Redeploy Trigger
+# Timestamp: 1749807867
+# Data: Fri Jun 13 06:44:27 2025
+
+# Correcoes aplicadas:
+# Bot Telegram corrigido para python-telegram-bot v20.x
+# Comando /start funcionando
+# Compatibilidade com Railway
+# Polling configurado corretamente
+
+REDEPLOY_TRIGGER = 1749807867
